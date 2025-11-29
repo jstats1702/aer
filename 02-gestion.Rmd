@@ -1,0 +1,330 @@
+---
+title: "Gestión de datos relacionales"
+author: 
+- Juan Sosa PhD
+- Email   jcsosam@unal.edu.co
+- GitHub  https://github.com/jstats1702 
+date: ""
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cerulean
+    highlight: kate
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+---
+
+## Introducción
+
+**Conformación**, **almacenamiento** y **gestión** de datos relacionales:
+
+- Variables **diádicas**.
+- Variables **nodales**.
+- Variables **derivadas** (e.g., indicadoras de grupos).
+
+Un **grafo** por sí solo (una colección de vértices y aristas) suele ser insuficiente para representar todos los atributos una red.
+
+La **decoración** de un grafo corresponde a la **conjunción de vértices y aristas con otras variables** de interés (atributos).
+
+## Grafos
+
+Un **grafo** $G = (V, E)$ es una estructura que consiste de un conjunto de **vértices** (nodos) $V$ y de un conjunto de **aristas** (enlaces) $E$, donde los elementos de $E$ son parejas de la forma $e=\{u,v\}$, con $u,v\in V$. 
+
+El **número de vértices** $|V|$ y el **número de aristas** $|E|$ se conocen como el **orden** y el **tamaño** del grafo, respectivamente.
+
+Los **vértices** del grafo **se enumeran** con los números enteros $1,\ldots,n$, con $n = |V|$.
+
+### Grafos y digrafos
+
+Un grafo para el que cada arista $\{u,v\}\in E$ es tal que $\{u,v\} \not\equiv \{v,u\}$, para todo $u,v\in V$ se denomina **grafo dirigido** o **digrafo**. De lo contrario se llama **grafo no dirigido** o simplemente **grafo**. 
+
+```{r, eval = TRUE, echo=FALSE, out.width="40%", fig.pos = 'H', fig.align = 'center'}
+knitr::include_graphics("02_graph_digraph.png")
+```
+
+### Multigrafos
+
+Un **multigrafo** es aquel grafo que permite **múltiples aristas** entre el mismo par de vértices y aristas de un vértice a sí mismo. 
+
+Un grafo que no es un multigrafo se denomina **grafo simple**.
+
+```{r, eval = TRUE, echo=FALSE, out.width="70%", fig.pos = 'H', fig.align = 'center'}
+knitr::include_graphics("02_multilayer.png")
+```
+
+### Ejemplo: red binaria no dirigida
+
+```{r}
+suppressMessages(suppressWarnings(library(igraph)))
+
+# Red binaria no dirigida
+g <- graph_from_literal(1-2, 1-3, 2-3, 2-4, 3-5, 4-5, 4-6, 4-7, 5-6, 6-7)
+```
+
+```{r}
+# Clase de objeto
+class(g)
+
+# Vértices
+V(g)
+
+# Orden
+vcount(g)
+
+# Aristas
+E(g)
+
+# Tamaño
+ecount(g)
+
+# Dirigida?
+is_directed(g)
+
+# Ponderada?
+is_weighted(g)
+
+# Simple?
+is_simple(g)
+```
+
+```{r, fig.height = 5, fig.width = 5, fig.align = 'center'}
+# Visualización
+set.seed(123)
+plot(g, main = "Red binaria no dirigida")
+```
+
+### Ejemplo: red ponderada no dirigida
+
+```{r}
+# Red ponderada no dirigida
+wg <- g
+
+# Pesos
+set.seed(123)
+(E(wg)$weight <- round(runif(ecount(g), 0, 1), 2))
+
+# Dirigida?
+is_directed(wg)
+
+# Ponderada?
+is_weighted(wg)
+
+# Simple?
+is_simple(wg)
+```
+
+```{r, fig.height = 5, fig.width = 5, fig.align = 'center'}
+# Visualización
+set.seed(123)
+plot(wg, 
+     edge.width = 5*E(wg)$weight, 
+     edge.label = E(wg)$weight, 
+     main = "Red ponderada no dirigida")
+```
+
+### Ejemplo: red binaria dirigida
+
+```{r}
+# Red binaria dirigida
+dg <- graph_from_literal(1-+2, 1++3, 2-+3, 3++4, 4-+5, 5-+6, 6++7)
+```
+
+```{r}
+# Aristas
+E(dg)
+
+# Tamaño
+ecount(dg)
+
+# Dirigida?
+is_directed(dg)
+
+# Ponderada?
+is_weighted(dg)
+
+# Simple?
+is_simple(dg)
+```
+
+```{r}
+# Etiquetas de los vértices
+(V(dg)$name <- LETTERS[1:vcount(dg)])
+
+
+# Agregar 'x' como atributo
+set.seed(123)
+(V(dg)$x <- round(rnorm(vcount(dg), 10, 5), 2))
+```
+
+```{r, fig.height = 5, fig.width = 5, fig.align = 'center'}
+# Visualización
+set.seed(123)
+plot(dg, 
+     vertex.size = 1.5*V(dg)$x,
+     vertex.label.cex = 0.5,
+     edge.arrow.size = 0.5,
+     main = "Red binaria dirigida")
+```
+
+## Estructuras de datos
+
+Generalmente los grafos **no se definen manualmente** ya que en la práctica la mayoría de las redes son **grandes**.
+
+Los datos para construir un grafo comúnmente se almacenarán en un **archivo de datos** (`.txt`, `.csc`, `.dat`, etc.). 
+
+### Matriz de adyacencia
+
+La **matriz de adyacencia** o **socio-matriz** $\mathbf{Y} = [y_{i,j}]$ asociada con un grafo $G=(V,E)$ de orden $n$ es una **matriz binaria** de $n\times n$ tal que $y_{i,j} = 1$ si $\{i,j\} \in E$ y $y_{i,j} = 0$ en otro caso.
+
+La **diagonal principal** de una matriz de adyacencia está llena de **ceros estructurales**.
+
+La matriz de adyacencia de un **grafo no dirigido** es **necesariamente simétrica**. 
+
+La matriz de adyacencia de un **grafo dirigido**    es **posiblemente asimétrica**.
+
+### Ejemplo: red binaria no dirigida
+
+```{r}
+# Red binaria no dirigida
+g <- graph_from_literal(1-2, 1-3, 2-3, 2-4, 3-5, 4-5, 4-6, 4-7, 5-6, 6-7)
+```
+
+```{r, fig.height = 5, fig.width = 5, fig.align = 'center'}
+# Visualización
+set.seed(123)
+plot(g, main = "Red binaria no dirigida")
+```
+
+```{r}
+# Matriz de adyacencia
+(A <- as_adjacency_matrix(g))
+
+# Clase de objeto
+class(A)
+
+# Formato 'matrix array'
+(Y <- as_adjacency_matrix(g, sparse = F))
+
+# Clase de objeto
+class(Y)
+
+# Simétrica?
+isSymmetric(Y)
+
+# Versión vectorizada exhaustiva
+(yvec1 <- Y[lower.tri(Y)])
+
+# Versión vectorizada indexada
+(yvec2 <- which(yvec1 == 1))
+```
+
+### Matriz de aristas
+
+Una **matriz de aristas** es un **arreglo de dos columnas** conformado por todos los **pares de vértices** que están **unidos** por una arista.
+
+En el caso de redes ponderadas, la matriz de aristas incluye una columna adicional que registra el peso asociado a cada arista.
+
+### Ejemplo: red binaria no dirigida (cont.)
+
+```{r}
+# Matriz de aristas
+n <- dim(Y)[1]
+A <- NULL
+for (i in 1:(n-1)) 
+  for (j in (i+1):n) 
+    if (Y[i,j] == 1) 
+      A <- rbind(A, c(i,j))
+```
+
+```{r}
+# Clase de objeto
+class(A)
+
+print(A)
+```
+
+## Ejemplo: trabajo colaborativo
+
+Red de **relaciones de trabajo colaborativo** entre los miembros de una firma de abogados (SG&R). 
+Estos datos fueron recolectados para **estudiar la cooperación** entre los actores de una organización.
+
+$y_{i,j} = 1$ si los miembros $i$ y $j$ **trabajaron juntos** en al menos un caso y $y_{i,j} = 0$ en otro caso.
+
+Una descripción completa de los datos se puede encontrar [aquí](https://www.stats.ox.ac.uk/~snijders/siena/Lazega_lawyers_data.htm).
+
+Disponible en el paquete `sand` de R.
+
+Lazega, E. (2001). *The collegial phenomenon: The social mechanisms of cooperation among peers in a corporate law partnership*. Oxford University Press on Demand.
+
+```{r}
+suppressMessages(suppressWarnings(library(sand)))
+suppressMessages(suppressWarnings(library(corrplot)))
+```
+
+```{r}
+# Aristas
+head(elist.lazega)
+
+# Dimensión
+dim(elist.lazega)
+```
+
+```{r}
+# Atributos
+head(v.attr.lazega)
+
+# Dimensión
+dim(v.attr.lazega)
+```
+
+```{r}
+# Grafo
+# Ver también 'graph_from_edgelist' y 'graph_from_adjacency_matrix'
+g_lazega <- graph_from_data_frame(d = elist.lazega, directed = "F", vertices = v.attr.lazega)
+
+V(g_lazega)$name <- 1:vcount(g_lazega)
+```
+
+```{r}
+# Matriz de adyacencia
+Y_lazega <- as_adjacency_matrix(g_lazega, sparse = F)
+```
+
+```{r}
+# Orden
+vcount(g_lazega)
+
+# Tamaño
+ecount(g_lazega)
+
+# Dirigida?
+is_directed(g_lazega)
+
+# Ponderada?
+is_weighted(g_lazega)
+
+# Simple?
+is_simple(g_lazega)
+```
+
+```{r, fig.height = 7, fig.width = 14, fig.align='center'}
+# Visualización
+par(mfrow = c(1,2))
+
+# Grafo
+set.seed(123)
+plot(g_lazega, 
+     vertex.size = 9, 
+     vertex.label.color = "black", 
+     vertex.color = NA, 
+     vertex.frame.color = "black", 
+     edge.color = "blue4", 
+     main = "Trabajo colaborativo")
+
+# Matriz de adyacencia
+corrplot(corr = Y_lazega, 
+         method = "color", 
+         tl.col = "black", 
+         addgrid.col = "gray90", 
+         cl.pos = "n")
+```
