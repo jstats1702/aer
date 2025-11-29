@@ -42,16 +42,6 @@ Un grafo para el que cada arista $\{u,v\}\in E$ es tal que $\{u,v\} \not\equiv \
 knitr::include_graphics("02_graph_digraph.png")
 ```
 
-### Multigrafos
-
-Un **multigrafo** es aquel grafo que permite **múltiples aristas** entre el mismo par de vértices y aristas de un vértice a sí mismo. 
-
-Un grafo que no es un multigrafo se denomina **grafo simple**.
-
-```{r, eval = TRUE, echo=FALSE, out.width="70%", fig.pos = 'H', fig.align = 'center'}
-knitr::include_graphics("02_multilayer.png")
-```
-
 ### Ejemplo: red binaria no dirigida
 
 ```{r}
@@ -164,6 +154,26 @@ plot(dg,
      vertex.label.cex = 0.5,
      edge.arrow.size = 0.5,
      main = "Red binaria dirigida")
+```
+
+### Multigrafos
+
+Un **multigrafo** es aquel grafo que permite **múltiples aristas** entre el mismo par de vértices y aristas de un vértice a sí mismo. 
+
+Un grafo que no es un multigrafo se denomina **grafo simple**.
+
+```{r, eval = TRUE, echo=FALSE, out.width="70%", fig.pos = 'H', fig.align = 'center'}
+knitr::include_graphics("02_multilayer.png")
+```
+
+### Grafos bipartitos
+
+Un **grafo bipartito** es un grafo $G = (V, E)$ tal que el conjunto de **vértices** $V$ puede dividirse en dos **subconjuntos disjuntos**, $V_1$ y $V_2$, y cada **arista** en $E$ tiene un extremo en $V_1$ y el otro en $V_2$.
+
+Este tipo de **grafos** se usa típicamente para representar **redes de pertenencia**. Por ejemplo, con los **miembros** representados por vértices en $V_1$ y las correspondientes **organizaciones** por vértices en $V_2$.
+
+```{r, eval = TRUE, echo=FALSE, out.width="70%", fig.pos = 'H', fig.align = 'center'}
+knitr::include_graphics("02_bipartie.png")
 ```
 
 ## Estructuras de datos
@@ -280,51 +290,289 @@ dim(v.attr.lazega)
 ```{r}
 # Grafo
 # Ver también 'graph_from_edgelist' y 'graph_from_adjacency_matrix'
-g_lazega <- graph_from_data_frame(d = elist.lazega, directed = "F", vertices = v.attr.lazega)
+g <- graph_from_data_frame(d = elist.lazega, directed = "F", vertices = v.attr.lazega)
 
-V(g_lazega)$name <- 1:vcount(g_lazega)
+V(g)$name <- 1:vcount(g)
 ```
 
 ```{r}
 # Matriz de adyacencia
-Y_lazega <- as_adjacency_matrix(g_lazega, sparse = F)
+Y <- as_adjacency_matrix(g, sparse = F)
 ```
 
 ```{r}
 # Orden
-vcount(g_lazega)
+vcount(g)
 
 # Tamaño
-ecount(g_lazega)
+ecount(g)
 
 # Dirigida?
-is_directed(g_lazega)
+is_directed(g)
 
 # Ponderada?
-is_weighted(g_lazega)
+is_weighted(g)
 
 # Simple?
-is_simple(g_lazega)
+is_simple(g)
 ```
 
 ```{r, fig.height = 7, fig.width = 14, fig.align='center'}
 # Visualización
-par(mfrow = c(1,2))
+par(mfrow = c(1,2), mar = c(1, 1, 2, 1))
 
 # Grafo
 set.seed(123)
-plot(g_lazega, 
-     vertex.size = 9, 
-     vertex.label.color = "black", 
-     vertex.color = NA, 
-     vertex.frame.color = "black", 
-     edge.color = "blue4", 
-     main = "Trabajo colaborativo")
+plot(
+  g, 
+  vertex.size        = 9, 
+  vertex.label.color = "black", 
+  vertex.color       = NA, 
+  vertex.frame.color = "black", 
+  edge.color         = "blue4", 
+  main               = "Trabajo colaborativo"
+)
 
 # Matriz de adyacencia
-corrplot(corr = Y_lazega, 
-         method = "color", 
-         tl.col = "black", 
-         addgrid.col = "gray90", 
-         cl.pos = "n")
+corrplot(
+  corr        = as.matrix(Y), 
+  method      = "color", 
+  tl.col      = "black", 
+  addgrid.col = "gray90", 
+  cl.pos      = "n"
+)
 ```
+
+## Ejemplo: relaciones sociales
+
+Datos de empleados de *Western Electric* (*Hawthorne plant*) en el banco de conexiones. El estudio buscaba entender cómo las **relaciones sociales informales** entre los trabajadores influían en su comportamiento y productividad.
+
+Los empleados trabajaban en una sola sala e incluían **dos inspectores** (actores 1 y 2), **tres soldadores** (actores 12, 13 y 14) y **nueve técnicos de cables** (actores 3 a 11). 
+
+Se recopilaron datos sobre cuatro categorías de interacción simétrica, que incluyen: participación en juegos pesados (*Horseplay*, red 1), participación en discusiones (*Arguments*, red 2), amistad (*Friendship*, red 3) y comportamiento antagónico (*Antagonism*, red 4).
+
+Estos datos se organizan como una **red multicapa** formada por **redes binarias no dirigidas**, donde cada **capa** $k$ representa las conexiones entre $n = 14$ individuos mediante la **matriz de adyacencia** $\mathbf{Y}_k = [y_{i,j,k}]$. Los elementos de esta matriz son $y_{i,j,k} \in \{0, 1\}$, para $1 \leq i < j \leq n$ y $k = 1, \ldots, K$.
+
+Roethlisberger, F. J., & Dickson, W. J. (2003). *Management and the Worker: An Account of a Research Program Conducted by the Western Electric Company, Hawthorne Works, Chicago*. Psychology Press.
+
+```{r data}
+# Datos
+load("wiring_data.RData")
+
+# Dimensiones
+dim(Y)
+
+n <- dim(Y)[1]
+K <- dim(Y)[3]
+```
+
+```{r viz data, fig.align='center'}
+# Definir los colores para los grupos de actores
+node_colors <- c(rep("orange", 2), rep("skyblue", 9), rep("green", 3))
+
+# Títulos personalizados para cada capa
+titles <- c("Horseplay", "Arguments", "Friendship", "Antagonism")
+
+# Configurar el layout del gráfico
+par(mfrow = c(2, 2), mar = c(1, 1, 2, 1))
+
+# Dibujar los gráficos para cada capa
+for (k in 1:4) {
+  # Crear el grafo desde la matriz de adyacencia
+  g_k <- graph_from_adjacency_matrix(Y[, , k], mode = "undirected")
+  
+  # Asignar etiquetas de nodos numeradas de 1 a n
+  V(g_k)$label <- 1:vcount(g_k)
+
+  # Graficar
+  set.seed(123)
+  plot(
+    g_k,
+    main = titles[k],
+    vertex.label = NA,
+    vertex.color = node_colors
+  )
+}
+```
+
+La **red de consenso binaria** se define como la red cuya matriz de adyacencia $\mathbf{Y} = [y_{i,j}]$ tiene entradas $y_{i,j} = 1$ si el promedio $\frac{1}{K}\sum_{k=1}^K y_{i,j,k}$ es mayor que $0.5$ (i.e., si el enlace aparece en más de la mitad de las capas), y $y_{i,j} = 0$ en caso contrario.
+
+La **red de consenso ponderada** se define como la red cuya matriz de adyacencia $\mathbf{Y} = [y_{i,j}]$ tiene entradas $y_{i,j}$ dadas por el total $\sum_{k=1}^K y_{i,j,k}$, el promedio $\frac{1}{K}\sum_{k=1}^K y_{i,j,k}$ o alguna otra **medida de resumen** adecuada de los enlaces a través de las $K$ capas.
+
+```{r}
+# Matriz de consenso ponderada (total)
+Y_c <- apply(X = Y, MARGIN = c(1, 2), FUN = sum)
+
+# Dimensiones
+dim(Y_c)
+```
+
+```{r}
+# Grafo de consenso ponderado
+g_c <- graph_from_adjacency_matrix(Y_c, mode = "undirected", weighted = TRUE)
+
+# Orden
+vcount(g_c)
+
+# Tamaño
+ecount(g_c)
+
+# Dirigida?
+is_directed(g_c)
+
+# Ponderada?
+is_weighted(g_c)
+
+# Simple?
+is_simple(g_c)
+```
+
+```{r, fig.height = 7, fig.width = 14, fig.align='center'}
+# Visualización
+par(mfrow = c(1, 2), mar = c(1, 1, 2, 1))
+
+# Grafo
+set.seed(123)
+plot(
+  g_c,
+  vertex.label       = NA,
+  vertex.color       = node_colors,
+  vertex.frame.color = "black",
+  edge.width         = 1.5 * E(g_c)$weight,
+  main               = "Western Electric"
+)
+
+# Matriz de adyacencia de consenso
+corrplot(
+  corr        = Y_c,
+  is.corr     = FALSE,
+  method      = "color",
+  tl.col      = "black",
+  addgrid.col = "gray90",
+  cl.pos      = "n",
+  main        = ""
+)
+```
+
+## Ejemplo: redes terroristas y contra-terroristas
+
+Basado en la **red terrorista de Noordin Top**, donde se analizan 79 individuos y sus vínculos con 32 **organizaciones terroristas**, instituciones educativas, negocios y vínculos personales (familia, amistad, correligión, apoyo logístico y participación en operaciones).
+
+El objetivo es diseñar una **estrategia estructural** para desarticular o debilitar de forma eficiente la red terrorista.
+
+Estos datos de **pertenencia** a organizaciones terroristas se almacenan en una **matriz de adyacencia bipartita** $\mathbf{Y} = [y_{i,j}]$, de dimensión $n \times m$, donde $y_{i,j} = 1$ si el **individuo** $i$ pertenece a la **organización terrorista** $j$ y $y_{i,j} = 0$ en caso contrario.
+
+Datos disponibles en https://thearda.com/data-archive?fid=TERRNET
+
+Everton, S. F. (2012). *Network Topography, Key Players and Terrorist Networks*. Connections 31(1):12-19.
+
+```{r}
+# Importar datos
+noordin <- read.delim("~/Dropbox/UN/netwroks_lectures/noordin.txt")
+
+# Identificar las columnas que comienzan con "ORGAN"
+organ_cols <- grep(pattern = "^ORGAN", x = names(noordin), value = TRUE)
+
+# Matriz de adyacencia bipartita
+Y <- as.matrix(noordin[, organ_cols])
+```
+
+```{r}
+# Grafo bipartito a partir de la matriz de adyacencia
+# filas = tipo 0 (individuos), columnas = tipo 1 (organizaciones)
+g <- graph_from_biadjacency_matrix(Y)
+
+# Tipo de nodos
+table(V(g)$type)
+
+# Colores de acuerdo el tipo de nodo
+node_colors <- ifelse(V(g)$type, "tomato", "steelblue")
+```
+
+```{r, fig.align='center'}
+# Visualización
+par(mfrow = c(1, 2), mar = c(1, 1, 2, 1))
+
+# Grafo
+set.seed(123)
+plot(
+  g,
+  vertex.label = NA,
+  vertex.color = node_colors,
+  vertex.size  = 8,
+  main         = "Red bipartita"
+)
+legend("topright", legend = c("Ind", "Org"), fill = c("tomato", "steelblue"), bty = "n")
+
+# Matriz de adyacencia bipartita
+corrplot(
+  corr    = Y,
+  is.corr = FALSE,
+  method  = "color",
+  tl.pos  = "n",
+  cl.pos  = "n"
+)
+```
+
+A partir de la matriz de adyacencia de una **red bipartita** $\mathbf{Y}$ de tamaño $n \times m$ se pueden construir dos **redes ponderadas** mediante proyecciones sobre cada conjunto de nodos:
+
+- **Red proyectada de las filas**: $\mathbf{Y}_{\text{F}} = \mathbf{Y}\,\mathbf{Y}^\top$, de tamaño $n \times n$.  
+- **Red proyectada de las columnas**: $\mathbf{Y}_{\text{C}} = \mathbf{Y}^\top \mathbf{Y}$, de tamaño $m \times m$.
+
+En ambos casos, los pesos se pueden interpretar como una **medida de similitud** entre nodos del mismo tipo, inducida por sus patrones de conexión en la red bipartita original:
+
+- En la proyección sobre filas, el peso en la arista $(i, i')$ es el **número de organizaciones compartidas** por los individuos $i$ e $i'$.
+- En la proyección sobre columnas, el peso en la arista $(j, j')$ es el **número de individuos compartidos** por las organizaciones $j$ y $j'$.
+
+```{r}
+# Proyección sobre filas
+Y_F <- Y %*% t(Y)
+diag(Y_F) <- 0
+
+# Proyección sobre columnas
+Y_C <- t(Y) %*% Y
+diag(Y_C) <- 0
+
+# Grafos ponderados a partir de las proyecciones
+g_F <- graph_from_adjacency_matrix(
+  Y_F,
+  mode     = "undirected",
+  weighted = TRUE,
+  diag     = FALSE
+)
+
+g_C <- graph_from_adjacency_matrix(
+  Y_C,
+  mode     = "undirected",
+  weighted = TRUE,
+  diag     = FALSE
+)
+```
+
+```{r, fig.height = 7, fig.width = 14, fig.align='center'}
+# Visualización
+par(mfrow = c(1, 2), mar = c(1, 1, 2, 1))
+
+# Grafo proyección filas
+set.seed(123)
+plot(
+  g_F,
+  main          = "Individuos",
+  vertex.size  = 4,
+  vertex.color = "tomato",
+  vertex.label = NA,
+  edge.width   = 0.5 + E(g_F)$weight
+)
+
+# Grafo proyección columnas
+set.seed(123)
+plot(
+  g_C,
+  main         = "Organizaciones",
+  vertex.size  = 8,
+  vertex.color = "steelblue",
+  vertex.label = NA,
+  edge.width   = 0.5 + 1.5 * E(g_C)$weight
+)
+```
+
