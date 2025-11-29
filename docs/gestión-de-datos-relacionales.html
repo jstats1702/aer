@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+<head>
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Capítulo 2 Gestión de datos relacionales | Análisis Estadístico de Redes</title>
+  <meta name="description" content="Capítulo 2 Gestión de datos relacionales | Análisis Estadístico de Redes" />
+  <meta name="generator" content="bookdown 0.45 and GitBook 2.6.7" />
+
+  <meta property="og:title" content="Capítulo 2 Gestión de datos relacionales | Análisis Estadístico de Redes" />
+  <meta property="og:type" content="book" />
+  
+  
+  
+
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Capítulo 2 Gestión de datos relacionales | Análisis Estadístico de Redes" />
+  
+  
+  
+
+<meta name="author" content="Juan Sosa" />
+
+
+<meta name="date" content="2025-11-29" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  
+  
+<link rel="prev" href="conceptos-preliminares.html"/>
+
+<script src="libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@6.4.6/dist/fuse.min.js"></script>
+<link href="libs/gitbook-2.6.7/css/style.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-table.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-bookdown.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-highlight.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-search.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-fontsettings.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-clipboard.css" rel="stylesheet" />
+
+
+
+
+
+
+
+
+<link href="libs/anchor-sections-1.1.0/anchor-sections.css" rel="stylesheet" />
+<link href="libs/anchor-sections-1.1.0/anchor-sections-hash.css" rel="stylesheet" />
+<script src="libs/anchor-sections-1.1.0/anchor-sections.js"></script>
+
+
+<style type="text/css">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+<style type="text/css">
+  
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+</style>
+
+</head>
+
+<body>
+
+
+
+  <div class="book without-animation with-summary font-size-2 font-family-1" data-basepath=".">
+
+    <div class="book-summary">
+      <nav role="navigation">
+
+<ul class="summary">
+<li class="chapter" data-level="" data-path="index.html"><a href="index.html"><i class="fa fa-check"></i>Introducción</a></li>
+<li class="chapter" data-level="1" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html"><i class="fa fa-check"></i><b>1</b> Conceptos preliminares</a>
+<ul>
+<li class="chapter" data-level="1.1" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#introducción-1"><i class="fa fa-check"></i><b>1.1</b> Introducción</a></li>
+<li class="chapter" data-level="1.2" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#ejemplos"><i class="fa fa-check"></i><b>1.2</b> Ejemplos</a></li>
+<li class="chapter" data-level="1.3" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#datos-relacionales"><i class="fa fa-check"></i><b>1.3</b> Datos relacionales</a></li>
+<li class="chapter" data-level="1.4" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#tipos-de-redes"><i class="fa fa-check"></i><b>1.4</b> Tipos de redes</a>
+<ul>
+<li class="chapter" data-level="1.4.1" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#redes-no-dirigidas-y-dirigidas"><i class="fa fa-check"></i><b>1.4.1</b> Redes no dirigidas y dirigidas</a></li>
+<li class="chapter" data-level="1.4.2" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#redes-binarias-y-ponderadas"><i class="fa fa-check"></i><b>1.4.2</b> Redes binarias y ponderadas</a></li>
+</ul></li>
+<li class="chapter" data-level="1.5" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#otros-tipos-de-redes"><i class="fa fa-check"></i><b>1.5</b> Otros tipos de redes</a>
+<ul>
+<li class="chapter" data-level="1.5.1" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#redes-neuronales"><i class="fa fa-check"></i><b>1.5.1</b> Redes neuronales</a></li>
+<li class="chapter" data-level="1.5.2" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#redes-bayesianas"><i class="fa fa-check"></i><b>1.5.2</b> Redes Bayesianas</a></li>
+</ul></li>
+<li class="chapter" data-level="1.6" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#software"><i class="fa fa-check"></i><b>1.6</b> Software</a></li>
+<li class="chapter" data-level="1.7" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#fuentes-de-datos"><i class="fa fa-check"></i><b>1.7</b> Fuentes de datos</a></li>
+<li class="chapter" data-level="1.8" data-path="conceptos-preliminares.html"><a href="conceptos-preliminares.html#algunas-referencias"><i class="fa fa-check"></i><b>1.8</b> Algunas referencias</a></li>
+</ul></li>
+<li class="chapter" data-level="2" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html"><i class="fa fa-check"></i><b>2</b> Gestión de datos relacionales</a>
+<ul>
+<li class="chapter" data-level="2.1" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#introducción-2"><i class="fa fa-check"></i><b>2.1</b> Introducción</a></li>
+<li class="chapter" data-level="2.2" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#grafos"><i class="fa fa-check"></i><b>2.2</b> Grafos</a>
+<ul>
+<li class="chapter" data-level="2.2.1" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#grafos-y-digrafos"><i class="fa fa-check"></i><b>2.2.1</b> Grafos y digrafos</a></li>
+<li class="chapter" data-level="2.2.2" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#multigrafos"><i class="fa fa-check"></i><b>2.2.2</b> Multigrafos</a></li>
+<li class="chapter" data-level="2.2.3" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#ejemplo-red-binaria-no-dirigida"><i class="fa fa-check"></i><b>2.2.3</b> Ejemplo: red binaria no dirigida</a></li>
+<li class="chapter" data-level="2.2.4" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#ejemplo-red-ponderada-no-dirigida"><i class="fa fa-check"></i><b>2.2.4</b> Ejemplo: red ponderada no dirigida</a></li>
+<li class="chapter" data-level="2.2.5" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#ejemplo-red-binaria-dirigida"><i class="fa fa-check"></i><b>2.2.5</b> Ejemplo: red binaria dirigida</a></li>
+</ul></li>
+<li class="chapter" data-level="2.3" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#estructuras-de-datos"><i class="fa fa-check"></i><b>2.3</b> Estructuras de datos</a>
+<ul>
+<li class="chapter" data-level="2.3.1" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#matriz-de-adyacencia"><i class="fa fa-check"></i><b>2.3.1</b> Matriz de adyacencia</a></li>
+<li class="chapter" data-level="2.3.2" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#ejemplo-red-binaria-no-dirigida-1"><i class="fa fa-check"></i><b>2.3.2</b> Ejemplo: red binaria no dirigida</a></li>
+<li class="chapter" data-level="2.3.3" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#matriz-de-aristas"><i class="fa fa-check"></i><b>2.3.3</b> Matriz de aristas</a></li>
+<li class="chapter" data-level="2.3.4" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#ejemplo-red-binaria-no-dirigida-cont."><i class="fa fa-check"></i><b>2.3.4</b> Ejemplo: red binaria no dirigida (cont.)</a></li>
+</ul></li>
+<li class="chapter" data-level="2.4" data-path="gestión-de-datos-relacionales.html"><a href="gestión-de-datos-relacionales.html#ejemplo-trabajo-colaborativo"><i class="fa fa-check"></i><b>2.4</b> Ejemplo: trabajo colaborativo</a></li>
+</ul></li>
+</ul>
+
+      </nav>
+    </div>
+
+    <div class="book-body">
+      <div class="body-inner">
+        <div class="book-header" role="navigation">
+          <h1>
+            <i class="fa fa-circle-o-notch fa-spin"></i><a href="./">Análisis Estadístico de Redes</a>
+          </h1>
+        </div>
+
+        <div class="page-wrapper" tabindex="-1" role="main">
+          <div class="page-inner">
+
+            <section class="normal" id="section-">
+<div id="gestión-de-datos-relacionales" class="section level1 hasAnchor" number="2">
+<h1><span class="header-section-number">Capítulo 2</span> Gestión de datos relacionales<a href="gestión-de-datos-relacionales.html#gestión-de-datos-relacionales" class="anchor-section" aria-label="Anchor link to header"></a></h1>
+<div id="introducción-2" class="section level2 hasAnchor" number="2.1">
+<h2><span class="header-section-number">2.1</span> Introducción<a href="gestión-de-datos-relacionales.html#introducción-2" class="anchor-section" aria-label="Anchor link to header"></a></h2>
+<p><strong>Conformación</strong>, <strong>almacenamiento</strong> y <strong>gestión</strong> de datos relacionales:</p>
+<ul>
+<li>Variables <strong>diádicas</strong>.</li>
+<li>Variables <strong>nodales</strong>.</li>
+<li>Variables <strong>derivadas</strong> (e.g., indicadoras de grupos).</li>
+</ul>
+<p>Un <strong>grafo</strong> por sí solo (una colección de vértices y aristas) suele ser insuficiente para representar todos los atributos una red.</p>
+<p>La <strong>decoración</strong> de un grafo corresponde a la <strong>conjunción de vértices y aristas con otras variables</strong> de interés (atributos).</p>
+</div>
+<div id="grafos" class="section level2 hasAnchor" number="2.2">
+<h2><span class="header-section-number">2.2</span> Grafos<a href="gestión-de-datos-relacionales.html#grafos" class="anchor-section" aria-label="Anchor link to header"></a></h2>
+<p>Un <strong>grafo</strong> <span class="math inline">\(G = (V, E)\)</span> es una estructura que consiste de un conjunto de <strong>vértices</strong> (nodos) <span class="math inline">\(V\)</span> y de un conjunto de <strong>aristas</strong> (enlaces) <span class="math inline">\(E\)</span>, donde los elementos de <span class="math inline">\(E\)</span> son parejas de la forma <span class="math inline">\(e=\{u,v\}\)</span>, con <span class="math inline">\(u,v\in V\)</span>.</p>
+<p>El <strong>número de vértices</strong> <span class="math inline">\(|V|\)</span> y el <strong>número de aristas</strong> <span class="math inline">\(|E|\)</span> se conocen como el <strong>orden</strong> y el <strong>tamaño</strong> del grafo, respectivamente.</p>
+<p>Los <strong>vértices</strong> del grafo <strong>se enumeran</strong> con los números enteros <span class="math inline">\(1,\ldots,n\)</span>, con <span class="math inline">\(n = |V|\)</span>.</p>
+<div id="grafos-y-digrafos" class="section level3 hasAnchor" number="2.2.1">
+<h3><span class="header-section-number">2.2.1</span> Grafos y digrafos<a href="gestión-de-datos-relacionales.html#grafos-y-digrafos" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<p>Un grafo para el que cada arista <span class="math inline">\(\{u,v\}\in E\)</span> es tal que <span class="math inline">\(\{u,v\} \not\equiv \{v,u\}\)</span>, para todo <span class="math inline">\(u,v\in V\)</span> se denomina <strong>grafo dirigido</strong> o <strong>digrafo</strong>. De lo contrario se llama <strong>grafo no dirigido</strong> o simplemente <strong>grafo</strong>.</p>
+<p><img src="02_graph_digraph.png" width="40%" style="display: block; margin: auto;" /></p>
+</div>
+<div id="multigrafos" class="section level3 hasAnchor" number="2.2.2">
+<h3><span class="header-section-number">2.2.2</span> Multigrafos<a href="gestión-de-datos-relacionales.html#multigrafos" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<p>Un <strong>multigrafo</strong> es aquel grafo que permite <strong>múltiples aristas</strong> entre el mismo par de vértices y aristas de un vértice a sí mismo.</p>
+<p>Un grafo que no es un multigrafo se denomina <strong>grafo simple</strong>.</p>
+<p><img src="02_multilayer.png" width="70%" style="display: block; margin: auto;" /></p>
+</div>
+<div id="ejemplo-red-binaria-no-dirigida" class="section level3 hasAnchor" number="2.2.3">
+<h3><span class="header-section-number">2.2.3</span> Ejemplo: red binaria no dirigida<a href="gestión-de-datos-relacionales.html#ejemplo-red-binaria-no-dirigida" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="gestión-de-datos-relacionales.html#cb1-1" tabindex="-1"></a><span class="fu">suppressMessages</span>(<span class="fu">suppressWarnings</span>(<span class="fu">library</span>(igraph)))</span>
+<span id="cb1-2"><a href="gestión-de-datos-relacionales.html#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="gestión-de-datos-relacionales.html#cb1-3" tabindex="-1"></a><span class="co"># Red binaria no dirigida</span></span>
+<span id="cb1-4"><a href="gestión-de-datos-relacionales.html#cb1-4" tabindex="-1"></a>g <span class="ot">&lt;-</span> <span class="fu">graph_from_literal</span>(<span class="dv">1-2</span>, <span class="dv">1-3</span>, <span class="dv">2-3</span>, <span class="dv">2-4</span>, <span class="dv">3-5</span>, <span class="dv">4-5</span>, <span class="dv">4-6</span>, <span class="dv">4-7</span>, <span class="dv">5-6</span>, <span class="dv">6-7</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="gestión-de-datos-relacionales.html#cb2-1" tabindex="-1"></a><span class="co"># Clase de objeto</span></span>
+<span id="cb2-2"><a href="gestión-de-datos-relacionales.html#cb2-2" tabindex="-1"></a><span class="fu">class</span>(g)</span></code></pre></div>
+<pre><code>## [1] &quot;igraph&quot;</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="gestión-de-datos-relacionales.html#cb4-1" tabindex="-1"></a><span class="co"># Vértices</span></span>
+<span id="cb4-2"><a href="gestión-de-datos-relacionales.html#cb4-2" tabindex="-1"></a><span class="fu">V</span>(g)</span></code></pre></div>
+<pre><code>## + 7/7 vertices, named, from 3a63abf:
+## [1] 1 2 3 4 5 6 7</code></pre>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="gestión-de-datos-relacionales.html#cb6-1" tabindex="-1"></a><span class="co"># Orden</span></span>
+<span id="cb6-2"><a href="gestión-de-datos-relacionales.html#cb6-2" tabindex="-1"></a><span class="fu">vcount</span>(g)</span></code></pre></div>
+<pre><code>## [1] 7</code></pre>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="gestión-de-datos-relacionales.html#cb8-1" tabindex="-1"></a><span class="co"># Aristas</span></span>
+<span id="cb8-2"><a href="gestión-de-datos-relacionales.html#cb8-2" tabindex="-1"></a><span class="fu">E</span>(g)</span></code></pre></div>
+<pre><code>## + 10/10 edges from 3a63abf (vertex names):
+##  [1] 1--2 1--3 2--3 2--4 3--5 4--5 4--6 4--7 5--6 6--7</code></pre>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="gestión-de-datos-relacionales.html#cb10-1" tabindex="-1"></a><span class="co"># Tamaño</span></span>
+<span id="cb10-2"><a href="gestión-de-datos-relacionales.html#cb10-2" tabindex="-1"></a><span class="fu">ecount</span>(g)</span></code></pre></div>
+<pre><code>## [1] 10</code></pre>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="gestión-de-datos-relacionales.html#cb12-1" tabindex="-1"></a><span class="co"># Dirigida?</span></span>
+<span id="cb12-2"><a href="gestión-de-datos-relacionales.html#cb12-2" tabindex="-1"></a><span class="fu">is_directed</span>(g)</span></code></pre></div>
+<pre><code>## [1] FALSE</code></pre>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="gestión-de-datos-relacionales.html#cb14-1" tabindex="-1"></a><span class="co"># Ponderada?</span></span>
+<span id="cb14-2"><a href="gestión-de-datos-relacionales.html#cb14-2" tabindex="-1"></a><span class="fu">is_weighted</span>(g)</span></code></pre></div>
+<pre><code>## [1] FALSE</code></pre>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="gestión-de-datos-relacionales.html#cb16-1" tabindex="-1"></a><span class="co"># Simple?</span></span>
+<span id="cb16-2"><a href="gestión-de-datos-relacionales.html#cb16-2" tabindex="-1"></a><span class="fu">is_simple</span>(g)</span></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="gestión-de-datos-relacionales.html#cb18-1" tabindex="-1"></a><span class="co"># Visualización</span></span>
+<span id="cb18-2"><a href="gestión-de-datos-relacionales.html#cb18-2" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb18-3"><a href="gestión-de-datos-relacionales.html#cb18-3" tabindex="-1"></a><span class="fu">plot</span>(g, <span class="at">main =</span> <span class="st">&quot;Red binaria no dirigida&quot;</span>)</span></code></pre></div>
+<p><img src="aer_files/figure-html/unnamed-chunk-13-1.png" width="480" style="display: block; margin: auto;" /></p>
+</div>
+<div id="ejemplo-red-ponderada-no-dirigida" class="section level3 hasAnchor" number="2.2.4">
+<h3><span class="header-section-number">2.2.4</span> Ejemplo: red ponderada no dirigida<a href="gestión-de-datos-relacionales.html#ejemplo-red-ponderada-no-dirigida" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="gestión-de-datos-relacionales.html#cb19-1" tabindex="-1"></a><span class="co"># Red ponderada no dirigida</span></span>
+<span id="cb19-2"><a href="gestión-de-datos-relacionales.html#cb19-2" tabindex="-1"></a>wg <span class="ot">&lt;-</span> g</span>
+<span id="cb19-3"><a href="gestión-de-datos-relacionales.html#cb19-3" tabindex="-1"></a></span>
+<span id="cb19-4"><a href="gestión-de-datos-relacionales.html#cb19-4" tabindex="-1"></a><span class="co"># Pesos</span></span>
+<span id="cb19-5"><a href="gestión-de-datos-relacionales.html#cb19-5" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb19-6"><a href="gestión-de-datos-relacionales.html#cb19-6" tabindex="-1"></a>(<span class="fu">E</span>(wg)<span class="sc">$</span>weight <span class="ot">&lt;-</span> <span class="fu">round</span>(<span class="fu">runif</span>(<span class="fu">ecount</span>(g), <span class="dv">0</span>, <span class="dv">1</span>), <span class="dv">2</span>))</span></code></pre></div>
+<pre><code>##  [1] 0.29 0.79 0.41 0.88 0.94 0.05 0.53 0.89 0.55 0.46</code></pre>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="gestión-de-datos-relacionales.html#cb21-1" tabindex="-1"></a><span class="co"># Dirigida?</span></span>
+<span id="cb21-2"><a href="gestión-de-datos-relacionales.html#cb21-2" tabindex="-1"></a><span class="fu">is_directed</span>(wg)</span></code></pre></div>
+<pre><code>## [1] FALSE</code></pre>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="gestión-de-datos-relacionales.html#cb23-1" tabindex="-1"></a><span class="co"># Ponderada?</span></span>
+<span id="cb23-2"><a href="gestión-de-datos-relacionales.html#cb23-2" tabindex="-1"></a><span class="fu">is_weighted</span>(wg)</span></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="gestión-de-datos-relacionales.html#cb25-1" tabindex="-1"></a><span class="co"># Simple?</span></span>
+<span id="cb25-2"><a href="gestión-de-datos-relacionales.html#cb25-2" tabindex="-1"></a><span class="fu">is_simple</span>(wg)</span></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="gestión-de-datos-relacionales.html#cb27-1" tabindex="-1"></a><span class="co"># Visualización</span></span>
+<span id="cb27-2"><a href="gestión-de-datos-relacionales.html#cb27-2" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb27-3"><a href="gestión-de-datos-relacionales.html#cb27-3" tabindex="-1"></a><span class="fu">plot</span>(wg, </span>
+<span id="cb27-4"><a href="gestión-de-datos-relacionales.html#cb27-4" tabindex="-1"></a>     <span class="at">edge.width =</span> <span class="dv">5</span><span class="sc">*</span><span class="fu">E</span>(wg)<span class="sc">$</span>weight, </span>
+<span id="cb27-5"><a href="gestión-de-datos-relacionales.html#cb27-5" tabindex="-1"></a>     <span class="at">edge.label =</span> <span class="fu">E</span>(wg)<span class="sc">$</span>weight, </span>
+<span id="cb27-6"><a href="gestión-de-datos-relacionales.html#cb27-6" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">&quot;Red ponderada no dirigida&quot;</span>)</span></code></pre></div>
+<p><img src="aer_files/figure-html/unnamed-chunk-15-1.png" width="480" style="display: block; margin: auto;" /></p>
+</div>
+<div id="ejemplo-red-binaria-dirigida" class="section level3 hasAnchor" number="2.2.5">
+<h3><span class="header-section-number">2.2.5</span> Ejemplo: red binaria dirigida<a href="gestión-de-datos-relacionales.html#ejemplo-red-binaria-dirigida" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="gestión-de-datos-relacionales.html#cb28-1" tabindex="-1"></a><span class="co"># Red binaria dirigida</span></span>
+<span id="cb28-2"><a href="gestión-de-datos-relacionales.html#cb28-2" tabindex="-1"></a>dg <span class="ot">&lt;-</span> <span class="fu">graph_from_literal</span>(<span class="dv">1</span><span class="sc">-+</span><span class="dv">2</span>, <span class="dv">1</span><span class="sc">++</span><span class="dv">3</span>, <span class="dv">2</span><span class="sc">-+</span><span class="dv">3</span>, <span class="dv">3</span><span class="sc">++</span><span class="dv">4</span>, <span class="dv">4</span><span class="sc">-+</span><span class="dv">5</span>, <span class="dv">5</span><span class="sc">-+</span><span class="dv">6</span>, <span class="dv">6</span><span class="sc">++</span><span class="dv">7</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="gestión-de-datos-relacionales.html#cb29-1" tabindex="-1"></a><span class="co"># Aristas</span></span>
+<span id="cb29-2"><a href="gestión-de-datos-relacionales.html#cb29-2" tabindex="-1"></a><span class="fu">E</span>(dg)</span></code></pre></div>
+<pre><code>## + 10/10 edges from f7d8d84 (vertex names):
+##  [1] 1-&gt;2 1-&gt;3 2-&gt;3 3-&gt;1 3-&gt;4 4-&gt;3 4-&gt;5 5-&gt;6 6-&gt;7 7-&gt;6</code></pre>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="gestión-de-datos-relacionales.html#cb31-1" tabindex="-1"></a><span class="co"># Tamaño</span></span>
+<span id="cb31-2"><a href="gestión-de-datos-relacionales.html#cb31-2" tabindex="-1"></a><span class="fu">ecount</span>(dg)</span></code></pre></div>
+<pre><code>## [1] 10</code></pre>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="gestión-de-datos-relacionales.html#cb33-1" tabindex="-1"></a><span class="co"># Dirigida?</span></span>
+<span id="cb33-2"><a href="gestión-de-datos-relacionales.html#cb33-2" tabindex="-1"></a><span class="fu">is_directed</span>(dg)</span></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="gestión-de-datos-relacionales.html#cb35-1" tabindex="-1"></a><span class="co"># Ponderada?</span></span>
+<span id="cb35-2"><a href="gestión-de-datos-relacionales.html#cb35-2" tabindex="-1"></a><span class="fu">is_weighted</span>(dg)</span></code></pre></div>
+<pre><code>## [1] FALSE</code></pre>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="gestión-de-datos-relacionales.html#cb37-1" tabindex="-1"></a><span class="co"># Simple?</span></span>
+<span id="cb37-2"><a href="gestión-de-datos-relacionales.html#cb37-2" tabindex="-1"></a><span class="fu">is_simple</span>(dg)</span></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="gestión-de-datos-relacionales.html#cb39-1" tabindex="-1"></a><span class="co"># Etiquetas de los vértices</span></span>
+<span id="cb39-2"><a href="gestión-de-datos-relacionales.html#cb39-2" tabindex="-1"></a>(<span class="fu">V</span>(dg)<span class="sc">$</span>name <span class="ot">&lt;-</span> LETTERS[<span class="dv">1</span><span class="sc">:</span><span class="fu">vcount</span>(dg)])</span></code></pre></div>
+<pre><code>## [1] &quot;A&quot; &quot;B&quot; &quot;C&quot; &quot;D&quot; &quot;E&quot; &quot;F&quot; &quot;G&quot;</code></pre>
+<div class="sourceCode" id="cb41"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb41-1"><a href="gestión-de-datos-relacionales.html#cb41-1" tabindex="-1"></a><span class="co"># Agregar &#39;x&#39; como atributo</span></span>
+<span id="cb41-2"><a href="gestión-de-datos-relacionales.html#cb41-2" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb41-3"><a href="gestión-de-datos-relacionales.html#cb41-3" tabindex="-1"></a>(<span class="fu">V</span>(dg)<span class="sc">$</span>x <span class="ot">&lt;-</span> <span class="fu">round</span>(<span class="fu">rnorm</span>(<span class="fu">vcount</span>(dg), <span class="dv">10</span>, <span class="dv">5</span>), <span class="dv">2</span>))</span></code></pre></div>
+<pre><code>## [1]  7.20  8.85 17.79 10.35 10.65 18.58 12.30</code></pre>
+<div class="sourceCode" id="cb43"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb43-1"><a href="gestión-de-datos-relacionales.html#cb43-1" tabindex="-1"></a><span class="co"># Visualización</span></span>
+<span id="cb43-2"><a href="gestión-de-datos-relacionales.html#cb43-2" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb43-3"><a href="gestión-de-datos-relacionales.html#cb43-3" tabindex="-1"></a><span class="fu">plot</span>(dg, </span>
+<span id="cb43-4"><a href="gestión-de-datos-relacionales.html#cb43-4" tabindex="-1"></a>     <span class="at">vertex.size =</span> <span class="fl">1.5</span><span class="sc">*</span><span class="fu">V</span>(dg)<span class="sc">$</span>x,</span>
+<span id="cb43-5"><a href="gestión-de-datos-relacionales.html#cb43-5" tabindex="-1"></a>     <span class="at">vertex.label.cex =</span> <span class="fl">0.5</span>,</span>
+<span id="cb43-6"><a href="gestión-de-datos-relacionales.html#cb43-6" tabindex="-1"></a>     <span class="at">edge.arrow.size =</span> <span class="fl">0.5</span>,</span>
+<span id="cb43-7"><a href="gestión-de-datos-relacionales.html#cb43-7" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">&quot;Red binaria dirigida&quot;</span>)</span></code></pre></div>
+<p><img src="aer_files/figure-html/unnamed-chunk-19-1.png" width="480" style="display: block; margin: auto;" /></p>
+</div>
+</div>
+<div id="estructuras-de-datos" class="section level2 hasAnchor" number="2.3">
+<h2><span class="header-section-number">2.3</span> Estructuras de datos<a href="gestión-de-datos-relacionales.html#estructuras-de-datos" class="anchor-section" aria-label="Anchor link to header"></a></h2>
+<p>Generalmente los grafos <strong>no se definen manualmente</strong> ya que en la práctica la mayoría de las redes son <strong>grandes</strong>.</p>
+<p>Los datos para construir un grafo comúnmente se almacenarán en un <strong>archivo de datos</strong> (<code>.txt</code>, <code>.csc</code>, <code>.dat</code>, etc.).</p>
+<div id="matriz-de-adyacencia" class="section level3 hasAnchor" number="2.3.1">
+<h3><span class="header-section-number">2.3.1</span> Matriz de adyacencia<a href="gestión-de-datos-relacionales.html#matriz-de-adyacencia" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<p>La <strong>matriz de adyacencia</strong> o <strong>socio-matriz</strong> <span class="math inline">\(\mathbf{Y} = [y_{i,j}]\)</span> asociada con un grafo <span class="math inline">\(G=(V,E)\)</span> de orden <span class="math inline">\(n\)</span> es una <strong>matriz binaria</strong> de <span class="math inline">\(n\times n\)</span> tal que <span class="math inline">\(y_{i,j} = 1\)</span> si <span class="math inline">\(\{i,j\} \in E\)</span> y <span class="math inline">\(y_{i,j} = 0\)</span> en otro caso.</p>
+<p>La <strong>diagonal principal</strong> de una matriz de adyacencia está llena de <strong>ceros estructurales</strong>.</p>
+<p>La matriz de adyacencia de un <strong>grafo no dirigido</strong> es <strong>necesariamente simétrica</strong>.</p>
+<p>La matriz de adyacencia de un <strong>grafo dirigido</strong> es <strong>posiblemente asimétrica</strong>.</p>
+</div>
+<div id="ejemplo-red-binaria-no-dirigida-1" class="section level3 hasAnchor" number="2.3.2">
+<h3><span class="header-section-number">2.3.2</span> Ejemplo: red binaria no dirigida<a href="gestión-de-datos-relacionales.html#ejemplo-red-binaria-no-dirigida-1" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<div class="sourceCode" id="cb44"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb44-1"><a href="gestión-de-datos-relacionales.html#cb44-1" tabindex="-1"></a><span class="co"># Red binaria no dirigida</span></span>
+<span id="cb44-2"><a href="gestión-de-datos-relacionales.html#cb44-2" tabindex="-1"></a>g <span class="ot">&lt;-</span> <span class="fu">graph_from_literal</span>(<span class="dv">1-2</span>, <span class="dv">1-3</span>, <span class="dv">2-3</span>, <span class="dv">2-4</span>, <span class="dv">3-5</span>, <span class="dv">4-5</span>, <span class="dv">4-6</span>, <span class="dv">4-7</span>, <span class="dv">5-6</span>, <span class="dv">6-7</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb45"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb45-1"><a href="gestión-de-datos-relacionales.html#cb45-1" tabindex="-1"></a><span class="co"># Visualización</span></span>
+<span id="cb45-2"><a href="gestión-de-datos-relacionales.html#cb45-2" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb45-3"><a href="gestión-de-datos-relacionales.html#cb45-3" tabindex="-1"></a><span class="fu">plot</span>(g, <span class="at">main =</span> <span class="st">&quot;Red binaria no dirigida&quot;</span>)</span></code></pre></div>
+<p><img src="aer_files/figure-html/unnamed-chunk-21-1.png" width="480" style="display: block; margin: auto;" /></p>
+<div class="sourceCode" id="cb46"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb46-1"><a href="gestión-de-datos-relacionales.html#cb46-1" tabindex="-1"></a><span class="co"># Matriz de adyacencia</span></span>
+<span id="cb46-2"><a href="gestión-de-datos-relacionales.html#cb46-2" tabindex="-1"></a>(A <span class="ot">&lt;-</span> <span class="fu">as_adjacency_matrix</span>(g))</span></code></pre></div>
+<pre><code>## 7 x 7 sparse Matrix of class &quot;dgCMatrix&quot;
+##   1 2 3 4 5 6 7
+## 1 . 1 1 . . . .
+## 2 1 . 1 1 . . .
+## 3 1 1 . . 1 . .
+## 4 . 1 . . 1 1 1
+## 5 . . 1 1 . 1 .
+## 6 . . . 1 1 . 1
+## 7 . . . 1 . 1 .</code></pre>
+<div class="sourceCode" id="cb48"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb48-1"><a href="gestión-de-datos-relacionales.html#cb48-1" tabindex="-1"></a><span class="co"># Clase de objeto</span></span>
+<span id="cb48-2"><a href="gestión-de-datos-relacionales.html#cb48-2" tabindex="-1"></a><span class="fu">class</span>(A)</span></code></pre></div>
+<pre><code>## [1] &quot;dgCMatrix&quot;
+## attr(,&quot;package&quot;)
+## [1] &quot;Matrix&quot;</code></pre>
+<div class="sourceCode" id="cb50"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb50-1"><a href="gestión-de-datos-relacionales.html#cb50-1" tabindex="-1"></a><span class="co"># Formato &#39;matrix array&#39;</span></span>
+<span id="cb50-2"><a href="gestión-de-datos-relacionales.html#cb50-2" tabindex="-1"></a>(Y <span class="ot">&lt;-</span> <span class="fu">as_adjacency_matrix</span>(g, <span class="at">sparse =</span> F))</span></code></pre></div>
+<pre><code>##   1 2 3 4 5 6 7
+## 1 0 1 1 0 0 0 0
+## 2 1 0 1 1 0 0 0
+## 3 1 1 0 0 1 0 0
+## 4 0 1 0 0 1 1 1
+## 5 0 0 1 1 0 1 0
+## 6 0 0 0 1 1 0 1
+## 7 0 0 0 1 0 1 0</code></pre>
+<div class="sourceCode" id="cb52"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb52-1"><a href="gestión-de-datos-relacionales.html#cb52-1" tabindex="-1"></a><span class="co"># Clase de objeto</span></span>
+<span id="cb52-2"><a href="gestión-de-datos-relacionales.html#cb52-2" tabindex="-1"></a><span class="fu">class</span>(Y)</span></code></pre></div>
+<pre><code>## [1] &quot;matrix&quot; &quot;array&quot;</code></pre>
+<div class="sourceCode" id="cb54"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb54-1"><a href="gestión-de-datos-relacionales.html#cb54-1" tabindex="-1"></a><span class="co"># Simétrica?</span></span>
+<span id="cb54-2"><a href="gestión-de-datos-relacionales.html#cb54-2" tabindex="-1"></a><span class="fu">isSymmetric</span>(Y)</span></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<div class="sourceCode" id="cb56"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb56-1"><a href="gestión-de-datos-relacionales.html#cb56-1" tabindex="-1"></a><span class="co"># Versión vectorizada exhaustiva</span></span>
+<span id="cb56-2"><a href="gestión-de-datos-relacionales.html#cb56-2" tabindex="-1"></a>(yvec1 <span class="ot">&lt;-</span> Y[<span class="fu">lower.tri</span>(Y)])</span></code></pre></div>
+<pre><code>##  [1] 1 1 0 0 0 0 1 1 0 0 0 0 1 0 0 1 1 1 1 0 1</code></pre>
+<div class="sourceCode" id="cb58"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb58-1"><a href="gestión-de-datos-relacionales.html#cb58-1" tabindex="-1"></a><span class="co"># Versión vectorizada indexada</span></span>
+<span id="cb58-2"><a href="gestión-de-datos-relacionales.html#cb58-2" tabindex="-1"></a>(yvec2 <span class="ot">&lt;-</span> <span class="fu">which</span>(yvec1 <span class="sc">==</span> <span class="dv">1</span>))</span></code></pre></div>
+<pre><code>##  [1]  1  2  7  8 13 16 17 18 19 21</code></pre>
+</div>
+<div id="matriz-de-aristas" class="section level3 hasAnchor" number="2.3.3">
+<h3><span class="header-section-number">2.3.3</span> Matriz de aristas<a href="gestión-de-datos-relacionales.html#matriz-de-aristas" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<p>Una <strong>matriz de aristas</strong> es un <strong>arreglo de dos columnas</strong> conformado por todos los <strong>pares de vértices</strong> que están <strong>unidos</strong> por una arista.</p>
+<p>En el caso de redes ponderadas, la matriz de aristas incluye una columna adicional que registra el peso asociado a cada arista.</p>
+</div>
+<div id="ejemplo-red-binaria-no-dirigida-cont." class="section level3 hasAnchor" number="2.3.4">
+<h3><span class="header-section-number">2.3.4</span> Ejemplo: red binaria no dirigida (cont.)<a href="gestión-de-datos-relacionales.html#ejemplo-red-binaria-no-dirigida-cont." class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<div class="sourceCode" id="cb60"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb60-1"><a href="gestión-de-datos-relacionales.html#cb60-1" tabindex="-1"></a><span class="co"># Matriz de aristas</span></span>
+<span id="cb60-2"><a href="gestión-de-datos-relacionales.html#cb60-2" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="fu">dim</span>(Y)[<span class="dv">1</span>]</span>
+<span id="cb60-3"><a href="gestión-de-datos-relacionales.html#cb60-3" tabindex="-1"></a>A <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb60-4"><a href="gestión-de-datos-relacionales.html#cb60-4" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>(n<span class="dv">-1</span>)) </span>
+<span id="cb60-5"><a href="gestión-de-datos-relacionales.html#cb60-5" tabindex="-1"></a>  <span class="cf">for</span> (j <span class="cf">in</span> (i<span class="sc">+</span><span class="dv">1</span>)<span class="sc">:</span>n) </span>
+<span id="cb60-6"><a href="gestión-de-datos-relacionales.html#cb60-6" tabindex="-1"></a>    <span class="cf">if</span> (Y[i,j] <span class="sc">==</span> <span class="dv">1</span>) </span>
+<span id="cb60-7"><a href="gestión-de-datos-relacionales.html#cb60-7" tabindex="-1"></a>      A <span class="ot">&lt;-</span> <span class="fu">rbind</span>(A, <span class="fu">c</span>(i,j))</span></code></pre></div>
+<div class="sourceCode" id="cb61"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb61-1"><a href="gestión-de-datos-relacionales.html#cb61-1" tabindex="-1"></a><span class="co"># Clase de objeto</span></span>
+<span id="cb61-2"><a href="gestión-de-datos-relacionales.html#cb61-2" tabindex="-1"></a><span class="fu">class</span>(A)</span></code></pre></div>
+<pre><code>## [1] &quot;matrix&quot; &quot;array&quot;</code></pre>
+<div class="sourceCode" id="cb63"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb63-1"><a href="gestión-de-datos-relacionales.html#cb63-1" tabindex="-1"></a><span class="fu">print</span>(A)</span></code></pre></div>
+<pre><code>##       [,1] [,2]
+##  [1,]    1    2
+##  [2,]    1    3
+##  [3,]    2    3
+##  [4,]    2    4
+##  [5,]    3    5
+##  [6,]    4    5
+##  [7,]    4    6
+##  [8,]    4    7
+##  [9,]    5    6
+## [10,]    6    7</code></pre>
+</div>
+</div>
+<div id="ejemplo-trabajo-colaborativo" class="section level2 hasAnchor" number="2.4">
+<h2><span class="header-section-number">2.4</span> Ejemplo: trabajo colaborativo<a href="gestión-de-datos-relacionales.html#ejemplo-trabajo-colaborativo" class="anchor-section" aria-label="Anchor link to header"></a></h2>
+<p>Red de <strong>relaciones de trabajo colaborativo</strong> entre los miembros de una firma de abogados (SG&amp;R).
+Estos datos fueron recolectados para <strong>estudiar la cooperación</strong> entre los actores de una organización.</p>
+<p><span class="math inline">\(y_{i,j} = 1\)</span> si los miembros <span class="math inline">\(i\)</span> y <span class="math inline">\(j\)</span> <strong>trabajaron juntos</strong> en al menos un caso y <span class="math inline">\(y_{i,j} = 0\)</span> en otro caso.</p>
+<p>Una descripción completa de los datos se puede encontrar <a href="https://www.stats.ox.ac.uk/~snijders/siena/Lazega_lawyers_data.htm">aquí</a>.</p>
+<p>Disponible en el paquete <code>sand</code> de R.</p>
+<p>Lazega, E. (2001). <em>The collegial phenomenon: The social mechanisms of cooperation among peers in a corporate law partnership</em>. Oxford University Press on Demand.</p>
+<div class="sourceCode" id="cb65"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb65-1"><a href="gestión-de-datos-relacionales.html#cb65-1" tabindex="-1"></a><span class="fu">suppressMessages</span>(<span class="fu">suppressWarnings</span>(<span class="fu">library</span>(sand)))</span>
+<span id="cb65-2"><a href="gestión-de-datos-relacionales.html#cb65-2" tabindex="-1"></a><span class="fu">suppressMessages</span>(<span class="fu">suppressWarnings</span>(<span class="fu">library</span>(corrplot)))</span></code></pre></div>
+<div class="sourceCode" id="cb66"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb66-1"><a href="gestión-de-datos-relacionales.html#cb66-1" tabindex="-1"></a><span class="co"># Aristas</span></span>
+<span id="cb66-2"><a href="gestión-de-datos-relacionales.html#cb66-2" tabindex="-1"></a><span class="fu">head</span>(elist.lazega)</span></code></pre></div>
+<pre><code>##   V1  V2
+## 1 V1 V17
+## 2 V2  V7
+## 3 V2 V16
+## 4 V2 V17
+## 5 V2 V22
+## 6 V2 V26</code></pre>
+<div class="sourceCode" id="cb68"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb68-1"><a href="gestión-de-datos-relacionales.html#cb68-1" tabindex="-1"></a><span class="co"># Dimensión</span></span>
+<span id="cb68-2"><a href="gestión-de-datos-relacionales.html#cb68-2" tabindex="-1"></a><span class="fu">dim</span>(elist.lazega)</span></code></pre></div>
+<pre><code>## [1] 115   2</code></pre>
+<div class="sourceCode" id="cb70"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb70-1"><a href="gestión-de-datos-relacionales.html#cb70-1" tabindex="-1"></a><span class="co"># Atributos</span></span>
+<span id="cb70-2"><a href="gestión-de-datos-relacionales.html#cb70-2" tabindex="-1"></a><span class="fu">head</span>(v.attr.lazega)</span></code></pre></div>
+<pre><code>##   Name Seniority Status Gender Office Years Age Practice School
+## 1   V1         1      1      1      1    31  64        1      1
+## 2   V2         2      1      1      1    32  62        2      1
+## 3   V3         3      1      1      2    13  67        1      1
+## 4   V4         4      1      1      1    31  59        2      3
+## 5   V5         5      1      1      2    31  59        1      2
+## 6   V6         6      1      1      2    29  55        1      1</code></pre>
+<div class="sourceCode" id="cb72"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb72-1"><a href="gestión-de-datos-relacionales.html#cb72-1" tabindex="-1"></a><span class="co"># Dimensión</span></span>
+<span id="cb72-2"><a href="gestión-de-datos-relacionales.html#cb72-2" tabindex="-1"></a><span class="fu">dim</span>(v.attr.lazega)</span></code></pre></div>
+<pre><code>## [1] 36  9</code></pre>
+<div class="sourceCode" id="cb74"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb74-1"><a href="gestión-de-datos-relacionales.html#cb74-1" tabindex="-1"></a><span class="co"># Grafo</span></span>
+<span id="cb74-2"><a href="gestión-de-datos-relacionales.html#cb74-2" tabindex="-1"></a><span class="co"># Ver también &#39;graph_from_edgelist&#39; y &#39;graph_from_adjacency_matrix&#39;</span></span>
+<span id="cb74-3"><a href="gestión-de-datos-relacionales.html#cb74-3" tabindex="-1"></a>g_lazega <span class="ot">&lt;-</span> <span class="fu">graph_from_data_frame</span>(<span class="at">d =</span> elist.lazega, <span class="at">directed =</span> <span class="st">&quot;F&quot;</span>, <span class="at">vertices =</span> v.attr.lazega)</span>
+<span id="cb74-4"><a href="gestión-de-datos-relacionales.html#cb74-4" tabindex="-1"></a></span>
+<span id="cb74-5"><a href="gestión-de-datos-relacionales.html#cb74-5" tabindex="-1"></a><span class="fu">V</span>(g_lazega)<span class="sc">$</span>name <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">vcount</span>(g_lazega)</span></code></pre></div>
+<div class="sourceCode" id="cb75"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb75-1"><a href="gestión-de-datos-relacionales.html#cb75-1" tabindex="-1"></a><span class="co"># Matriz de adyacencia</span></span>
+<span id="cb75-2"><a href="gestión-de-datos-relacionales.html#cb75-2" tabindex="-1"></a>Y_lazega <span class="ot">&lt;-</span> <span class="fu">as_adjacency_matrix</span>(g_lazega, <span class="at">sparse =</span> F)</span></code></pre></div>
+<div class="sourceCode" id="cb76"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb76-1"><a href="gestión-de-datos-relacionales.html#cb76-1" tabindex="-1"></a><span class="co"># Orden</span></span>
+<span id="cb76-2"><a href="gestión-de-datos-relacionales.html#cb76-2" tabindex="-1"></a><span class="fu">vcount</span>(g_lazega)</span></code></pre></div>
+<pre><code>## [1] 36</code></pre>
+<div class="sourceCode" id="cb78"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb78-1"><a href="gestión-de-datos-relacionales.html#cb78-1" tabindex="-1"></a><span class="co"># Tamaño</span></span>
+<span id="cb78-2"><a href="gestión-de-datos-relacionales.html#cb78-2" tabindex="-1"></a><span class="fu">ecount</span>(g_lazega)</span></code></pre></div>
+<pre><code>## [1] 115</code></pre>
+<div class="sourceCode" id="cb80"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb80-1"><a href="gestión-de-datos-relacionales.html#cb80-1" tabindex="-1"></a><span class="co"># Dirigida?</span></span>
+<span id="cb80-2"><a href="gestión-de-datos-relacionales.html#cb80-2" tabindex="-1"></a><span class="fu">is_directed</span>(g_lazega)</span></code></pre></div>
+<pre><code>## [1] FALSE</code></pre>
+<div class="sourceCode" id="cb82"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb82-1"><a href="gestión-de-datos-relacionales.html#cb82-1" tabindex="-1"></a><span class="co"># Ponderada?</span></span>
+<span id="cb82-2"><a href="gestión-de-datos-relacionales.html#cb82-2" tabindex="-1"></a><span class="fu">is_weighted</span>(g_lazega)</span></code></pre></div>
+<pre><code>## [1] FALSE</code></pre>
+<div class="sourceCode" id="cb84"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb84-1"><a href="gestión-de-datos-relacionales.html#cb84-1" tabindex="-1"></a><span class="co"># Simple?</span></span>
+<span id="cb84-2"><a href="gestión-de-datos-relacionales.html#cb84-2" tabindex="-1"></a><span class="fu">is_simple</span>(g_lazega)</span></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<div class="sourceCode" id="cb86"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb86-1"><a href="gestión-de-datos-relacionales.html#cb86-1" tabindex="-1"></a><span class="co"># Visualización</span></span>
+<span id="cb86-2"><a href="gestión-de-datos-relacionales.html#cb86-2" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">2</span>))</span>
+<span id="cb86-3"><a href="gestión-de-datos-relacionales.html#cb86-3" tabindex="-1"></a></span>
+<span id="cb86-4"><a href="gestión-de-datos-relacionales.html#cb86-4" tabindex="-1"></a><span class="co"># Grafo</span></span>
+<span id="cb86-5"><a href="gestión-de-datos-relacionales.html#cb86-5" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
+<span id="cb86-6"><a href="gestión-de-datos-relacionales.html#cb86-6" tabindex="-1"></a><span class="fu">plot</span>(g_lazega, </span>
+<span id="cb86-7"><a href="gestión-de-datos-relacionales.html#cb86-7" tabindex="-1"></a>     <span class="at">vertex.size =</span> <span class="dv">9</span>, </span>
+<span id="cb86-8"><a href="gestión-de-datos-relacionales.html#cb86-8" tabindex="-1"></a>     <span class="at">vertex.label.color =</span> <span class="st">&quot;black&quot;</span>, </span>
+<span id="cb86-9"><a href="gestión-de-datos-relacionales.html#cb86-9" tabindex="-1"></a>     <span class="at">vertex.color =</span> <span class="cn">NA</span>, </span>
+<span id="cb86-10"><a href="gestión-de-datos-relacionales.html#cb86-10" tabindex="-1"></a>     <span class="at">vertex.frame.color =</span> <span class="st">&quot;black&quot;</span>, </span>
+<span id="cb86-11"><a href="gestión-de-datos-relacionales.html#cb86-11" tabindex="-1"></a>     <span class="at">edge.color =</span> <span class="st">&quot;blue4&quot;</span>, </span>
+<span id="cb86-12"><a href="gestión-de-datos-relacionales.html#cb86-12" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">&quot;Trabajo colaborativo&quot;</span>)</span>
+<span id="cb86-13"><a href="gestión-de-datos-relacionales.html#cb86-13" tabindex="-1"></a></span>
+<span id="cb86-14"><a href="gestión-de-datos-relacionales.html#cb86-14" tabindex="-1"></a><span class="co"># Matriz de adyacencia</span></span>
+<span id="cb86-15"><a href="gestión-de-datos-relacionales.html#cb86-15" tabindex="-1"></a><span class="fu">corrplot</span>(<span class="at">corr =</span> Y_lazega, </span>
+<span id="cb86-16"><a href="gestión-de-datos-relacionales.html#cb86-16" tabindex="-1"></a>         <span class="at">method =</span> <span class="st">&quot;color&quot;</span>, </span>
+<span id="cb86-17"><a href="gestión-de-datos-relacionales.html#cb86-17" tabindex="-1"></a>         <span class="at">tl.col =</span> <span class="st">&quot;black&quot;</span>, </span>
+<span id="cb86-18"><a href="gestión-de-datos-relacionales.html#cb86-18" tabindex="-1"></a>         <span class="at">addgrid.col =</span> <span class="st">&quot;gray90&quot;</span>, </span>
+<span id="cb86-19"><a href="gestión-de-datos-relacionales.html#cb86-19" tabindex="-1"></a>         <span class="at">cl.pos =</span> <span class="st">&quot;n&quot;</span>)</span></code></pre></div>
+<p><img src="aer_files/figure-html/unnamed-chunk-31-1.png" width="1344" style="display: block; margin: auto;" /></p>
+
+</div>
+</div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+<a href="conceptos-preliminares.html" class="navigation navigation-prev navigation-unique" aria-label="Previous page"><i class="fa fa-angle-left"></i></a>
+
+    </div>
+  </div>
+<script src="libs/gitbook-2.6.7/js/app.min.js"></script>
+<script src="libs/gitbook-2.6.7/js/clipboard.min.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-search.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-sharing.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-fontsettings.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-bookdown.js"></script>
+<script src="libs/gitbook-2.6.7/js/jquery.highlight.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-clipboard.js"></script>
+<script>
+gitbook.require(["gitbook"], function(gitbook) {
+gitbook.start({
+  "sharing": {
+    "github": false,
+    "facebook": true,
+    "twitter": true,
+    "linkedin": false,
+    "weibo": false,
+    "instapaper": false,
+    "vk": false,
+    "whatsapp": false,
+    "all": ["facebook", "twitter", "linkedin", "weibo", "instapaper"]
+  },
+  "fontsettings": {
+    "theme": "white",
+    "family": "sans",
+    "size": 2
+  },
+  "edit": {
+    "link": null,
+    "text": null
+  },
+  "history": {
+    "link": null,
+    "text": null
+  },
+  "view": {
+    "link": null,
+    "text": null
+  },
+  "download": null,
+  "search": {
+    "engine": "fuse",
+    "options": null
+  },
+  "toc": {
+    "collapse": "subsection"
+  }
+});
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    var src = "true";
+    if (src === "" || src === "true") src = "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/latest.js?config=TeX-MML-AM_CHTML";
+    if (location.protocol !== "file:")
+      if (/^https?:/.test(src))
+        src = src.replace(/^https?:/, '');
+    script.src = src;
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+</body>
+
+</html>
