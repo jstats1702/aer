@@ -230,14 +230,14 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <pre><code>## [1] &quot;igraph&quot;</code></pre>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="gestión-de-datos-relacionales.html#cb4-1" tabindex="-1"></a><span class="co"># Vértices</span></span>
 <span id="cb4-2"><a href="gestión-de-datos-relacionales.html#cb4-2" tabindex="-1"></a><span class="fu">V</span>(g)</span></code></pre></div>
-<pre><code>## + 7/7 vertices, named, from 4eb6830:
+<pre><code>## + 7/7 vertices, named, from deaaf88:
 ## [1] 1 2 3 4 5 6 7</code></pre>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="gestión-de-datos-relacionales.html#cb6-1" tabindex="-1"></a><span class="co"># Orden</span></span>
 <span id="cb6-2"><a href="gestión-de-datos-relacionales.html#cb6-2" tabindex="-1"></a><span class="fu">vcount</span>(g)</span></code></pre></div>
 <pre><code>## [1] 7</code></pre>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="gestión-de-datos-relacionales.html#cb8-1" tabindex="-1"></a><span class="co"># Aristas</span></span>
 <span id="cb8-2"><a href="gestión-de-datos-relacionales.html#cb8-2" tabindex="-1"></a><span class="fu">E</span>(g)</span></code></pre></div>
-<pre><code>## + 10/10 edges from 4eb6830 (vertex names):
+<pre><code>## + 10/10 edges from deaaf88 (vertex names):
 ##  [1] 1--2 1--3 2--3 2--4 3--5 4--5 4--6 4--7 5--6 6--7</code></pre>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="gestión-de-datos-relacionales.html#cb10-1" tabindex="-1"></a><span class="co"># Tamaño</span></span>
 <span id="cb10-2"><a href="gestión-de-datos-relacionales.html#cb10-2" tabindex="-1"></a><span class="fu">ecount</span>(g)</span></code></pre></div>
@@ -288,7 +288,7 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
 <span id="cb28-2"><a href="gestión-de-datos-relacionales.html#cb28-2" tabindex="-1"></a>dg <span class="ot">&lt;-</span> <span class="fu">graph_from_literal</span>(<span class="dv">1</span><span class="sc">-+</span><span class="dv">2</span>, <span class="dv">1</span><span class="sc">++</span><span class="dv">3</span>, <span class="dv">2</span><span class="sc">-+</span><span class="dv">3</span>, <span class="dv">3</span><span class="sc">++</span><span class="dv">4</span>, <span class="dv">4</span><span class="sc">-+</span><span class="dv">5</span>, <span class="dv">5</span><span class="sc">-+</span><span class="dv">6</span>, <span class="dv">6</span><span class="sc">++</span><span class="dv">7</span>)</span></code></pre></div>
 <div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="gestión-de-datos-relacionales.html#cb29-1" tabindex="-1"></a><span class="co"># Aristas</span></span>
 <span id="cb29-2"><a href="gestión-de-datos-relacionales.html#cb29-2" tabindex="-1"></a><span class="fu">E</span>(dg)</span></code></pre></div>
-<pre><code>## + 10/10 edges from 6e59bc7 (vertex names):
+<pre><code>## + 10/10 edges from 878e7ac (vertex names):
 ##  [1] 1-&gt;2 1-&gt;3 2-&gt;3 3-&gt;1 3-&gt;4 4-&gt;3 4-&gt;5 5-&gt;6 6-&gt;7 7-&gt;6</code></pre>
 <div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="gestión-de-datos-relacionales.html#cb31-1" tabindex="-1"></a><span class="co"># Tamaño</span></span>
 <span id="cb31-2"><a href="gestión-de-datos-relacionales.html#cb31-2" tabindex="-1"></a><span class="fu">ecount</span>(dg)</span></code></pre></div>
@@ -753,7 +753,7 @@ gitbook.start({
     "link": null,
     "text": null
   },
-  "download": null,
+  "download": ["aer.pdf"],
   "search": {
     "engine": "fuse",
     "options": null
