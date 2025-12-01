@@ -1,0 +1,379 @@
+---
+title: "Conceptos fundamentales de teoría de grafos"
+author: 
+- Juan Sosa PhD
+- Email   jcsosam@unal.edu.co
+- GitHub  https://github.com/jstats1702 
+date: ""
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cerulean
+    highlight: kate
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introducción
+
+La **teoría de grafos** es fundamental para analizar redes sociales, porque proporciona un lenguaje matemático preciso para representar actores como vértices y relaciones como aristas. 
+
+A partir de esta representación podemos describir y cuantificar propiedades estructurales de la red, como quién está conectado con quién, qué tan lejos están los vértices entre sí y cómo se agrupan entre sí.
+
+## Grafos y subgrafos
+
+Un **grafo** $G = (V, E)$ es una estructura que consiste de un conjunto de **vértices** (nodos) $V$ y de un conjunto de **aristas** (enlaces) $E$, donde los elementos de $E$ son parejas de la forma $e=\{u,v\}$, con $u,v\in V$. 
+
+Un grafo $G'=(V',E')$ es un **subgrafo** de $G=(V,E)$ si $V'\subset V$ y $E'\subset E$.
+
+```{r, eval = TRUE, echo=FALSE, out.width="70%", fig.pos = 'H', fig.align = 'center'}
+knitr::include_graphics("03_subgraph.png")
+```
+
+Sea $S \subseteq V$ un subconjunto de vértices. El **subgrafo inducido por $S$** es el grafo $G_S = (S, E_S)$ que contiene exactamente los vértices de $S$ y **todas y solo** las aristas del grafo original cuyos extremos pertenecen a $S$ (no se crean aristas nuevas), es decir, $E_S = \big\{\{u,v\} \in E : u \in S,\ v \in S \big\}$.
+
+```{r}
+suppressMessages(suppressWarnings(library(igraph)))
+
+# Grafo
+g <- graph_from_literal(1-2, 1-3, 2-3, 2-4, 3-5, 4-6, 5-6)
+
+# Subgrafo inducido
+g_sub <- induced_subgraph(g, vids = c(1, 2, 3, 5))
+```
+
+```{r, fig.align = 'center'}
+# Visualización
+par(mfrow = c(1,2), mar = c(1, 1, 2, 1))
+
+# Grafo
+set.seed(123)
+plot(
+  g, 
+  vertex.color = "lightblue",
+  vertex.size  = 20,
+  main         = "Grafo"
+)
+
+# Grafo inducido
+set.seed(123)
+plot(
+  g_sub,
+  vertex.color = "salmon",
+  vertex.size  = 20,
+  main = "Subgrafo inducido por {1, 2, 3, 5}"
+)
+```
+
+## Adyacencia
+
+Se dice que dos vértices $u, v \in V$ son **adyacentes** (*adjacent*), lo que se escribe $u \sim v$, si están unidos por alguna **arista** de $E$, es decir, si $\{u,v\} \in E$.
+
+Un vértice $v \in V$ es **incidente** (*incident*) con una arista $e \in E$ si $e = \{v,u\}$ para algún $u \in V$.
+
+La **vecindad** de un vértice $v \in V$, lo que se denota $N_v$, es el conjunto de vértices adyacentes a $v$, es decir, $N_v = \{u \in V : u \sim v\}$.
+
+El **grado** (*degree*) de un vértice $v \in V$ es el número de aristas incidentes en $v$, y coincide con la cardinalidad de su vecindad, es decir, $d_v = |N_v|$. 
+
+Un vértice $v \in V$ se llama **aislado** (*isolated*) si $v \not\sim u$ para todo $u \in V$, o, de forma equivalente, si su grado es $d_v = 0$.
+
+En un dígrafo, la **vecindad de salida** de un vértice $v \in V$ es el conjunto de vértices a los que $v$ apunta, $N_v^{\text{out}} = \{u \in V : (v,u) \in E\}$, mientras que la **vecindad de entrada** es el conjunto de vértices que tienen una arista dirigida hacia $v$, $N_v^{\text{in}} = \{u \in V : (u,v) \in E\}$.
+
+En un dígrafo, el **grado de salida** (*out-degree*) $d_v^{\text{out}}$ y el **grado de entrada** (*in-degree*) $d_v^{\text{in}}$ de un vértice $v \in V$ son, respectivamente, el número de aristas que salen de $v$ y el número de aristas que apuntan hacia $v$.
+
+### Ejemplo
+
+```{r}
+# Grafo
+g <- make_empty_graph(n = 8, directed = FALSE)
+g <- add_edges(g, c(1, 2,
+                    2, 3,
+                    3, 4,
+                    3, 5))
+```
+
+```{r}
+# Grado de cada vértice
+(deg <- degree(g))
+```
+
+```{r, fig.align='center'}
+# Visualización
+par(mfrow = c(1,1), mar = c(1, 1, 2, 1))
+
+# Grafo
+set.seed(123)
+plot(g)
+```
+
+```{r}
+# Vértices aislados
+V(g)[deg == 0]
+
+# Vértices adyacentes a 3
+(nb3 <- neighbors(g, v = 3))
+
+# Aristas incidentes en el vértice 3
+(ic3 <- incident(g, v = 3, mode = "all"))
+```
+
+```{r, fig.align='center'}
+# Colores de vértices
+v_col      <- rep(0, vcount(g))
+v_col[3]   <- "khaki"
+v_col[nb3] <- "khaki"
+
+# Colores de aristas
+e_col      <- rep("grey", ecount(g))
+e_col[ic3] <- "khaki"
+
+# Visualización
+par(mfrow = c(1,1), mar = c(1, 1, 2, 1))
+
+set.seed(123)
+plot(
+  g,
+  vertex.color = v_col,
+  edge.color   = e_col,
+  edge.width   = ifelse(e_col == "khaki", 2, 1)
+)
+```
+
+## Ejemplo
+
+```{r}
+# Digrafo
+dg <- graph_from_literal(1-+2, 1-+3, 1-+4, 2-+3, 2-+5, 3-+5, 4-+2, 6-+3, 7)
+```
+
+```{r, fig.align='center'}
+# Visualización
+par(mfrow = c(1,1), mar = c(1, 1, 2, 1))
+
+set.seed(123)
+plot(dg)
+```
+
+```{r}
+# Grado de entrada
+degree(dg, mode = "in")
+
+# Grado de salida
+degree(dg, mode = "out")
+```
+
+## Movimiento
+
+Una **caminata** (*walk*) de $v_0$ a $v_\ell$ de longitud $\ell$ es una secuencia alternante de vértices y aristas $\{v_0, e_1, v_1, e_2, v_2, \ldots, v_{\ell-1}, e_\ell, v_\ell\}$ tal que, para cada $i = 1,\ldots,\ell$, los extremos de $e_i$ son $\{v_{i-1}, v_i\}$ (se permiten vértices y aristas repetidos).
+
+- $1 \rightarrow 2 \rightarrow 3 \rightarrow 4 \rightarrow 3$ es una **caminata abierta**.  
+- $1 \rightarrow 2 \rightarrow 3 \rightarrow 4 \rightarrow 3 \rightarrow 1$ es una **caminata cerrada**.
+
+```{r, eval = TRUE, echo=FALSE, out.width="20%", fig.pos = 'H', fig.align = 'center'}
+knitr::include_graphics("03_walk.png")
+```
+
+Un **recorrido** (*trail*) es una caminata abierta en la que no se repite ninguna arista (aunque sí pueden repetirse vértices).
+
+- $1 \rightarrow 3 \rightarrow 8 \rightarrow 6 \rightarrow 3 \rightarrow 2$ es un **recorrido**.
+
+```{r, eval = TRUE, echo=FALSE, out.width="25%", fig.pos = 'H', fig.align = 'center'}
+knitr::include_graphics("03_trail.png")
+```
+
+Un **camino** (*path*) es una recorrido en la que no se repite ningún vértice.
+
+- $6 \rightarrow 8 \rightarrow 3 \rightarrow 1 \rightarrow 2 \rightarrow 4$ es un **camino**.
+
+```{r, eval = TRUE, echo=FALSE, out.width="25%", fig.pos = 'H', fig.align = 'center'}
+knitr::include_graphics("03_path.png")
+```
+
+## Conectividad
+
+Se dice que un vértice $v$ es **accesible** (*reachable*) desde otro vértice $u$ si existe al menos una caminata desde $u$ hasta $v$.  
+
+Se dice que un grafo está **conectado** (*connected*) si, para todo par de vértices $u, v$, existe una caminata que los une, es decir, si cada vértice es accesible desde cualquier otro.
+ 
+### Ejemplo: grafos conectados con 5 vértices
+
+```{r, eval = TRUE, echo=FALSE, out.width="50%", fig.pos = 'H', fig.align = 'center'}
+knitr::include_graphics("03_connected_G5.png")
+```
+
+Una **componente conexa** (*connected component*) o simplemente **componente** de un grafo es un subgrafo conexo **maximal**, es decir, un subgrafo conexo al que no se le puede añadir ningún otro vértice del grafo sin perder la conectividad (o, equivalentemente, sin dejar de ser conexo).
+
+La **componente gigante** (*giant component*) de un grafo es la componente conexa de mayor tamaño, es decir, la componente que contiene el mayor número de vértices. En grafos grandes, suele ser la componente que agrupa una fracción significativa del total de vértices y concentra la mayor parte de los caminos del grafo.
+
+### Ejemplo
+
+```{r}
+# Grado
+g <- graph_from_literal(1-7, 2-7, 2-4, 3-6, 4-7, 5-11, 6-12, 7-8, 7-9, 7-10)
+```
+
+```{r, fig.align = 'center'}
+# Visualización
+par(mfrow = c(1,1), mar = c(1, 1, 2, 1))
+
+set.seed(123)
+plot(g)
+```
+
+```{r}
+# Conectado?
+is_connected(g)
+```
+
+```{r}
+# Componentes
+components(g)
+```
+
+Un dígrafo está **débilmente conectado** (*weakly connected*) si su grafo subyacente, obtenido al ignorar la dirección de las aristas, es conectado.
+
+Un dígrafo está **fuertemente conectado** (*strongly connected*) si, para todo par de vértices $u, v$, existe una caminata dirigida de $u$ a $v$ y de $v$ a $u$, es decir, si cada vértice es accesible desde cualquier otro mediante aristas dirigidas.
+
+### Ejemplo
+
+```{r, fig.align='center'}
+# Digrafo
+dg <- graph_from_literal(1-+2, 2-+3, 3-+1, 3-+4, 4-+5)
+```
+
+```{r, fig.align = 'center'}
+# Visualización
+par(mfrow = c(1,1), mar = c(1, 1, 2, 1))
+
+set.seed(123)
+plot(dg)
+```
+
+```{r}
+# Conectado débilmente?
+is_connected(graph = dg, mode = "weak")
+```
+
+```{r}
+# Conectado fuertemente?
+is_connected(graph = dg, mode = "strong")
+```
+
+```{r}
+# Componentes débilmente conectadas
+components(dg, mode = "weak")
+```
+
+```{r}
+# Componentes fuertemente conectadas
+components(dg, mode = "strong")
+```
+
+## Distancia
+
+La **distancia geodésica** entre dos vértices $u$ y $v$ de un grafo se denota con $d(u,v)$ y es la longitud del camino más corto que los conecta.  
+
+Si no existe ningún camino entre $u$ y $v$, su distancia se define como $d(u,v) = \infty$.  
+
+El valor máximo de las distancias geodésicas (finitas) entre todos los pares de vértices se denomina **diámetro** del grafo.  
+
+La **distancia geodésica promedio** es una medida del grado de separación entre los vértices del grafo. 
+
+La **excentricidad** de un vértice $v$ se define como $\varepsilon(v) = \max_{u} d(u,v)$, y el diámetro es el máximo de las excentricidades.
+
+### Ejemplo
+
+```{r, fig.align='center'}
+# Grafo
+g <- graph_from_literal(1-2, 1-3, 2-3, 2-4, 3-5, 4-5, 4-6, 4-7, 5-6, 6-7)
+```
+
+```{r, fig.align = 'center'}
+# Visualización
+par(mfrow = c(1,1), mar = c(1, 1, 2, 1))
+
+set.seed(123)
+plot(g)
+```
+
+```{r}
+# Distancia
+distances(graph = g, v = 1, to = 6)
+```
+
+```{r}
+# Caminata
+shortest_paths(graph = g, from = 1, to = 6)$vpath
+```
+
+```{r}
+# Caminos
+all_shortest_paths(graph = g, from = 1, to = 6)$res
+```
+
+```{r}
+# Distancias
+(D <- distances(graph = g, v = V(g), to = V(g)))
+```
+
+```{r}
+# Diámetro
+diameter(g)
+```
+
+```{r}
+# Diámetro (otra manera)
+max(D[lower.tri(D)])
+```
+
+```{r}
+# Camino del diámetro
+(d <- get_diameter(g))
+```
+
+```{r, fig.align = 'center'}
+# Visualización
+par(mfrow = c(1,1), mar = c(1, 1, 2, 1))
+
+V(g)$color <- "white"
+E(g)$color <- "grey"
+E(g)$width <- 1
+V(g)[d]$color <- "royalblue"
+E(g, path = d)$color <- "royalblue"
+E(g, path = d)$width <- 2
+set.seed(123)
+plot(g)
+```
+
+```{r}
+# Distancia geodésica promedio
+mean_distance(g)
+```
+
+```{r}
+# Distancia geodésica promedio (otra manera)
+mean(D[lower.tri(D)])
+```
+
+```{r}
+# Distribución de las distancias
+distance_table(g)
+```
+
+```{r, fig.align='center'}
+# Visualización
+caminos <- distance_table(g)$res
+names(caminos) <- 1:length(caminos)
+barplot(
+  prop.table(caminos), 
+  xlab = "Distancia geodésica", 
+  ylab = "F. Relativa", 
+  border = "grey", 
+  col = "grey", 
+  main = "Distribución de distancias geodésicas"
+)
+```
