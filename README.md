@@ -7,3 +7,4 @@ En este repositorio se encuentran todos los materiales del curso **Análisis Est
 1. Conceptos preliminares.
 2. Gestión de datos relacionales.
 3. Conceptos fundamentales de teoría de grafos.
+4. Visualización de datos relacionales.
