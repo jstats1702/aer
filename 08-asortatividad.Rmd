@@ -15,7 +15,6 @@ output:
 ---
 
 
-
 # Introducción
 
 La **conexión selectiva** entre vértices de acuerdo con sus características se denomina **mezcla asortativa** (*assortative mixing*).
@@ -32,6 +31,7 @@ Si el coeficiente es alto, significa que los vértices conectados tienden a tene
 ```{r, eval = TRUE, echo=FALSE, out.width="40%", fig.pos = 'H', fig.align = 'center'}
 knitr::include_graphics("08_assortatividad_assor.jpg")
 ```
+
 
 # Características categóricas
 
@@ -202,6 +202,7 @@ is_directed(karate)
 # ponderada?
 is_weighted(karate)
 ```
+
 
 ```{r, fig.height = 6, fig.width = 6, fig.align='center'}
 # visualización
