@@ -133,7 +133,10 @@ head(dat_edges)
 
 ```{r}
 # grafo
-got <- graph_from_data_frame(d = dat_edges[,c(1,2)], vertices = dat_nodes$Id, directed = "F") 
+got <- graph_from_data_frame(d = dat_edges[,c(1,2)], 
+                             vertices = dat_nodes$Id, 
+                             directed = "F")
+
 E(got)$weight <- dat_edges$Weight
 ```
 
@@ -294,7 +297,10 @@ V(karate)$size <- 7*sqrt(degree(karate))
 E(karate)$width <- E(karate)$weight
 
 # grafo decorado
-plot(karate, layout = l, vertex.frame.color = "black", vertex.label.color = "black")
+plot(karate, 
+     layout = l, 
+     vertex.frame.color = "black", 
+     vertex.label.color = "black")
 title(main = "Interacciones sociales")
 ```
 
@@ -370,7 +376,7 @@ plot(fblog_c,
 ```
 
 
-## Otras alternatvivas de visualización
+## Otras alternativas de visualización
 
 Usando **`ggraph`**.
 
