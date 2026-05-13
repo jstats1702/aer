@@ -1,0 +1,711 @@
+---
+title: "Un Modelo para Redes Dinámicas con Efectos de Sociabilidad"
+author: "J. Sosa"
+date: "2025-01-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Modelo
+
+Se presenta una extensión del **modelo con efectos de sociabilidad** diseñado para una **única red**, adaptado para caracterizar una **serie temporal de redes binarias no dirigidas**.  
+
+Este enfoque permite modelar la **evolución dinámica** de la red, capturando variaciones en la **conectividad global** y en la **sociabilidad individual** a lo largo del tiempo.  
+
+Considérese una **secuencia temporal** de **redes binarias no dirigidas**, representada mediante **matrices de adyacencia** \(\mathbf{Y}^{(t)} = [y_{i,j}^{(t)}]\) para \(t = 1, 2, \dots, T\). En este contexto, cada elemento \(y_{i,j}^{(t)} \in \{0,1\}\) denota la **presencia** (\(y_{i,j}^{(t)} = 1\)) o **ausencia** (\(y_{i,j}^{(t)} = 0\)) de una **conexión** entre los **nodos** \(i\) y \(j\) en el instante de **tiempo** \(t\).  
+
+
+### Verosimilitud {-}
+
+El modelo para la **probabilidad de conexión** en cada instante de tiempo \(t\) se especifica como:  
+\[
+y_{i,j,t} \mid \theta_{i,j,t} \overset{\text{ind}}{\sim} \textsf{Ber}(\theta_{i,j,t}), \quad \text{para } i < j, \; t = 1, \dots, T,
+\]  
+donde:  
+\[
+\theta_{i,j,t} = \Phi\left(\mu_t + \delta_{i,t} + \delta_{j,t}\right),
+\]  
+y \(\Phi(\cdot)\) representa la **función de distribución acumulada** de una **Normal estándar**, utilizada como **función de enlace** para garantizar que las **probabilidades** \(\theta_{i,j,t}\) permanezcan dentro del intervalo válido \((0, 1)\). 
+
+
+### Previa {-}  
+
+El **efecto global de conectividad** \(\mu_t\) se modela mediante un **proceso autorregresivo de primer orden (AR(1))**, diseñado para capturar **tendencias** o **variaciones suaves** a lo largo del tiempo:  
+\[
+\mu_t \mid \mu_{t-1} \sim \textsf{N}(\rho_\mu \mu_{t-1}, \sigma^2),
+\]  
+donde el parámetro \(0 \leq \rho_\mu \leq 1\) regula la **persistencia temporal** del efecto global, controlando el grado de dependencia entre periodos consecutivos.  
+
+Los **efectos individuales de sociabilidad** \(\delta_{i,t}\) también se modelan mediante un AR(1):  
+\[
+\delta_{i,t} \mid \delta_{i,t-1} \sim \textsf{N}(\rho_\delta \delta_{i,t-1}, \tau^2),
+\]  
+donde el parámetro \(0 \leq \rho_\delta \leq 1\) controla la **persistencia temporal** en la sociabilidad individual.  
+
+En el **primer instante temporal** (\(t = 1\)), se asumen las siguientes **distribuciones previas**:  
+\[
+\mu_1 \sim \textsf{N}(0, \sigma^2), \qquad \delta_{i,1} \overset{\text{iid}}{\sim} \textsf{N}(0, \tau^2).
+\]  
+
+Las **distribuciones previas** para los **componentes de varianza** y los **parámetros de persistencia** se especifican de la siguiente manera:  
+
+- **Varianzas**:  
+\[
+\sigma^2 \sim \textsf{GI}(a_\sigma, b_\sigma), \quad \tau^2 \sim \textsf{GI}(a_\tau, b_\tau),
+\]  
+donde \(\sigma^2\) y \(\tau^2\) controlan la **variabilidad temporal** del **efecto global de conectividad** y de los **efectos de sociabilidad** individuales, respectivamente.  
+
+- **Persistencias**:  
+\[
+\rho_\mu \sim \textsf{Beta}(a_\mu, b_\mu), \quad \rho_\delta \sim \textsf{Beta}(a_\delta, b_\delta),
+\]  
+donde \(\rho_\mu\) y \(\rho_\delta\) determinan el grado de **persistencia temporal** en el **efecto global** y en los **efectos de sociabilidad**, garantizando valores en el intervalo \((0, 1)\).
+
+Los parámetros \(\rho_\mu\) y \(\rho_\delta\) representan **coeficientes de persistencia temporal** en los procesos autoregresión utilizados para modelar la evolución de los efectos globales (\(\mu_t\)) y los efectos individuales (\(\delta_{i,t}\)). Estos coeficientes deben estar en el intervalo \([0, 1]\) por las siguientes razones:  
+
+1. **Interpretación como persistencia temporal**:
+
+   - Cuando \(\rho = 0\), no hay dependencia temporal, y el valor en el tiempo \(t\) es independiente del valor anterior (\(t-1\)), lo que equivale a un **proceso sin memoria**.  
+   - Cuando \(\rho = 1\), el proceso es completamente dependiente del estado anterior, reflejando **persistencia perfecta** o una **tendencia suavizada** a lo largo del tiempo.  
+   - Valores intermedios (\(0 < \rho < 1\)) indican grados variables de **correlación temporal**, permitiendo modelar cambios graduales y tendencias en los datos.  
+
+2. **Estabilidad del proceso AR(1)**:
+
+   - Para garantizar que el proceso autorregresivo sea **estacionario**, el parámetro de persistencia debe cumplir \(|\rho| < 1\).  
+   - Sin embargo, dado que los modelos descritos aquí capturan **persistencia positiva** en los efectos, \(\rho\) se restringe al intervalo \((0, 1)\), evitando valores negativos que implicarían **oscilaciones** en lugar de **persistencia suave**.  
+
+Restringir \(\rho_\mu\) y \(\rho_\delta\) al intervalo \([0, 1]\) garantiza que el proceso autorregresivo sea **estable**, **interpretable**, y adecuado para capturar la **persistencia positiva** en los efectos modelados.
+
+
+### Parámetros e hiperparámetros
+
+El **conjunto completo de parámetros** para el modelo de red dinámica es:  
+\[
+\Theta = \{\mu_1, \ldots, \mu_T, \delta_{1,1}, \ldots, \delta_{n,T}, \sigma^2, \tau^2, \rho_\mu, \rho_\delta\}.
+\]  
+
+- **\(\mu_t\):** Representa el **efecto global de conectividad** en el instante de tiempo \(t\), capturando la **tendencia general** de formación de conexiones en la red.  
+- **\(\delta_{i,t}\):** Denota la **sociabilidad individual** del nodo \(i\) en el tiempo \(t\), reflejando la **propensión específica** de cada nodo a establecer conexiones.  
+- **\(\sigma^2\):** Es la **varianza** asociada al **efecto global de conectividad**, describiendo la **incertidumbre** en la evolución temporal de \(\mu_t\).  
+- **\(\tau^2\):** Corresponde a la **varianza** de los **efectos individuales de sociabilidad**, capturando la **heterogeneidad** en las propensiones de los nodos.  
+- **\(\rho_\mu\):** Controla la **persistencia temporal** en el **efecto global**, indicando el grado de **dependencia** entre periodos consecutivos.  
+- **\(\rho_\delta\):** Regula la **persistencia temporal** en la **sociabilidad individual**, midiendo la **estabilidad** de las propensiones de los nodos a lo largo del tiempo.  
+
+En total, el modelo tiene \(T(n + 1) + 4\) parámetros, donde \(T\) es el número de periodos temporales y \(n\) es el número de nodos en la red.
+
+Los hiperparámetros para especificar las distribuciones previas son:  
+\[
+\{a_\sigma, b_\sigma, a_\tau, b_\tau, a_\mu, b_\mu, a_\delta, b_\delta\}.
+\]  
+
+El modelo captura patrones temporales al permitir que tanto el **efecto de conectividad global** \(\mu^{(t)}\) como las **propensiones de conectividad individuales** \(\delta_i^{(t)}\) evolucionen suavemente en el tiempo mediante procesos autoregresivos. 
+
+La combinación de estos efectos permite modelar dinámicas complejas, como cambios en la **densidad** de la red, **transiciones estructurales**, y **variabilidad individual** en la **sociabilidad**. 
+
+
+# Estimación
+
+En el modelo propuesto, **las distribuciones condicionales completas no tienen forma cerrada** debido a que la **función de enlace** introduce una relación **no lineal** entre los parámetros y las observaciones.
+
+### Uso de variables latentes auxiliares {-}
+
+Para abordar esta **limitación**, se introduce un conjunto de **variables auxiliares latentes** \(z_{i,j,t}\) que facilitan la implementación del **muestreador de Gibbs**. Estas variables permiten reformular el modelo en términos de una representación continua, vinculada a los datos observados \(y_{i,j,t}\), de la siguiente manera:  
+\[
+y_{i,j,t} =
+\begin{cases} 
+1 & \text{si } z_{i,j,t} > 0, \\
+0 & \text{si } z_{i,j,t} \leq 0,
+\end{cases}
+\]  
+donde las variables latentes siguen la distribución:  
+\[
+z_{i,j,t} \mid \eta_{i,j,t} \sim \textsf{N}\left(\eta_{i,j,t}, 1\right),
+\]  
+y el **predictor lineal** se define como:  
+\[
+\eta_{i,j,t} = \mu_t + \delta_{i,t} + \delta_{j,t}.
+\]  
+
+Esta formulación simplifica la inferencia al permitir que las **distribuciones condicionales completas (DCCs)** de los parámetros mantengan una **forma cerrada**, mejorando la **eficiencia computacional** del algoritmo.  
+
+### Distribuciones Condicionales Completas {-}
+
+1. $z_{i,j,t} \mid y_{i,j,t}, \mu_t, \delta_{i,t}, \delta_{j,t}$ es Normal truncada:  
+\[
+z_{i,j,t} \mid y_{i,j,t}, \mu_t, \delta_{i,t}, \delta_{j,t} \sim
+\begin{cases} 
+\textsf{N}_{(0,\infty)}\,\,\,(\mu_t + \delta_{i,t} + \delta_{j,t}, 1), & \text{si } y_{i,j,t} = 1, \\
+\textsf{N}_{(-\infty,0]}     (\mu_t + \delta_{i,t} + \delta_{j,t}, 1), & \text{si } y_{i,j,t} = 0.
+\end{cases}
+\]  
+
+2. $\mu_t \mid \mathbf{z}_t, \boldsymbol{\delta}_t, \rho_\mu, \sigma^2 \sim \textsf{N}(m_t, v_t^2)$, con:
+\[
+v_t^2 = \left( \frac{n(n-1)}{2} + \frac{1}{\sigma^2} \right)^{-1}.
+\]  
+
+- Para \(t = 1\):  
+\[
+m_1 = v_1^2 \sum_{i < j} \left(z_{i,j,1} - \delta_{i,1} - \delta_{j,1}\right).
+\]  
+- Para \(t > 1\):  
+\[
+m_t = v_t^2 \left( \frac{\rho_\mu \mu_{t-1}}{\sigma^2} + \sum_{i < j} \left(z_{i,j,t} - \delta_{i,t} - \delta_{j,t}\right) \right).
+\]  
+
+3. $\delta_{i,t} \mid \mathbf{z}_t, \mu_t, \boldsymbol{\delta}_{-i,t}, \rho_\delta, \tau^2 \sim \textsf{N}(m_{i,t}, v_{i,t}^2)$, con:
+\[
+v_{i,t}^2 = \left( n-1 + \frac{1}{\tau^2} \right)^{-1}.
+\]  
+
+- Para \(t = 1\): 
+\[
+m_{i,1} = v_{i,1}^2 \sum_{j \neq i} \left( z_{i,j,1} - \mu_1 - \delta_{j,1} \right).
+\]  
+
+- Para \(t > 1\): 
+\[
+m_{i,t} = v_{i,t}^2 \left( \frac{\rho_\delta\, \delta_{i,t-1}}{\tau^2} + \sum_{j \neq i} \left( z_{i,j,t} - \mu_t - \delta_{j,t} \right) \right).
+\]  
+
+4. $\sigma^2 \mid \boldsymbol{\mu}, \rho_\mu \sim \textsf{GI}(a,b)$, con:
+\[
+a = a_\sigma + \frac{T}{2},\quad
+b = b_\sigma + \frac{1}{2}(1 - \rho_\mu^2)\,\mu_1^2 + \frac{1}{2} \sum_{t=2}^{T} \left( \mu_t - \rho_\mu \mu_{t-1} \right)^2.
+\] 
+
+5. $\tau^2 \mid \boldsymbol{\delta}, \rho_\delta \sim \textsf{IG}(a,b)$, con:
+\[
+a = a_\tau + \frac{nT}{2},\quad
+b = b_\tau + \frac{1}{2}(1 - \rho_\delta^2)\sum_{i=1}^{n}\delta_{i,1}^2 + \frac{1}{2} \sum_{i=1}^{n} \sum_{t=2}^{T} \left( \delta_{i,t} - \rho_\delta\,\delta_{i,t-1} \right)^2.
+\]
+
+6. $\rho_\mu$ no tiene forma cerrada, dado que:
+\[
+-\frac{1}{2\sigma^2}\sum_{t=2}^{T} \left(\mu_t - \rho_\mu \mu_{t-1}\right)^2 + (a_\mu - 1)\log(\rho_\mu) + (b_\mu - 1)\log(1 - \rho_\mu) + \text{C},
+\]
+donde C es una constante que no depende de $\rho_\mu$.
+
+7. $\rho_\delta$ no tiene forma cerrada, dado que:
+\[
+-\frac{1}{2\tau^2} \sum_{i=1}^{n} \sum_{t=2}^{T} \left(\delta_{i,t} - \rho_\delta \, \delta_{i,t-1}\right)^2 + (a_\delta - 1)\log(\rho_\delta) + (b_\delta - 1)\log(1 - \rho_\delta) + \text{C},
+\]
+donde C es una constante que no depende de $\rho_\delta$.
+
+ 
+```{r DCCs}
+# Distribuciones condicionales completas
+# Muestreo de z
+sample_z <- function(y, mu, delta, z, T, n) {
+  for (t in 1:T) {
+    for (i in 1:(n - 1)) {
+      for (j in (i + 1):n) {
+        mean_z <- mu[t] + delta[i, t] + delta[j, t]
+        if (y[i, j, t] == 1) {
+          z[i, j, t] <- truncnorm::rtruncnorm(1, a = 0, b = Inf, mean = mean_z, sd = 1)
+        } else {
+          z[i, j, t] <- truncnorm::rtruncnorm(1, a = -Inf, b = 0, mean = mean_z, sd = 1)
+        }
+        z[j, i, t] <- z[i, j, t]
+      }
+    }
+  }
+  return(z)
+}
+
+# Muestreo de mu
+sample_mu <- function(z, delta, mu, rho_mu, sigma2, T, n) {
+  v2_mu <- 1 / (n * (n - 1) / 2 + 1 / sigma2)
+  for (t in 1:T) {
+    sum_residuals <- 0
+    for (i in 1:(n - 1)) {
+      for (j in (i + 1):n) {
+        sum_residuals <- sum_residuals + (z[i, j, t] - delta[i, t] - delta[j, t])
+      }
+    }
+    if (t == 1) {
+      m_mu <- v2_mu * sum_residuals
+    } else {
+      m_mu <- v2_mu * (sum_residuals + rho_mu * mu[t - 1] / sigma2)
+    }
+    mu[t] <- rnorm(1, mean = m_mu, sd = sqrt(v2_mu))
+  }
+  return(mu)
+}
+
+# Muestreo de delta
+sample_delta <- function(z, mu, delta, rho_delta, tau2, T, n) {
+  v2_delta <- 1 / (1 / tau2 + (n - 1))
+  for (t in 1:T) {
+    for (i in 1:n) {
+      sum_residuals <- 0
+      for (j in 1:n) {
+        if (j != i) {
+          sum_residuals <- sum_residuals + (z[i, j, t] - mu[t] - delta[j, t])
+        }
+      }
+      if (t == 1) {
+        m_delta <- v2_delta * sum_residuals
+      } else {
+        m_delta <- v2_delta * (rho_delta * delta[i, t - 1] / tau2 + sum_residuals)
+      }
+      delta[i, t] <- rnorm(1, mean = m_delta, sd = sqrt(v2_delta))
+    }
+  }
+  return(delta)
+}
+
+# Muestreo de sigma2
+sample_sigma2 <- function(mu, rho_mu, a_sigma, b_sigma, T) {
+  A <- a_sigma + T / 2
+  B <- b_sigma + 0.5 * (1 - rho_mu^2) * mu[1]^2
+  for (t in 2:T) {
+    B <- B + 0.5 * (mu[t] - rho_mu * mu[t - 1])^2
+  }
+  return(1 / rgamma(1, shape = A, rate = B))
+}
+
+# Muestreo de tau2
+sample_tau2 <- function(delta, rho_delta, a_tau, b_tau, T, n) {
+  A <- a_tau + (n * T) / 2
+  B <- b_tau + 0.5 * (1 - rho_delta^2) * sum(delta[, 1]^2)
+  for (t in 2:T) {
+    for (i in 1:n) {
+      B <- B + 0.5 * (delta[i, t] - rho_delta * delta[i, t - 1])^2
+    }
+  }
+  return(1 / rgamma(1, shape = A, rate = B))
+}
+```
+
+
+```{r gibbs}
+# Muestreador de Gibbs para el modelo dinámico
+gibbs_sampler_dynamic <- function(rho_mu, rho_delta, delta, y, n_iter, n_burn, n_thin, a_sigma, b_sigma, a_tau, b_tau, a_mu, b_mu, a_delta, b_delta) {
+  # Dimensiones
+  n <- dim(y)[1]
+  T <- dim(y)[3]
+
+  # Inicialización
+  sigma2 <- 1 / rgamma(1, shape = a_sigma, rate = b_sigma)
+  tau2 <- 1 / rgamma(1, shape = a_tau, rate = b_tau)
+  mu <- rnorm(T, mean = 0, sd = sqrt(sigma2))
+  # delta <- matrix(rnorm(n * T, mean = 0, sd = sqrt(tau2)), nrow = n, ncol = T)
+  z <- array(0, dim = c(n, n, T))
+  # rho_mu <- rbeta(1, a_mu, b_mu)
+  # rho_delta <- rbeta(1, a_delta, b_delta)
+
+  # Adaptación inicial
+  # epsilon_mu <- 0.1 
+  # epsilon_delta <- 0.1
+  # accept_rate_mu <- 0
+  # accept_rate_delta <- 0
+  
+  # Almacenamiento
+  n_samples <- (n_iter - n_burn) / n_thin
+  samples <- list(mu = matrix(0, n_samples, T),
+                  delta = array(0, dim = c(n_samples, n, T)),
+                  sigma2 = numeric(n_samples),
+                  tau2 = numeric(n_samples),
+                  rho_mu = numeric(n_samples),
+                  rho_delta = numeric(n_samples))
+
+  # Muestreo
+  cat("Iniciando muestreador de Gibbs...\n")
+  for (iter in 1:n_iter) {
+    z <- sample_z(y, mu, delta, z, T, n)
+    mu <- sample_mu(z, delta, mu, rho_mu, sigma2, T, n)
+    # delta <- sample_delta(z, mu, delta, rho_delta, tau2, T, n)
+    sigma2 <- sample_sigma2(mu, rho_mu, a_sigma, b_sigma, T)
+    tau2 <- sample_tau2(delta, rho_delta, a_tau, b_tau, T, n)
+
+    # Actualizar rho_mu
+    # res_mu <- sample_rho_mu(rho_mu, mu, sigma2, a_mu, b_mu, T, iter, epsilon_mu, accept_rate_mu)
+    # rho_mu <- res_mu$rho_mu
+    # epsilon_mu <- res_mu$epsilon
+    # accept_rate_mu <- res_mu$accept_rate
+    
+    # Actualizar rho_delta
+    # res_delta <- sample_rho_delta(rho_delta, delta, tau2, a_delta, b_delta, T, n, iter, epsilon_delta, accept_rate_delta)
+    # rho_delta <- res_delta$rho_delta
+    # epsilon_delta <- res_delta$epsilon
+    # accept_rate_delta <- res_delta$accept_rate
+
+    # Almacenamiento
+    if (iter > n_burn && (iter - n_burn) %% n_thin == 0) {
+      idx <- (iter - n_burn) / n_thin
+      samples$mu[idx, ] <- mu
+      samples$delta[idx, , ] <- delta
+      samples$sigma2[idx] <- sigma2
+      samples$tau2[idx] <- tau2
+      samples$rho_mu[idx] <- rho_mu
+      samples$rho_delta[idx] <- rho_delta
+    }
+
+    # Progreso
+    if (iter %% (n_iter / 10) == 0) {
+      cat(sprintf("Progreso: %d%% completado... \n", (iter / n_iter) * 100))
+    }
+  }
+  cat("Muestreador completado.\n")
+  return(samples)
+}
+```
+
+
+### Hiperparámetros {-}
+
+Se recomienda \(\mathbb{E}[\sigma^2] \leq \mathbb{E}[\tau_i^2]\) para que la heterogeneidad individual \(\delta_{i,k}\) sea mayor que la media global \(\mu_k\).
+
+
+\(a_\sigma = 3, b_\sigma = 2\).  
+
+- Valor esperado: \(\textsf{E}[\sigma^2] = \frac{b_\sigma}{a_\sigma - 1} = 1\).  
+- Coeficiente de variación: \(\textsf{CV}[\sigma^2] = \sqrt{\frac{1}{a_\sigma - 2}} = 1\).  
+
+\(a_\tau = 3, b_\tau = 2\).  
+
+- Valor esperado: \(\textsf{E}[\tau^2] = \frac{b_\tau}{a_\tau - 1} = 1\).  
+- Coeficiente de variación: \(\textsf{CV}[\tau^2] = \sqrt{\frac{1}{a_\tau - 2}} = 1\).  
+
+\(a_\mu = 1, b_\mu = 1\). 
+
+- Valor esperado: \(\textsf{E}[\rho_\mu] = \frac{a_\mu}{a_\mu + b_\mu} =  0.5\).  
+- Coeficiente de variación: \(\textsf{CV}[\rho_\mu] = \sqrt{\frac{b_\mu}{a_\mu(a_\mu + b_\mu + 1)}} = 0.577\).
+
+Similarmente para $a_\delta$ y $b_\delta$.
+
+
+
+
+
+# Ejemplo: Datos de relaciones entre estudiantes
+
+Este conjunto de datos fue recopilado por **Gerhard van de Bunt** y se analiza en profundidad en **van de Bunt (1999)** y **van de Bunt, van Duijn y Snijders (1999)**. Se ha utilizado como ejemplo en varios artículos metodológicos.  
+
+### Descripción del estudio  
+
+Los datos provienen de un grupo de **32 estudiantes universitarios de primer año**, seleccionados tras eliminar aquellos que **abandonaron la universidad** o no completaron al menos **cuatro de los siete cuestionarios** aplicados. Excepto por algunas **relaciones preexistentes**, los estudiantes **no se conocían** al inicio del estudio.  
+
+Las mediciones se realizaron en **7 momentos temporales**.
+
+### Evaluación de las relaciones
+
+Los estudiantes calificaron sus **relaciones sociales** en una **escala de 6 puntos**:  
+
+1. **Amistad cercana**: Personas consideradas como **amigos verdaderos**.  
+2. **Amistad**: Buena relación, pero aún **no se considera una amistad verdadera**.  
+3. **Relación amistosa**: Contacto **agradable y frecuente** en clase, con posibilidad de convertirse en **amistad**.  
+4. **Relación neutral**: Contacto **cordial**, pero con **poco en común** y **baja probabilidad** de evolucionar en amistad.  
+5. **Persona desconocida**: Individuos **no conocidos**.  
+6. **Relación conflictiva**: **Mala relación**, sin intención de entablar amistad y con **riesgo de conflicto**.  
+
+
+### Codificación de los datos
+
+Los datos de las **redes sociales** están almacenados en los archivos **vrnd32t0.dat** a **vrnd32t6.dat** y codificados como:  
+
+- **0 = Desconocido**  
+- **1 = Amistad cercana**  
+- **2 = Amistad**  
+- **3 = Relación amistosa**  
+- **4 = Neutral**  
+- **5 = Conflictiva**  
+- **6 = Falta de respuesta al ítem**  
+- **9 = Falta de respuesta del actor**  
+
+
+
+
+
+```{r data}
+# Importar datos
+y1 <- as.matrix(read.table("C:/Users/User/Dropbox/UN/networks/VRND32T1.DAT", quote="\"", comment.char=""))
+y2 <- as.matrix(read.table("C:/Users/User/Dropbox/UN/networks/VRND32T2.DAT", quote="\"", comment.char=""))
+y3 <- as.matrix(read.table("C:/Users/User/Dropbox/UN/networks/VRND32T3.DAT", quote="\"", comment.char=""))
+y4 <- as.matrix(read.table("C:/Users/User/Dropbox/UN/networks/VRND32T4.DAT", quote="\"", comment.char=""))
+y5 <- as.matrix(read.table("C:/Users/User/Dropbox/UN/networks/VRND32T5.DAT", quote="\"", comment.char=""))
+y6 <- as.matrix(read.table("C:/Users/User/Dropbox/UN/networks/VRND32T6.DAT", quote="\"", comment.char=""))
+# Tamaños
+n <- dim(y1)[1]
+T <- 6
+# Conformación de la base de datos
+y <- array(data = NA, dim = c(n, n, T))
+for (t in 1:T) {
+  A <- get(paste0("y", t))
+  A[A == 2] <- 1
+  A[A != 1] <- 0
+  A <- A + t(A)
+  A[A != 0] <- 1
+  y[ , , t] <- A 
+}
+```
+
+
+
+
+
+```{r}
+# Generar red dinámica según el modelo especificado
+simulate_dynamic_network <- function(n, T, rho_mu, rho_delta, sigma2, tau2) {
+  # Inicialización de parámetros
+  mu <- numeric(T)
+  delta <- matrix(0, nrow = n, ncol = T)
+  y <- array(0, dim = c(n, n, T))
+
+  # Generar efectos globales y de sociabilidad
+  mu[1] <- rnorm(1, mean = 0, sd = sqrt(sigma2))
+  delta[, 1] <- rnorm(n, mean = 0, sd = sqrt(tau2))
+
+  for (t in 2:T) {
+    mu[t] <- rnorm(1, mean = rho_mu * mu[t - 1], sd = sqrt(sigma2))
+    delta[, t] <- rnorm(n, mean = rho_delta * delta[, t - 1], sd = sqrt(tau2))
+  }
+
+  # Generar matrices de adyacencia
+  for (t in 1:T) {
+    for (i in 1:(n - 1)) {
+      for (j in (i + 1):n) {
+        eta_ij <- mu[t] + delta[i, t] + delta[j, t]
+        theta_ij <- pnorm(eta_ij)
+        y[i, j, t] <- rbinom(1, 1, theta_ij)
+        y[j, i, t] <- y[i, j, t]  # Simetría
+      }
+    }
+  }
+
+  return(list(y = y, mu = mu, delta = delta))
+}
+```
+
+
+```{r}
+# Parámetros del modelo
+n <- 25
+T <- 5
+rho_mu <- 0.25
+rho_delta <- 0.75
+sigma2 <- 0.2
+tau2 <- 0.1
+
+# Simular la red dinámica
+set.seed(123)
+simulated_network <- simulate_dynamic_network(n, T, rho_mu, rho_delta, sigma2, tau2)
+y <- simulated_network$y
+```
+
+
+
+```{r viz data, echo=F, fig.align='center', fig.width=9, fig.height=6}
+# Cargar la librería necesaria
+suppressMessages(suppressWarnings(library(igraph)))
+
+# Configurar el diseño del gráfico en 6 paneles (2 filas x 3 columnas) y ajustar márgenes
+par(mfrow = c(2, 3), mar = c(1, 1, 2, 1))
+
+# Dimensiones
+n <- dim(y)[1]  # Número de nodos
+T <- dim(y)[3]  # Número de tiempos
+
+# Dibujar cada red en los 6 tiempos
+for (t in 1:T) {
+  # Crear el grafo desde la matriz de adyacencia binaria en el tiempo t
+  net <- graph_from_adjacency_matrix(y[,,t], mode = "undirected", diag = FALSE)
+  
+  # Dibujar el grafo
+  plot(net,
+       main = paste("t =", t),  # Título del panel
+       vertex.size = 17,               # Tamaño más grande de nodos
+       vertex.label.cex = 1.2,         # Tamaño más grande de etiquetas
+       vertex.color = NA,              # Sin color de relleno (transparente)
+       vertex.frame.color = "black",   # Borde negro en los nodos
+       edge.width = 1.5,               # Grosor de las aristas
+       edge.color = adjustcolor("black", 0.5),  # Aristas en negro
+       layout = layout_in_circle)      # Diseño circular
+}
+
+# Restaurar el diseño original del gráfico
+par(mfrow = c(1, 1), mar = c(5, 4, 4, 2) + 0.1)
+```
+
+### Ajuste del modelo
+
+
+```{r hyperpars}
+# Hiperparámetros
+a_sigma <- 3
+b_sigma <- 2
+a_tau   <- 3
+b_tau   <- 2
+a_mu    <- 1
+b_mu    <- 1
+a_delta <- 1
+b_delta <- 1
+```
+
+
+```{r model fitting, echo=T, eval=F}
+# Ajustar el modelo usando el muestreador
+n_iter <- 10000 + 1000
+n_burn <- 1000
+n_thin <- 1
+set.seed(123)
+samples <- gibbs_sampler_dynamic(rho_mu, rho_delta, simulated_network$delta, y, n_iter, n_burn, n_thin, a_sigma, b_sigma, a_tau, b_tau, a_mu, b_mu, a_delta, b_delta)
+save(samples, file = "samples_dynamic_bunt.RData")
+```
+
+
+```{r load samples, echo=F, eval=T}
+load("C:/Users/User/Dropbox/UN/networks/samples_dynamic_bunt.RData")
+```
+
+
+### Convergencia
+
+
+La verosimilitud condicional conjunta para todas las observaciones es:
+
+\[
+p(\mathbf{Y} \mid \boldsymbol{\mu}, \boldsymbol{\delta}) =
+\prod_{t=1}^{T} \prod_{i < j} \left[ \Phi\left( \mu_t + \delta_{i,t} + \delta_{j,t} \right)^{y_{i,j,t}} \cdot \left(1 - \Phi\left( \mu_t + \delta_{i,t} + \delta_{j,t} \right)\right)^{1 - y_{i,j,t}} \right].
+\]
+
+Tomando el logaritmo, obtenemos la **log-verosimilitud**:
+
+\[
+\log p(\mathbf{Y} \mid \boldsymbol{\mu}, \boldsymbol{\delta}) =
+\sum_{t=1}^{T} \sum_{i < j} \left[ y_{i,j,t} \log \Phi\left( \mu_t + \delta_{i,t} + \delta_{j,t} \right) + (1 - y_{i,j,t}) \log \left(1 - \Phi\left( \mu_t + \delta_{i,t} + \delta_{j,t} \right)\right) \right].
+\]
+
+
+```{r loglik func}
+# Función para calcular la log-verosimilitud para todas las muestras del MCMC
+log_likelihood_dynamic <- function(y, samples) {
+  # Dimensiones
+  n <- dim(y)[1]              # Número de nodos
+  T <- dim(y)[3]              # Número de tiempos
+  n_samples <- nrow(samples$mu) # Número de muestras del MCMC
+  
+  # Inicializar un vector para almacenar la log-verosimilitud por muestra
+  log_lik_samples <- numeric(n_samples)
+  
+  # Iterar sobre las muestras del MCMC
+  for (s in 1:n_samples) {  # Recorrer cada muestra
+    log_lik <- 0            # Inicializar log-verosimilitud para la muestra actual
+    
+    # Obtener los parámetros de la muestra actual
+    mu <- samples$mu[s, ]          # Efectos globales (\mu_t)
+    delta <- samples$delta[s, , ]    # Efectos individuales (\delta_{i,t})
+    
+    # Calcular la log-verosimilitud para esta muestra
+    for (t in 1:T) {           # Iterar sobre tiempos
+      for (i in 1:(n - 1)) {   # Iterar sobre nodos
+        for (j in (i + 1):n) { # Solo considerar i < j
+          # Probabilidad de conexión usando la función probit
+          theta <- pnorm(eta <- mu[t] + delta[i, t] + delta[j, t])  # Φ(eta)
+          
+          # Actualizar la log-verosimilitud
+          if (y[i, j, t] == 1) {
+            log_lik <- log_lik + log(theta)     # Conexión observada
+          } else {
+            log_lik <- log_lik + log(1 - theta) # Sin conexión
+          }
+        }
+      }
+    }
+    # Almacenar la log-verosimilitud calculada para esta muestra
+    log_lik_samples[s] <- log_lik
+  }
+  
+  # Retornar el vector con la log-verosimilitud para todas las muestras
+  return(log_lik_samples)
+}
+```
+
+
+```{r calc loglik, echo=T, eval=F}
+# Calcular la log-verosimilitud para las muestras del muestreador
+log_lik <- log_likelihood_dynamic(y, samples)
+save(log_lik, file = "loglik_dynamic_bunt.RData")
+```
+
+
+```{r viz loglik, echo=F, fig.align='center'}
+# Crear un data frame para el gráfico
+log_lik_df <- data.frame(
+  Iteration = seq_along(log_lik),  # Número de iteración
+  LogLikelihood = log_lik          # Valores de la log-verosimilitud
+)
+# Graficar la log-verosimilitud frente a las iteraciones (solo puntos pequeños)
+suppressMessages(suppressWarnings(library(ggplot2)))
+ggplot(log_lik_df, aes(x = Iteration, y = LogLikelihood)) +
+  geom_point(size = 0.5, color = 1, alpha = 0.3) +  # Puntos pequeños y semitransparentes
+  theme_minimal() +  # Tema limpio
+  labs(
+    title = "Log-verosimilitud",
+    x = "Iteración",
+    y = "Log-verosimilitud"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  )
+```
+
+
+```{r tab conver}
+# Cargar librerías necesarias
+suppressMessages(suppressWarnings(library(coda)))
+suppressMessages(suppressWarnings(library(kableExtra)))
+
+# Función para calcular MCSE
+mc_ee <- function(samples) {
+  n_eff <- effectiveSize(samples)          # Tamaño efectivo
+  sd_est <- sd(as.vector(samples))         # Desviación estándar
+  mcse <- abs(sd_est / sqrt(n_eff))        # Error estándar de Monte Carlo (MCSE)
+  return(mcse)
+}
+
+# Calcular métricas para cada parámetro
+results <- data.frame(
+  Parámetro = c("mu", "delta", "sigma2", "tau2", "rho_mu", "rho_delta"),  
+  ESS = c(
+    round(mean(apply(samples$mu, 2, effectiveSize)), 0),
+    round(mean(apply(samples$delta, c(2, 3), effectiveSize)), 0),
+    round(effectiveSize(samples$sigma2), 0),
+    round(effectiveSize(samples$tau2), 0),
+    round(effectiveSize(samples$rho_mu), 0),
+    round(effectiveSize(samples$rho_delta), 0)
+  ),
+  SD = c(
+    round(mean(apply(samples$mu, 2, sd)), 3),
+    round(mean(apply(samples$delta, c(2 ,3), sd)), 3),
+    round(sd(samples$sigma2), 3),
+    round(sd(samples$tau2), 3),
+    round(sd(samples$rho_mu), 3),
+    round(sd(samples$rho_delta), 3)
+  ),
+  MCSE = c(
+    round(mean(apply(samples$mu, 2, mc_ee)), 3),
+    round(mean(apply(samples$delta, c(2 ,3), mc_ee)), 3),
+    round(mc_ee(samples$sigma2), 3),
+    round(mc_ee(samples$tau2), 3),
+    round(mc_ee(samples$rho_mu), 3),
+    round(mc_ee(samples$rho_delta), 3)
+  )
+)
+
+# Mostrar la tabla
+results %>%
+  kbl(caption = "Algunas métricas de convergencia") %>%
+  kable_classic(full_width = F, html_font = "Arial") %>%
+  column_spec(1, bold = TRUE) %>%
+  column_spec(2:4, width = "3cm") %>%
+  row_spec(0, bold = TRUE, background = "#f0f0f0") %>%
+  row_spec(1:nrow(results), background = "#f9f9f9")
+```

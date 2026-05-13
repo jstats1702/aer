@@ -1,0 +1,1365 @@
+---
+title: "Un Modelo para Redes Multicapa con Efectos de Sociabilidad y Variabilidad Individual"
+author: "J. Sosa"
+date: "2024-12-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Modelo 
+
+Se considera una **red multicapa** compuesta por **redes binarias no dirigidas**, donde cada capa \(k\) representa las conexiones entre \(n\) individuos mediante la **matriz de adyacencia** \(\mathbf{Y}_k = [y_{i,j,k}]\). Los elementos de esta matriz son \(y_{i,j,k} \in \{0, 1\}\), para $1 \leq i < j \leq n$ y \(k = 1, \ldots, K\).
+
+La **probabilidad de conexión** entre dos nodos en la capa \(k\) se modela mediante:  
+\[
+y_{i,j,k} \mid \theta_{i,j,k} \overset{\text{ind}}{\sim} \textsf{Bernoulli}(\theta_{i,j,k}),
+\]  
+con 
+\[
+\theta_{i,j,k} = \Phi\left(\mu_k + \delta_{i,k} + \delta_{j,k}\right),
+\]  
+donde \(\Phi(\cdot)\) denota la función de distribución acumulada de una **Normal estándar**. Esta función se utilizada como **función de enlace** para garantizar que las **probabilidades** \(\theta_{i,j,k}\) permanezcan dentro del intervalo \((0, 1)\).  
+
+#### Distribución previa {-}
+
+**Efectos globales promedio por capa** \(\mu_k\)  
+
+Se asume que los efectos globales promedio siguen una distribución Normal:  
+\[
+\mu_k \mid \theta, \sigma^2 \overset{\text{iid}}{\sim} \textsf{N}(\theta, \sigma^2),
+\]  
+cuyos parámetros siguen la siguiente distribución previa:  
+\[
+\theta \sim \textsf{N}(a_\theta, b_\theta), \quad \sigma^2 \sim \textsf{GI}(a_\sigma, b_\sigma).
+\]
+
+**Efectos de sociabilidad específicos** \(\delta_{i,k}\)
+
+Los efectos de sociabilidad se modelan por medio de un enfoque jerárquico:  
+\[
+\delta_{i,k} \overset{\text{ind}}{\sim} \textsf{N}(\vartheta_i, \tau_i^2),
+\]  
+donde:
+
+1. La media \(\vartheta_i\) varía entre nodos:  
+   \[
+   \vartheta_i \overset{\text{iid}}{\sim} \textsf{N}(\gamma, \kappa^2).
+   \]  
+2. La varianza \(\tau_i^2\) también varía entre nodos:  
+   \[
+   \tau_i^2 \overset{\text{iid}}{\sim} \textsf{GI}(\alpha, \beta).
+   \]
+
+**Previas para los parámetros** \(\gamma, \kappa^2, \alpha, \beta\)
+
+Para capturar la variabilidad entre nodos y capas, se especifican las siguientes distribuciones previas:  
+
+- Media global de los efectos de sociabilidad:  
+\[
+\gamma \sim \textsf{N}(a_\gamma, b_\gamma).
+\]  
+- Varianza global de los efectos de sociabilidad:  
+\[
+\kappa^2 \sim \textsf{GI}(a_\kappa, b_\kappa).
+\]  
+- Parámetros para la distribución de las varianzas individuales (\(\tau_i^2\)):  
+\[
+\alpha \sim \textsf{G}(a_\alpha, b_\alpha), \quad \beta \sim \textsf{G}(a_\beta, b_\beta).
+\]
+
+Este **modelo jerárquico** permite **capturar variaciones** tanto **entre capas** como **entre individuos dentro de cada capa**. 
+
+La estructura jerárquica facilita la inclusión de **información compartida** entre las capas mientras se modela la **heterogeneidad específica** de cada **nodo** y cada **capa**.
+
+#### Parámetros e hiperparámetros {-}
+
+En total el modelo tiene $(K+4)(n+1)$ parámetros,
+\[
+\Theta = \{\mu_k, \theta, \sigma^2, \delta_{i,k}, \vartheta_i, \tau_i^2, \gamma, \kappa^2, \alpha, \beta\},
+\] 
+y 12 hiperparámetros,
+\[
+\Upsilon = \{a_\theta, b_\theta, a_\sigma, b_\sigma, a_\gamma, b_\gamma, a_\kappa, b_\kappa, a_\alpha, b_\alpha, a_\beta, b_\beta\}.
+\] 
+
+
+# Estimación
+
+En el modelo propuesto, **las distribuciones condicionales completas no tienen forma cerrada** debido a que la **función de enlace** introduce una relación **no lineal** entre los parámetros y las observaciones.
+
+#### Uso de variables latentes auxiliares {-}
+
+Para abordar esta limitación, se introduce un conjunto de **variables auxiliares (latentes)** \(z_{i,j,k}\) tal que: \[
+y_{i,j,k} = 
+\begin{cases} 
+1 & \text{si } z_{i,j,k} > 0, \\
+0 & \text{si } z_{i,j,k} \leq 0,
+\end{cases}
+\]  
+donde:  
+\[
+z_{i,j,k} \mid \mu_k, \delta_{i,k}, \delta_{j,k} \sim \textsf{Normal}\left(\mu_k + \delta_{i,k} + \delta_{j,k}, 1\right).
+\]  
+
+La introducción de las variables a \(uziliaresz_{i,j,k}\) mantiene el modelo original, ya que estas variables son consistentes con la especificación del modelo inicial dado que:  
+\[
+z_{i,j,k} \mid \mu_k, \delta_{i,k}, \delta_{j,k} \sim \textsf{Normal}\left(\mu_k + \delta_{i,k} + \delta_{j,k}, 1\right),
+\]  
+la probabilidad de que \(y_{i,j,k} = 1\) es equivalente a la probabilidad de que \(z_{i,j,k} > 0\):  
+\[
+\textsf{P}(y_{i,j,k} = 1 \mid \mu_k, \delta_{i,k}, \delta_{j,k}) = \textsf{P}(z_{i,j,k} > 0).
+\]  
+
+Este enfoque **linealiza el modelo** al sustituir la **función de enlace** \(\Phi(\cdot)\) por **variables auxiliares** \(z_{i,j,k}\) con **distribución Normal estándar**. Esta reformulación simplifica el cálculo de las distribuciones condicionales completas, permitiendo que adopten formas estándar.  
+
+#### Distribuciones Condicionales Completas {-}
+
+1. $z_{i,j,k} \mid y_{i,j,k}, \mu_k, \delta_{i,k}, \delta_{j,k}$ es Normal truncada:  
+\[
+z_{i,j,k} \mid y_{i,j,k}, \mu_k, \delta_{i,k}, \delta_{j,k} \sim
+\begin{cases} 
+\textsf{N}_{(0,\infty)}\,\,\,(\mu_k + \delta_{i,k} + \delta_{j,k}, 1), & \text{si } y_{i,j,k} = 1, \\
+\textsf{N}_{(-\infty,0]}     (\mu_k + \delta_{i,k} + \delta_{j,k}, 1), & \text{si } y_{i,j,k} = 0.
+\end{cases}
+\]  
+
+2. $\mu_k \mid \mathbf{z}_k, \boldsymbol{\delta}_k, \theta, \sigma^2 \sim \textsf{N}(m_k, v_k^2)$, con:
+\[
+v_k^2 = \left( \frac{1}{\sigma^2} + \sum_{i < j} 1 \right)^{-1},\quad
+m_k = v_k^2 \left( \frac{\theta}{\sigma^2} + \sum_{i < j} \left(z_{i,j,k} - \delta_{i,k} - \delta_{j,k}\right) \right).
+\]  
+
+3. $\delta_{i,k} \mid \mathbf{z}_k, \mu_k, \boldsymbol{\delta}_{-i,k}, \vartheta_i, \tau_i^2 \sim \textsf{N}(m_{i,k}, v_{i,k}^2)$, con
+\[
+v_{i,k}^2 = \left( \frac{1}{\tau_i^2} + \sum_{j \neq i} 1 \right)^{-1},\quad 
+m_{i,k} = v_{i,k}^2 \left( \frac{\vartheta_i}{\tau_i^2} + \sum_{j \neq i} \left(z_{i,j,k} - \mu_k - \delta_{j,k}\right) \right).
+\]  
+
+4. $\vartheta_i \mid \boldsymbol{\delta}_i, \gamma, \kappa^2 \sim \textsf{Normal}(m_i, v_i^2)$, con:  
+\[
+v_i^2 = \left( \frac{1}{\kappa^2} + \frac{K}{\tau_i^2} \right)^{-1},\quad
+m_i = v_i^2 \left( \frac{\gamma}{\kappa^2} + \frac{1}{\tau_i^2}\sum_{k=1}^{K}\delta_{i,k} \right).
+\]  
+
+5. $\tau_i^2 \mid \boldsymbol{\delta}_i, \vartheta_i \sim \textsf{GI}(a, b)$, con:
+\[
+a = \alpha + \frac{K}{2},\quad
+b = \beta + \frac{1}{2} \sum_{k=1}^{K} (\delta_{i,k} - \vartheta_i)^2.
+\]  
+
+6. $\theta \mid \boldsymbol{\mu}, \sigma^2 \sim \textsf{N}(m, v^2)$, con:
+\[
+v^2 = \left( \frac{1}{b_\theta} + \frac{K}{\sigma^2} \right)^{-1},\quad
+m = v^2 \left( \frac{a_\theta}{b_\theta} + \frac{1}{\sigma^2} \sum_{k=1}^{K} \mu_k \right).
+\]  
+
+7. $\sigma^2 \mid \boldsymbol{\mu}, \theta \sim \textsf{GI}(a, b)$, con:
+\[
+a = a_\sigma + \frac{K}{2},\quad
+b = b_\sigma + \frac{1}{2} \sum_{k=1}^{K} (\mu_k - \theta)^2.
+\]  
+
+8. $\gamma \mid \boldsymbol{\vartheta}, \kappa^2 \sim \textsf{N}(m, v^2)$, con:
+\[
+v^2 = \left( \frac{1}{b_\gamma} + \frac{n}{\kappa^2} \right)^{-1},\quad
+m = v^2 \left( \frac{a_\gamma}{b_\gamma} + \frac{1}{\kappa^2} \sum_{i=1}^{n} \vartheta_i \right).
+\]  
+
+9. $\kappa^2 \mid \boldsymbol{\vartheta}, \gamma \sim \textsf{GI}(a, b)$, con:
+\[
+a = a_\kappa + \frac{n}{2}, \quad
+b = b_\kappa + \frac{1}{2} \sum_{i=1}^{n} (\vartheta_i - \gamma)^2.
+\]  
+
+10. $\alpha \mid \boldsymbol{\tau}^2, a_\alpha, b_\alpha$ no tiene forma cerrada, dado que:
+\[
+\log p(\alpha \mid \boldsymbol{\tau}^2, a_\alpha, b_\alpha) =
+(a_\alpha - 1) \log(\alpha) - n \log \Gamma(\alpha) - \alpha\left(b_\alpha - n \log \beta + \sum_{i=1}^{n} \log(\tau_i^2)\right) + \text{C},
+\]
+donde C es una constante que no depende de $\alpha$. Por tal motivo, se aplica un **algoritmo HMC** para obtener muestras de $\eta = \log\alpha$. ¡No olvidar el Jabiano de la transformación! 
+
+11. $\beta \mid \tau_1^2, \ldots, \tau_n^2 \sim \textsf{Gamma}(a,b)$, con:  
+\[
+a = a_\beta + n\,\alpha,\quad
+b = b_\beta + \sum_{i=1}^{n} \frac{1}{\tau_i^2}.
+\]  
+
+
+```{r DCCs}
+# Distribuciones condicionales completas
+# Muestreo de z
+sample_z <- function(y, mu, delta, z, K, n) {
+  for (k in 1:K) {
+    for (i in 1:(n - 1)) {
+      for (j in (i + 1):n) {
+        mean_z <- mu[k] + delta[i, k] + delta[j, k]
+        if (y[i, j, k] == 1) {
+          z[i, j, k] <- truncnorm::rtruncnorm(1, a = 0, b = Inf, mean = mean_z, sd = 1)
+        } else {
+          z[i, j, k] <- truncnorm::rtruncnorm(1, a = -Inf, b = 0, mean = mean_z, sd = 1)
+        }
+        z[j, i, k] <- z[i, j, k]
+      }
+    }
+  }
+  return(z)
+}
+
+# Muestreo de mu_k
+sample_mu <- function(z, mu, delta, sigma2, theta, K, n) {
+  for (k in 1:K) {
+    v2_mu <- 1 / (1 / sigma2 + n * (n - 1) / 2)
+    sum_residuals <- 0
+    for (i in 1:(n - 1)) {
+      for (j in (i + 1):n) {
+        sum_residuals <- sum_residuals + (z[i, j, k] - delta[i, k] - delta[j, k])
+      }
+    }
+    m_mu <- v2_mu * (theta / sigma2 + sum_residuals)
+    mu[k] <- rnorm(1, mean = m_mu, sd = sqrt(v2_mu))
+  }
+  return(mu)
+}
+
+# Muestreo de delta
+sample_delta <- function(z, mu, tau2, delta, vartheta, K, n) {
+  for (k in 1:K) {
+    for (i in 1:n) {
+      v2_delta <- 1 / (1 / tau2[i] + (n - 1))
+      sum_residuals <- 0
+      for (j in 1:n) {
+        if (j != i) {
+          sum_residuals <- sum_residuals + (z[i, j, k] - mu[k] - delta[j, k])
+        }
+      }
+      m_delta <- v2_delta * (vartheta[i] / tau2[i] + sum_residuals)
+      delta[i, k] <- rnorm(1, mean = m_delta, sd = sqrt(v2_delta))
+    }
+  }
+  return(delta)
+}
+
+# Muestreo de vartheta
+sample_vartheta <- function(delta, gamma, vartheta, kappa2, tau2, n, K) {
+  for (i in 1:n) {
+    v2_vartheta <- 1 / (1 / kappa2 + K / tau2[i])
+    m_vartheta <- v2_vartheta * (gamma / kappa2 + sum(delta[i, ]) / tau2[i])
+    vartheta[i] <- rnorm(1, mean = m_vartheta, sd = sqrt(v2_vartheta))
+  }
+  return(vartheta)
+}
+
+# Muestreo de tau^2
+sample_tau2 <- function(delta, vartheta, tau2, alpha, beta, n, K) {
+  for (i in 1:n) {
+    A <- alpha + 0.5 * K
+    B <- beta + 0.5 * sum((delta[i, ] - vartheta[i])^2)
+    tau2[i] <- 1 / rgamma(1, shape = A, rate = B)
+  }
+  return(tau2)
+}
+
+# Muestreo de theta
+sample_theta <- function(mu, sigma2, a_theta, b_theta, K) {
+  v2_theta <- 1 / (1 / b_theta + K / sigma2)
+  m_theta <- v2_theta * (a_theta / b_theta + sum(mu) / sigma2)
+  return(rnorm(1, mean = m_theta, sd = sqrt(v2_theta)))
+}
+
+# Muestreo de sigma^2
+sample_sigma2 <- function(mu, theta, a_sigma, b_sigma, K) {
+  A <- a_sigma + 0.5 * K
+  B <- b_sigma + 0.5 * sum((mu - theta)^2)
+  return(1 / rgamma(1, shape = A, rate = B))
+}
+
+# Muestreo de gamma
+sample_gamma <- function(vartheta, kappa2, a_gamma, b_gamma, n) {
+  v2_gamma <- 1 / (1 / b_gamma + n / kappa2)
+  m_gamma <- v2_gamma * (a_gamma / b_gamma + sum(vartheta) / kappa2)
+  return(rnorm(1, mean = m_gamma, sd = sqrt(v2_gamma)))
+}
+
+# Muestreo de kappa^2
+sample_kappa2 <- function(vartheta, gamma, a_kappa, b_kappa, n) {
+  A <- a_kappa + 0.5 * n
+  B <- b_kappa + 0.5 * sum((vartheta - gamma)^2)
+  return(1 / rgamma(1, shape = A, rate = B))
+}
+
+# Muestreo HMC de alpha
+log_p_eta <- function(eta, beta, tau2, a_alpha, b_alpha, n) {
+  alpha <- exp(eta)
+  return((a_alpha - 1) * eta - n * lgamma(alpha) - alpha * (b_alpha + sum(log(tau2)) - n * log(beta)) + eta)
+}
+
+grad_log_p_eta <- function(eta, beta, tau2, a_alpha, b_alpha, n) {
+  alpha <- exp(eta)
+  return(a_alpha - alpha * (n * digamma(alpha) + b_alpha + sum(log(tau2)) - n * log(beta)))
+}
+
+sample_alpha <- function(alpha, beta, tau2, a_alpha, b_alpha, n) {
+  L <- 50
+  eps <- 1/L
+  eta <- log(alpha)
+  p <- rnorm(1)
+  p_curr <- p
+  grad <- grad_log_p_eta(eta, beta, tau2, a_alpha, b_alpha, n)
+  # Paso 1: mitad de momento
+  p <- p + 0.5 * eps * grad
+  # Paso 2: dinámica Hamiltoniana, no aplicar el gradiente en el último paso
+  for (l in 1:L) {
+    eta <- eta + eps * p
+    if (l != L) {
+      grad <- grad_log_p_eta(eta, beta, tau2, a_alpha, b_alpha, n)
+      p <- p + eps * grad
+    }
+  }
+  # Paso 3: mitad de momento final
+  grad <- grad_log_p_eta(eta, beta, tau2, a_alpha, b_alpha, n)
+  p <- p + 0.5 * eps * grad
+  # Aceptar o rechazar
+  if (runif(1) < exp(log_p_eta(eta, beta, tau2, a_alpha, b_alpha, n) - log_p_eta(log(alpha), beta, tau2, a_alpha, b_alpha, n) - 0.5 * (p^2 - p_curr^2))) {
+    alpha <- exp(eta)
+  } 
+  return(alpha)
+}
+
+# Muestreo de beta
+sample_beta <- function(tau2, alpha, a_beta, b_beta, n) {
+  A <- a_beta + alpha * n
+  B <- b_beta + sum(1 / tau2)
+  return(rgamma(1, shape = A, rate = B))
+}
+```
+
+
+```{r gibbs}
+# Muestreador de Gibbs para el modelo multicapa
+gibbs_sampler_multilayer <- function(y, n_iter, n_burn, n_thin,
+                                     a_theta, b_theta, a_sigma, b_sigma, 
+                                     a_gamma, b_gamma, a_kappa, b_kappa, 
+                                     a_alpha, b_alpha, a_beta, b_beta) {
+  # Dimensiones
+  n <- dim(y)[1]
+  K <- dim(y)[3]
+  
+  # Inicialización
+  sigma2 <- 1 / rgamma(1, shape = a_sigma, rate = b_sigma)
+  theta <- rnorm(1, mean = 0, sd = sqrt(b_theta))
+  mu <- rnorm(K, mean = theta, sd = sqrt(sigma2))
+  kappa2 <- 1 / rgamma(1, shape = a_kappa, rate = b_kappa)
+  gamma <- rnorm(1, mean = 0, sd = sqrt(b_gamma))
+  vartheta <- rnorm(n, mean = gamma, sd = sqrt(kappa2))
+  alpha <- 1 # rexp(1, rate = a_alpha)
+  beta <- rgamma(1, shape = a_beta, rate = b_beta)
+  tau2 <- 1 / rgamma(n, shape = alpha, rate = beta)
+  delta <- matrix(0, nrow = n, ncol = K)
+  z <- array(0, dim = c(n, n, K))
+
+  # Almacenamiento
+  n_samples <- (n_iter - n_burn) / n_thin
+  samples <- list(mu = matrix(0, n_samples, K),
+                  delta = array(0, dim = c(n_samples, n, K)),
+                  vartheta = matrix(0, n_samples, n),
+                  tau2 = matrix(0, n_samples, n),
+                  sigma2 = numeric(n_samples),
+                  theta = numeric(n_samples),
+                  gamma = numeric(n_samples),
+                  kappa2 = numeric(n_samples),
+                  alpha = numeric(n_samples),
+                  beta = numeric(n_samples))
+
+  # Muestreo
+  cat("Iniciando muestreador de Gibbs...\n")
+  for (iter in 1:n_iter) {
+    z <- sample_z(y, mu, delta, z, K, n)
+    mu <- sample_mu(z, mu, delta, sigma2, theta, K, n)
+    delta <- sample_delta(z, mu, tau2, delta, vartheta, K, n)
+    vartheta <- sample_vartheta(delta, gamma, vartheta, kappa2, tau2, n, K)
+    tau2 <- sample_tau2(delta, vartheta, tau2, alpha, beta, n, K)
+    theta <- sample_theta(mu, sigma2, a_theta, b_theta, K)
+    sigma2 <- sample_sigma2(mu, theta, a_sigma, b_sigma, K)
+    gamma <- sample_gamma(vartheta, kappa2, a_gamma, b_gamma, n)
+    kappa2 <- sample_kappa2(vartheta, gamma, a_kappa, b_kappa, n)
+    alpha <- sample_alpha(alpha, beta, tau2, a_alpha, b_alpha, n)
+    beta <- sample_beta(tau2, alpha, a_beta, b_beta, n)
+    # Almacenamiento
+    if (iter > n_burn && (iter - n_burn) %% n_thin == 0) {
+      idx <- (iter - n_burn) / n_thin
+      samples$mu[idx, ] <- mu
+      samples$delta[idx, , ] <- delta
+      samples$vartheta[idx, ] <- vartheta
+      samples$tau2[idx, ] <- tau2
+      samples$sigma2[idx] <- sigma2
+      samples$theta[idx] <- theta
+      samples$gamma[idx] <- gamma
+      samples$kappa2[idx] <- kappa2
+      samples$alpha[idx] <- alpha
+      samples$beta[idx] <- beta
+    }
+    # Progreso
+    if (iter %% (n_iter / 10) == 0) {
+      cat(sprintf("Progreso: %d%% completado\n", (iter / n_iter) * 100))
+    }
+  }
+  cat("Muestreador completado.\n")
+  return(samples)
+}
+```
+
+
+#### Hiperparámetros {-}
+
+Se recomienda \(\mathbb{E}[\sigma^2] \leq \mathbb{E}[\tau_i^2]\) para que la heterogeneidad individual \(\delta_{i,k}\) sea mayor que la media global \(\mu_k\).
+
+\(a_\theta = 0, b_\theta = 1\).  
+
+- Media: \(\textsf{E}[\theta] = 0\).  
+- Varianza: \(\textsf{Var}[\theta] = 1\).  
+
+\(a_\sigma = 3, b_\sigma = 2\).  
+
+- Valor esperado: \(\textsf{E}[\sigma^2] = \frac{b_\sigma}{a_\sigma - 1} = 1\).  
+- Coeficiente de variación: \(\textsf{CV}[\sigma^2] = \sqrt{\frac{1}{a_\sigma - 2}} = 1\).  
+
+\(a_\sigma = 2, b_\sigma = 1\).  
+
+- Valor esperado: \(\textsf{E}[\sigma^2] = \frac{b_\sigma}{a_\sigma - 1} = 1\).  
+- Coeficiente de variación: \(\textsf{CV}[\sigma^2] = \sqrt{\frac{1}{a_\sigma - 2}} = \infty\).  
+
+\(a_\gamma = 0, b_\gamma = 1\).  
+
+- Media: \(\textsf{E}[\gamma] = 0\).  
+- Varianza: \(\textsf{Var}[\gamma] = 1\).  
+
+\(a_\kappa = 3, b_\kappa = 2\).  
+
+- Valor esperado: \(\textsf{E}[\kappa^2] = \frac{b_\kappa}{a_\kappa - 1} = 1\).  
+- Coeficiente de variación: \(\textsf{CV}[\kappa^2] = 1\).  
+
+\(a_\kappa = 2, b_\kappa = 1\).  
+
+- Valor esperado: \(\textsf{E}[\kappa^2] = \frac{b_\kappa}{a_\kappa - 1} = 1\).  
+- Coeficiente de variación: \(\textsf{CV}[\kappa^2] = \infty\).  
+
+\(a_\alpha = 1, b_\alpha = 1\).  
+
+- Valor esperado: \(\textsf{E}[\alpha] = \frac{a_\alpha}{b_\alpha} = 1\).  
+- Coeficiente de variación: \(\textsf{CV}[\alpha] = \frac{1}{\sqrt{a_\alpha}} = 1\).  
+
+\(a_\beta = 1, b_\beta = 1\).  
+
+- Valor esperado: \(\textsf{E}[\beta] = \frac{a_\beta}{b_\beta} = 1\).  
+- Coeficiente de variación: \(\textsf{CV}[\beta] = \frac{1}{\sqrt{a_\beta}} = 1\).  
+
+
+# Ejemplo: Datos del banco de conexiones
+
+Estos son datos observacionales de \( n = 14 \) empleados de *Western Electric* (*Hawthorne plant*) en el banco de conexiones, presentados en **Roethlisberger y Dickson (2003)**. 
+
+Los empleados trabajaban en una sola sala e incluían **dos inspectores** (actores 1 y 2), **tres soldadores** (actores 12, 13 y 14) y **nueve ensambladores o técnicos de cables** (actores 3 a 11). 
+
+Los autores recopilaron datos sobre \( K = 4 \) categorías de interacción simétrica, que incluyen: participación en juegos pesados (*Horseplay*, red 1), participación en discusiones (*Arguments*, red 2), amistad (*Friendship*, red 3) y comportamiento antagónico (*Antagonism*, red 4).
+
+Roethlisberger, F. J., & Dickson, W. J. (2003). *Management and the Worker: An Account of a Research Program Conducted by the Western Electric Company, Hawthorne Works, Chicago*. Psychology Press.
+
+
+```{r data}
+load("C:/Users/User/Dropbox/PAPERS/projects/_old_/NIC/revision2/wiring_data.RData")
+y <- Ycube
+rm(Ycube,Y,I,J)
+n <- dim(y)[1]
+K <- dim(y)[3]
+```
+
+
+```{r viz data, echo=F, fig.align='center'}
+# Cargar la librería igraph
+suppressMessages(suppressWarnings(library(igraph)))
+
+# Definir los colores para los grupos de actores
+node_colors <- c(rep("orange", 2), rep("skyblue", 9), rep("green", 3))
+
+# Títulos personalizados para cada capa
+titles <- c("Capa 1: Horseplay", "Capa 2: Arguments: red 2", "Capa 3: Friendship", "Capa 4: Antagonism")
+
+# Configurar el layout del gráfico
+par(mfrow = c(2, 2), mar = c(1, 1, 2, 1)) # Márgenes y diseño en 2x2
+
+# Dibujar los gráficos para cada capa
+for (k in 1:4) {
+  # Crear el grafo desde la matriz de adyacencia
+  graph_k <- graph_from_adjacency_matrix(y[, , k], mode = "undirected")
+  
+  # Asignar etiquetas de nodos numeradas de 1 a n
+  V(graph_k)$label <- 1:vcount(graph_k)
+
+  # Graficar el grafo
+  set.seed(123)
+  plot(
+    graph_k,
+    layout = layout_with_kk,                 # Disposición del grafo
+    main = titles[k],                        # Título del gráfico
+    vertex.size = 18,                        # Tamaño del nodo
+    vertex.label.cex = 0.8,                  # Tamaño de las etiquetas
+    vertex.label.color = "black",            # Color de las etiquetas
+    vertex.color = node_colors,              # Colores para los nodos
+    vertex.frame.color = node_colors,        # Color del borde del nodo
+    edge.color = adjustcolor("black", alpha.f = 0.25) # Bordes negros semitransparentes
+  )
+}
+```
+
+
+#### Ajuste del modelo {-}
+
+
+```{r hyperpars}
+# Hiperparámetros
+a_theta <- 0
+b_theta <- 1
+a_sigma <- 3
+b_sigma <- 2
+a_gamma <- 0
+b_gamma <- 1
+a_kappa <- 3
+b_kappa <- 2
+a_alpha <- 1
+b_alpha <- 1
+a_beta  <- 1
+b_beta  <- 1
+```
+
+
+```{r model fitting, echo=T, eval=F}
+# Ajustar el modelo usando el muestreador
+n_iter <- 1000000 + 10000
+n_burn <- 10000
+n_thin <- 50
+set.seed(123)
+samples <- gibbs_sampler_multilayer(y, n_iter, n_burn, n_thin,
+                                    a_theta, b_theta, a_sigma, b_sigma, 
+                                    a_gamma, b_gamma, a_kappa, b_kappa, 
+                                    a_alpha, b_alpha, a_beta,  b_beta)
+save(samples, file = "samples_multilayer_wiring.RData")
+```
+
+
+```{r load samples, echo=F, eval=T}
+load("C:/Users/User/Dropbox/UN/networks/samples_multilayer_wiring.RData")
+```
+
+
+#### Convergencia {-}
+
+
+Para cada muestra de \(\boldsymbol{\mu}\) y \(\boldsymbol{\delta}\), la **log-verosimilitud del modelo** se calcula como:  
+\[
+\log p(\boldsymbol{\mu}, \boldsymbol{\delta} \mid \mathbf{Y}) = \sum_{k=1}^{K} \sum_{i < j} \left[ y_{i,j,k} \log(\theta_{i,j,k}) + (1 - y_{i,j,k}) \log(1 - \theta_{i,j,k}) \right],
+\]
+donde \(\theta_{i,j,k} = \Phi(\mu_k + \delta_{i,k} + \delta_{j,k})\).
+
+
+```{r func loglik}
+# Función para calcular la log-verosimilitud para el modelo multicapa
+log_likelihood_multilayer <- function(y, samples) {
+  n <- dim(y)[1]  # Número de nodos
+  K <- dim(y)[3]  # Número de capas
+  n_samples <- length(samples$mu[, 1])   # Número de muestras
+  log_lik_samples <- numeric(n_samples)  # Almacenar la log-verosimilitud para cada muestra
+  
+  for (s in 1:n_samples) {
+    log_lik <- 0  # Inicializar log-verosimilitud para la muestra actual
+    for (k in 1:K) { 
+      mu_k <- samples$mu[s, k]            # Efecto global de la capa k
+      delta_k <- samples$delta[s, , k]    # Efectos individuales de la capa k
+      for (i in 1:(n - 1)) {
+        for (j in (i + 1):n) {
+          eta_ijk <- mu_k + delta_k[i] + delta_k[j]  # Predictor lineal
+          p_ijk <- pnorm(eta_ijk)  # Probabilidad del modelo (probit)
+          # Sumar la contribución del par (i, j) en la capa k a la log-verosimilitud
+          log_lik <- log_lik + y[i, j, k] * log(p_ijk + 1e-10) + (1 - y[i, j, k]) * log(1 - p_ijk + 1e-10)
+        }
+      }
+    }
+    log_lik_samples[s] <- log_lik
+  }
+  return(log_lik_samples)
+}
+```
+
+
+```{r calc loglik, echo=T, eval=F}
+# Calcular la log-verosimilitud para las muestras del muestreador
+log_lik <- log_likelihood_multilayer(y, samples)
+save(log_lik, file = "loglik_multilayer_wiring.RData")
+```
+
+
+```{r load loglik, echo=F, eval=T}
+load("C:/Users/User/Dropbox/UN/networks/loglik_multilayer_wiring.RData")
+```
+
+
+```{r viz loglik, echo=F, fig.align='center'}
+# Crear un data frame para el gráfico
+log_lik_df <- data.frame(
+  Iteration = seq_along(log_lik),  # Número de iteración
+  LogLikelihood = log_lik          # Valores de la log-verosimilitud
+)
+# Graficar la log-verosimilitud frente a las iteraciones (solo puntos pequeños)
+suppressMessages(suppressWarnings(library(ggplot2)))
+ggplot(log_lik_df, aes(x = Iteration, y = LogLikelihood)) +
+  geom_point(size = 0.5, color = 1, alpha = 0.3) +  # Puntos pequeños y semitransparentes
+  theme_minimal() +  # Tema limpio
+  labs(
+    title = "Log-verosimilitud",
+    x = "Iteración",
+    y = "Log-verosimilitud"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  )
+```
+
+
+```{r tab conver}
+# Cargar librerías necesarias
+suppressMessages(suppressWarnings(library(coda)))
+suppressMessages(suppressWarnings(library(kableExtra)))
+
+# Función para calcular MCSE
+mc_ee <- function(samples) {
+  n_eff <- effectiveSize(samples)          # Tamaño efectivo
+  sd_est <- sd(as.vector(samples))         # Desviación estándar
+  mcse <- abs(sd_est / sqrt(n_eff))        # Error estándar de Monte Carlo (MCSE)
+  return(mcse)
+}
+
+# Calcular métricas para cada parámetro
+results <- data.frame(
+  Parámetro = c("mu", "delta", "vartheta", "tau2", "theta", "sigma2", "gamma", "kappa2", "alpha", "beta"),  
+  ESS = c(
+    round(mean(apply(samples$mu, 2, effectiveSize)), 0),
+    round(mean(apply(samples$delta, c(2, 3), effectiveSize)), 0),
+    round(mean(apply(samples$vartheta, 2, effectiveSize)), 0),
+    round(mean(apply(samples$tau2, 2, effectiveSize)), 0),
+    round(effectiveSize(samples$theta), 0),
+    round(effectiveSize(samples$sigma2), 0),
+    round(effectiveSize(samples$gamma), 0),
+    round(effectiveSize(samples$kappa2), 0),
+    round(effectiveSize(samples$alpha), 0),
+    round(effectiveSize(samples$beta), 0)
+  ),
+  SD = c(
+    round(mean(apply(samples$mu, 2, sd)), 3),
+    round(mean(apply(samples$delta, c(2, 3), sd)), 3),
+    round(mean(apply(samples$vartheta, 2, sd)), 3),
+    round(mean(apply(samples$tau2, 2, sd)), 3),
+    round(sd(samples$theta), 3),
+    round(sd(samples$sigma2), 3),
+    round(sd(samples$gamma), 3),
+    round(sd(samples$kappa2), 3),
+    round(sd(samples$alpha), 3),
+    round(sd(samples$beta), 3)
+  ),
+  MCSE = c(
+    round(mean(apply(samples$mu, 2, mc_ee)), 3),
+    round(mean(apply(samples$delta, c(2, 3), mc_ee)), 3),
+    round(mean(apply(samples$vartheta, 2, mc_ee)), 3),
+    round(mean(apply(samples$tau2, 2, mc_ee)), 3),
+    round(mc_ee(samples$theta), 3),
+    round(mc_ee(samples$sigma2), 3),
+    round(mc_ee(samples$gamma), 3),
+    round(mc_ee(samples$kappa2), 3),
+    round(mc_ee(samples$alpha), 3),
+    round(mc_ee(samples$beta), 3)
+  )
+)
+
+# Mostrar la tabla
+results %>%
+  kbl(caption = "Algunas métricas de convergencia") %>%
+  kable_classic(full_width = F, html_font = "Arial") %>%
+  column_spec(1, bold = TRUE) %>%
+  column_spec(2:4, width = "3cm") %>%
+  row_spec(0, bold = TRUE, background = "#f0f0f0") %>%
+  row_spec(1:nrow(results), background = "#f9f9f9")
+```
+
+
+
+#### Inferencia sobre los efectos globales promedio {-}
+
+
+Los **\(\mu_k\)** representan los **efectos globales promedio** para cada capa \(k\). Estos parámetros capturan la **tendencia general de conectividad en cada capa**, proporcionando información sobre la probabilidad promedio de conexión entre los individuos.  
+
+Un valor **positivo** de \(\mu_k\) sugiere que los individuos en esa capa tienen una **mayor tendencia a establecer conexiones**, mientras que un valor **negativo** indica que las conexiones son **menos probables**. Por otro lado, valores **cercanos a cero** implican que la probabilidad de conexión está más influenciada por las **características individuales** \(\delta_{i,k}\) que por el **efecto global** de la capa.
+
+El análisis de los **\(\mu_k\)** facilita la **comparación de los niveles generales de conectividad** entre capas y permite **identificar aquellas capas con mayor densidad o dispersión** en términos de interacción global.
+
+
+```{r post inference mu, echo=F}
+# Cargar la librería necesaria
+suppressMessages(suppressWarnings(library(kableExtra)))
+
+# Extraer las muestras de mu
+mu_samples <- samples$mu
+
+# Calcular estadísticas resumidas
+mu_means <- apply(mu_samples, 2, mean)                            # Media posterior
+mu_sd <- apply(mu_samples, 2, sd)                                 # Desviación estándar
+ci_95 <- t(apply(mu_samples, 2, quantile, probs = c(0.025, 0.975))) # Intervalos al 95%
+
+# Crear un dataframe con los resultados
+mu_summary <- data.frame(
+  Capa = c("Horseplay", "Arguments", "Friendship", "Antagonism"),
+  Media = round(mu_means, 3),
+  SD = round(mu_sd, 3),
+  `Q2.5` = round(ci_95[, 1], 3),
+  `Q97.5` = round(ci_95[, 2], 3)
+)
+
+# Mostrar la tabla de forma estética
+mu_summary %>%
+  kbl(caption = "Inferencia de los efectos globales") %>%
+  kable_classic(full_width = F, html_font = "Arial") %>%
+  column_spec(1, bold = TRUE) %>%
+  column_spec(2:5, width = "3cm") %>%
+  row_spec(0, bold = TRUE, background = "#f0f0f0") %>%
+  row_spec(1:nrow(mu_summary), background = "#f9f9f9")
+```
+
+
+
+#### Inferencia sobre la sociabilidad local {-}
+
+
+Se realiza inferencia sobre la **sociabilidad específica** \(\delta_{i,k}\) de cada individuo en las diferentes capas de la red.
+
+Se obtienen las **estadísticas posteriores** para cada individuo en cada capa utilizando las muestras del MCMC. Los resultados se ordenan según las **medias posteriores** y se visualizan mediante **barras verticales** que representan los intervalos de credibilidad, mientras que las **medias posteriores** se destacan con **puntos**.
+
+Una **línea roja punteada** en **0** ayuda a diferenciar individuos con valores **positivos** (mayor sociabilidad) de aquellos con valores **negativos** (menor sociabilidad). Además, el eje \(y\) se fija entre **-9 y 3**, lo que facilita las **comparaciones directas** entre capas. 
+
+Este gráfico analiza la **sociabilidad local** de los individuos en distintas capas de la red. **Valores positivos** representan mayor sociabilidad, mientras que **valores negativos** indican un menor nivel de conexión o aislamiento. La **amplitud de los intervalos** ilustra el grado de **incertidumbre** en las estimaciones.
+
+En aplicaciones prácticas, esta visualización resulta útil para **detectar actores influyentes** y **identificar individuos aislados** en la red, además de permitir el análisis de la **heterogeneidad en los patrones de conexión** dentro de cada capa.
+
+
+```{r post inference delta, echo = F, fig.align='center'}
+# Cargar librerías necesarias
+suppressMessages(suppressWarnings(library(ggplot2)))
+suppressMessages(suppressWarnings(library(gridExtra)))
+
+# Etiquetas para las capas
+layer_titles <- c("Horseplay", "Arguments", "Friendship", "Antagonism")
+
+# Extraer las muestras de delta
+delta_samples <- samples$delta
+n <- dim(delta_samples)[2] # Número de individuos
+K <- dim(delta_samples)[3] # Número de capas
+
+# Crear una lista para almacenar los gráficos
+plot_list <- list()
+
+for (k in 1:K) {
+  # Extraer delta para la capa k
+  delta_k <- delta_samples[, , k]
+  
+  # Calcular la media y los intervalos al 95% para cada individuo
+  means <- apply(delta_k, 2, mean)
+  ci_lower <- apply(delta_k, 2, quantile, probs = 0.025)
+  ci_upper <- apply(delta_k, 2, quantile, probs = 0.975)
+  
+  # Crear un dataframe con los resultados
+  delta_df <- data.frame(
+    ID = 1:n,
+    Mean = means,
+    Lower = ci_lower,
+    Upper = ci_upper
+  )
+  
+  # Ordenar por la media
+  delta_df <- delta_df[order(delta_df$Mean), ]
+  delta_df$Order <- 1:n
+  
+  # Asignar colores según la posición del intervalo respecto a 0
+  delta_df$Color <- ifelse(
+    delta_df$Upper < 0, "red", # Por debajo de 0
+    ifelse(delta_df$Lower > 0, "darkgreen", "black") # Por encima o contiene 0
+  )
+  
+  # Crear el gráfico para la capa k
+  p <- ggplot(delta_df, aes(x = factor(Order), y = Mean, color = Color)) +
+    geom_point(size = 2) + # Media
+    geom_segment(aes(x = factor(Order), xend = factor(Order), y = Lower, yend = Upper)) + # Intervalos verticales
+    geom_text(aes(label = ID, y = Upper + 0.3), size = 3, color = "black") + # Etiquetas encima con espacio
+    geom_hline(yintercept = 0, linetype = "dashed", color = "blue") + # Línea azul horizontal punteada en 0
+    scale_color_identity() + # Usa los colores directamente
+    scale_y_continuous(limits = c(-9, 3)) + # Rango fijo del eje y
+    labs(
+      title = layer_titles[k], # Título específico para cada capa
+      x = "Actores", 
+      y = expression(delta)
+    ) +
+    theme_minimal() + # Tema sin líneas de cuadrícula
+    theme(
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank()
+    )
+  
+  # Guardar el gráfico en la lista
+  plot_list[[k]] <- p
+}
+
+# Combinar los gráficos en un diseño 2 x 2
+grid.arrange(grobs = plot_list, ncol = 2, nrow = 2)
+```
+
+
+```{r viz data 2, echo=F, fig.align='center'}
+# Cargar la librería igraph
+suppressMessages(suppressWarnings(library(igraph)))
+
+# Definir los colores para los grupos de actores
+node_colors <- c(rep("orange", 2), rep("skyblue", 9), rep("green", 3))
+
+# Títulos personalizados para cada capa
+titles <- c("Horseplay", "Arguments: red 2", "Friendship", "Antagonism")
+
+# Configurar el layout del gráfico
+par(mfrow = c(2, 2), mar = c(1, 1, 2, 1)) # Márgenes y diseño en 2x2
+
+# Dibujar los gráficos para cada capa
+for (k in 1:4) {
+  # Crear el grafo desde la matriz de adyacencia
+  graph_k <- graph_from_adjacency_matrix(y[, , k], mode = "undirected")
+  
+  # Asignar etiquetas de nodos numeradas de 1 a n
+  V(graph_k)$label <- 1:vcount(graph_k)
+
+  # Graficar el grafo
+  set.seed(123)
+  plot(
+    graph_k,
+    layout = layout_with_kk,                 # Disposición del grafo
+    main = titles[k],                        # Título del gráfico
+    vertex.size = 18,                        # Tamaño del nodo
+    vertex.label.cex = 0.8,                  # Tamaño de las etiquetas
+    vertex.label.color = "black",            # Color de las etiquetas
+    vertex.color = node_colors,              # Colores para los nodos
+    vertex.frame.color = node_colors,        # Color del borde del nodo
+    edge.color = adjustcolor("black", alpha.f = 0.25) # Bordes negros semitransparentes
+  )
+}
+```
+
+
+#### Correlación entre capas {-}
+
+
+Se calculan las **correlaciones entre capas** en función de los **efectos de sociabilidad local** \(\delta_{i,k}\), con el propósito de evaluar la **similitud** en los **patrones de conexión** de los individuos a través de los distintos **contextos** representados por las **capas de la red**.
+
+En cada iteración del **muestreador MCMC**, se extraen los valores de los **efectos de sociabilidad** \(\delta_{i,k}\) correspondientes a cada capa y se calcula la **matriz de correlación** entre las capas a partir de estos valores. Este proceso se repite a lo largo de todas las iteraciones, generando múltiples muestras de la **matriz de correlaciones**. Finalmente, se obtienen **estadísticas resumen** para cada par de capas, incluyendo la **media posterior**, la **desviación estándar** y los **intervalos de credibilidad al 95%**.  
+
+Las **correlaciones** son herramientas útiles para identificar **patrones de interdependencia** entre los distintos tipos de relaciones y detectar **similitudes estructurales** entre las capas. Estos análisis pueden ser especialmente relevantes en estudios sobre **comportamiento social**, **cohesión grupal** y **dinámicas organizacionales**.
+
+
+```{r post inference cor}
+# Cargar librerías necesarias
+suppressMessages(suppressWarnings(library(kableExtra)))
+suppressMessages(suppressWarnings(library(coda)))
+
+# Extraer las muestras de delta
+delta_samples <- samples$delta
+
+# Dimensiones
+n <- dim(delta_samples)[2]  # Número de individuos
+K <- dim(delta_samples)[3]  # Número de capas
+n_iter <- dim(delta_samples)[1]  # Número de iteraciones
+
+# Inicializar listas para almacenar correlaciones
+R_list <- vector("list", n_iter)
+
+# Calcular las matrices de correlación para cada muestra
+for (iter in 1:n_iter) {
+  # Extraer las muestras de delta en esta iteración
+  delta_iter <- delta_samples[iter, , ]  # Matriz n x K
+  # Calcular la matriz de correlación
+  R_list[[iter]] <- cor(delta_iter)
+}
+
+# Convertir las matrices de correlación en un array 3D (K x K x Iter)
+R_array <- array(unlist(R_list), dim = c(K, K, n_iter))
+
+# Calcular estadísticas resumen
+mean_R <- apply(R_array, c(1, 2), mean)  # Media posterior
+sd_R <- apply(R_array, c(1, 2), sd)      # Desviación estándar
+ci_lower <- apply(R_array, c(1, 2), quantile, probs = 0.025)  # Límite inferior IC
+ci_upper <- apply(R_array, c(1, 2), quantile, probs = 0.975)  # Límite superior IC
+
+# Crear etiquetas descriptivas
+pairs <- c("Horseplay - Arguments", "Horseplay - Friendship", "Horseplay - Antagonism",
+           "Arguments - Friendship", "Arguments - Antagonism", "Friendship - Antagonism")
+
+# Crear una tabla estilizada
+results <- data.frame(
+  Capas = pairs,
+  Media = round(c(mean_R[1, 2], mean_R[1, 3], mean_R[1, 4], 
+                  mean_R[2, 3], mean_R[2, 4], mean_R[3, 4]), 3),
+  SD = round(c(sd_R[1, 2], sd_R[1, 3], sd_R[1, 4], 
+               sd_R[2, 3], sd_R[2, 4], sd_R[3, 4]), 3),
+  `Q2.5` = round(c(ci_lower[1, 2], ci_lower[1, 3], ci_lower[1, 4], 
+                              ci_lower[2, 3], ci_lower[2, 4], ci_lower[3, 4]), 3),
+  `Q97.5` = round(c(ci_upper[1, 2], ci_upper[1, 3], ci_upper[1, 4], 
+                              ci_upper[2, 3], ci_upper[2, 4], ci_upper[3, 4]), 3)
+)
+
+# Mostrar tabla estilizada
+results %>%
+  kbl(caption = "Correlaciones entre capas") %>%
+  kable_classic(full_width = F, html_font = "Arial") %>%
+  column_spec(1, bold = TRUE) %>%
+  column_spec(2:5, width = "3cm") %>%
+  row_spec(0, bold = TRUE, background = "#f0f0f0") %>%
+  row_spec(1:nrow(results), background = "#f9f9f9")
+```
+
+
+#### Inferencia sobre los efectos promedio {-}
+
+
+Los intervalos para \(\vartheta_i\) describen el **efecto promedio de socialidad** de cada nodo. **Valores elevados** indican una mayor propensión a formar conexiones, mientras que **valores bajos** sugieren **aislamiento**. 
+
+Los intervalos para \(\sqrt{\tau^2_i}\) miden la **variabilidad en la socialidad** de cada nodo entre capas. **Valores pequeños** sugieren **conectividad estable**, mientras que **valores grandes** indican **heterogeneidad** en los patrones de conexión. 
+
+
+```{r post inference varthetas, echo=F, fig.align='center'}
+# Cargar librerías necesarias
+suppressMessages(suppressWarnings(library(ggplot2)))
+
+# Obtener estadísticas resumidas para vartheta
+vartheta_means <- apply(samples$vartheta, 2, mean) # Medias posteriores
+
+# Calcular los intervalos de confianza
+ci_95 <- t(apply(samples$vartheta, 2, quantile, probs = c(0.025, 0.975)))
+
+# Crear un dataframe ordenado por la media posterior
+vartheta_df <- data.frame(
+  Index = 1:length(vartheta_means),
+  Mean = vartheta_means,
+  CI_95_Lower = ci_95[, 1],
+  CI_95_Upper = ci_95[, 2]
+)
+vartheta_df <- vartheta_df[order(vartheta_df$Mean), ] # Ordenar por la media
+vartheta_df$Rank <- 1:nrow(vartheta_df) # Crear índice ordenado
+
+# Asignar colores según la posición del intervalo respecto a 0
+vartheta_df$Color <- ifelse(
+  vartheta_df$CI_95_Upper < 0, "red", # Por debajo de 0
+  ifelse(vartheta_df$CI_95_Lower > 0, "darkgreen", "black") # Por encima o contiene 0
+)
+
+# Crear el gráfico
+p <- ggplot(vartheta_df) +
+  # Intervalos al 95% con colores según condición
+  geom_segment(aes(x = Rank, xend = Rank, y = CI_95_Lower, yend = CI_95_Upper, color = Color), linewidth  = 1) +
+  # Media posterior como punto negro
+  geom_point(aes(x = Rank, y = Mean), color = "black", size = 1.5) +
+  # Línea horizontal punteada en y = 0
+  geom_hline(yintercept = 0, linetype = "dotted", color = "blue") +
+  # Etiquetas sobre los intervalos
+  geom_text(aes(x = Rank, y = CI_95_Upper + 0.15, label = Index), size = 3) +
+  # Etiquetas en el eje x para los vértices
+  scale_x_continuous(breaks = vartheta_df$Rank, labels = vartheta_df$Index) +
+  # Títulos y ajustes
+  labs(
+    title = expression("Intervalos de confianza para " ~ vartheta),
+    y = "",
+    x = "Actores"
+  ) +
+  # Escala del eje y entre -3 y 3
+  coord_cartesian(ylim = c(-3, 3)) +
+  # Usar los colores definidos
+  scale_color_identity() +
+  # Tema minimalista sin cuadrículas
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+
+# Mostrar el gráfico
+print(p)
+```
+
+
+```{r post inference taus, echo=F, fig.align='center'}
+# Cargar librerías necesarias
+suppressMessages(suppressWarnings(library(ggplot2)))
+
+# Calcular sqrt(tau2)
+sqrt_tau2 <- sqrt(samples$tau2)
+
+# Obtener estadísticas resumidas para sqrt(tau2)
+sqrt_tau2_means <- apply(sqrt_tau2, 2, mean)       # Medias posteriores
+
+# Calcular los intervalos de confianza
+ci_95 <- t(apply(sqrt_tau2, 2, quantile, probs = c(0.025, 0.975)))
+
+# Crear un dataframe ordenado por la media posterior
+sqrt_tau2_df <- data.frame(
+  Index = 1:length(sqrt_tau2_means),
+  Mean = sqrt_tau2_means,
+  CI_95_Lower = ci_95[, 1],
+  CI_95_Upper = ci_95[, 2]
+)
+sqrt_tau2_df <- sqrt_tau2_df[order(sqrt_tau2_df$Mean), ] # Ordenar de menor a mayor por la media
+sqrt_tau2_df$Rank <- 1:nrow(sqrt_tau2_df)                # Crear un índice ordenado
+
+# Crear el gráfico
+p <- ggplot(sqrt_tau2_df) +
+  # Intervalos de confianza al 95%
+  geom_segment(aes(x = Rank, xend = Rank, y = CI_95_Lower, yend = CI_95_Upper),
+               color = "black", linewidth  = 1, alpha = 0.5) +
+  # Medias posteriores
+  geom_point(aes(x = Rank, y = Mean), color = "black", size = 1.5) +
+  # Números de vértice encima del intervalo
+  geom_text(aes(x = Rank, y = CI_95_Upper + 0.25, label = Index), size = 3) +
+  # Etiquetas en el eje x
+  scale_x_continuous(breaks = sqrt_tau2_df$Rank, labels = sqrt_tau2_df$Index) +
+  # Título y etiquetas de ejes
+  labs(
+    title = expression("Intervalos de confianza para " ~ tau),
+    y = "",
+    x = "Actores"
+  ) +
+  # Limitar el eje y
+  coord_cartesian(ylim = c(0, 7.5)) +
+  # Tema para eliminar gridlines
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(), # Quitar líneas de cuadrícula principales
+    panel.grid.minor = element_blank(), # Quitar líneas de cuadrícula menores
+    axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 1) # Rotar etiquetas del eje x verticalmente
+  )
+
+# Mostrar el gráfico
+print(p)
+```
+
+
+#### Agrupamiento basado en los efectos promedio {-}
+
+En cada iteración del algoritmo **MCMC**, se construye una matriz con \(n\) filas y 2 columnas, donde la primera columna almacena los valores de **\(\vartheta\)** y la segunda los valores de **\(\sqrt{\tau^2}\)** para cada vértice. Posteriormente, se aplica el algoritmo de **\(k\)-means** para agrupar los vértices en **clusters**, determinando el número óptimo de grupos mediante el **método del codo**. 
+
+Con los resultados del clustering, se genera una matriz de indicadoras cuyas entradas especifican si dos vértices pertenecen al **mismo grupo**. Esta matriz se acumula en cada iteración para calcular la **matriz de probabilidades de co-clustering**, obtenida como la **media** de las matrices indicadoras de agrupamiento.
+
+
+```{r coclust probs, echo=T, eval=F}
+# Cargar las bibliotecas necesarias
+suppressMessages(suppressWarnings(library(stats)))
+suppressMessages(suppressWarnings(library(cluster)))
+
+# Extraer muestras de vartheta y tau2
+vartheta_samples <- samples$vartheta
+sqrt_tau2_samples <- sqrt(samples$tau2)
+
+# Obtener dimensiones
+n <- ncol(vartheta_samples)
+n_iter <- nrow(vartheta_samples)
+
+# Algoritmo para calcular matriz C
+C <- matrix(0, n, n)
+for (iter in 1:n_iter) {
+  A <- cbind(vartheta_samples[iter, ], sqrt_tau2_samples[iter, ])
+  wss <- numeric(10)
+  for (k in 1:10) {
+    kmeans_result <- kmeans(A, centers = k, nstart = 10)
+    wss[k] <- kmeans_result$tot.withinss
+  }
+  elbow_k <- which(diff(diff(wss)) == min(diff(diff(wss)))) + 1
+  kmeans_result <- kmeans(A, centers = elbow_k, nstart = 10)
+  cluster_assignments <- kmeans_result$cluster
+  
+  B <- matrix(0, n, n)
+  for (i in 1:(n - 1)) {
+    for (j in (i + 1):n) {
+      if (cluster_assignments[i] == cluster_assignments[j]) {
+        B[i, j] <- 1
+        B[j, i] <- 1
+      }
+    }
+  }
+  C <- C + B
+}
+C <- C / n_iter
+save(C, file = "clustprob_multilayer_wiring.RData")
+```
+
+
+```{r load coclust probs, echo=F, eval=T}
+load("C:/Users/User/Dropbox/UN/networks/clustprob_multilayer_wiring.RData")
+```
+
+
+El paquete **mclust** se utiliza para estimar una **partición puntual** a partir de la **matriz de probabilidades de co-clustering**. A continuación, se generan dos gráficos: un **diagrama de calor** que muestra las **probabilidades de co-clustering** y una **matriz binaria** que indica si los vértices pertenecen al **mismo grupo**. 
+
+Estos gráficos ofrecen una **comparación visual** entre las **probabilidades inferidas** y la **partición puntual** obtenida, proporcionando una herramienta clara y efectiva para interpretar los resultados.
+
+
+```{r viz coclust probs, fig.align='center', fig.height=4, fig.width=10}
+# Cargar las bibliotecas necesarias
+suppressMessages(suppressWarnings(library(mclust)))
+suppressMessages(suppressWarnings(library(ggplot2)))
+suppressMessages(suppressWarnings(library(reshape2)))
+suppressMessages(suppressWarnings(library(gridExtra)))
+# Paso 1: Obtener la partición puntual usando MCLUST
+clustering <- Mclust(C, G = 1:10, verbose = F) # Estima el número óptimo de grupos (G) usando BIC
+partition <- clustering$classification # Clasificación de los nodos en clusters
+# Paso 2: Reordenar la matriz C basada en los clusters obtenidos
+order <- order(partition) # Ordenar nodos según los clusters
+C_ordered <- C[order, order] # Reordenar filas y columnas de C
+# Paso 3: Convertir a formato largo para ggplot
+C_long <- melt(C_ordered)
+colnames(C_long) <- c("Nodo_i", "Nodo_j", "Probabilidad")
+# Crear el diagrama de calor de la matriz C
+heatmap_C <- ggplot(C_long, aes(x = as.factor(Nodo_i), y = as.factor(Nodo_j), fill = Probabilidad)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "blue") +
+  labs(title = expression(bold("Probabilidades")), x = "Nodo", y = "Nodo") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+# Paso 4: Graficar la partición puntual como una matriz de bloques
+partition_matrix <- outer(partition[order], partition[order], "==") # Crear matriz binaria de bloques
+partition_long <- melt(partition_matrix)
+colnames(partition_long) <- c("Nodo_i", "Nodo_j", "Cluster")
+# Modificación: Color blanco para 0s y azul para 1s, etiquetas con "Agrupamiento"
+heatmap_partition <- ggplot(partition_long, aes(x = as.factor(Nodo_i), y = as.factor(Nodo_j), fill = factor(Cluster))) +
+  geom_tile() +
+  scale_fill_manual(values = c("white", "blue"), name = "Agrupamiento") + # Colores para 0 y 1
+  labs(title = expression(bold("Partición")), x = "Nodo", y = "Nodo") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+# Paso 5: Combinar gráficos
+grid.arrange(heatmap_C, heatmap_partition, ncol = 2)
+```
+
+
+
+#### Probabilidades de interacción {-}
+
+
+En la primera columna se presentan las **matrices de adyacencia** para cada capa, donde el color **rojo** indica una **conexión observada** (\(y_{ij,k} = 1\)) y el color **blanco** representa la **ausencia de conexión** (\(y_{ij,k} = 0\)). 
+
+En la segunda columna se muestran las **probabilidades de interacción estimadas**, con una escala de colores que varía según los valores de probabilidad. Estas probabilidades se obtienen promediando las predicciones generadas mediante la función probit \(\Phi(\mu_k + \delta_{i,k} + \delta_{j,k})\) a lo largo de todas las iteraciones del muestreador. 
+
+Este gráfico permite **evaluar el ajuste del modelo** al comparar las conexiones observadas con las probabilidades estimadas, facilitando la **identificación de patrones de conexión** y posibles **discrepancias** entre los datos observados y las predicciones del modelo.
+
+
+```{r inter probs, echo=T, eval=F}
+# Cargar librerías necesarias
+suppressMessages(suppressWarnings(library(ggplot2)))
+suppressMessages(suppressWarnings(library(gridExtra)))
+suppressMessages(suppressWarnings(library(igraph)))
+suppressMessages(suppressWarnings(library(MASS)))
+
+# Extraer muestras de los parámetros
+mu_samples <- samples$mu
+delta_samples <- samples$delta
+
+# Dimensiones del problema
+n <- dim(delta_samples)[2]  # Número de actores
+K <- dim(delta_samples)[3]  # Número de capas
+n_iter <- dim(delta_samples)[1]  # Número de iteraciones
+
+# Crear lista para almacenar las matrices promedio de probabilidad de interacción
+P_avg <- vector("list", K)
+
+# Calcular las probabilidades promedio para cada capa
+for (k in 1:K) {
+  # Inicializar matriz para acumular probabilidades
+  P_sum <- matrix(0, n, n)
+  
+  # Iterar sobre las muestras del MCMC
+  for (iter in 1:n_iter) {
+    mu_k <- mu_samples[iter, k]
+    delta_k <- delta_samples[iter, , k]
+    
+    # Calcular la matriz de probabilidades P_k en esta iteración
+    P_k <- matrix(0, n, n)
+    for (i in 1:(n - 1)) {
+      for (j in (i + 1):n) {
+        eta_ij <- mu_k + delta_k[i] + delta_k[j]
+        P_k[i, j] <- pnorm(eta_ij)  # Función Phi (CDF normal)
+        P_k[j, i] <- P_k[i, j]      # Matriz simétrica
+      }
+    }
+    # Acumular las probabilidades
+    P_sum <- P_sum + P_k
+  }
+  # Calcular el promedio a través de todas las iteraciones
+  P_avg[[k]] <- P_sum / n_iter
+}
+save(P_avg, file = "interprob_multilayer_wiring.RData")
+```
+
+
+```{r load inter probs, echo=F, eval=T}
+load("C:/Users/User/Dropbox/UN/networks/interprob_multilayer_wiring.RData")
+```
+
+
+```{r viz inter probs, echo=F, fig.align='center', fig.height=12, fig.width=7}
+# Cargar bibliotecas necesarias
+suppressMessages(suppressWarnings(library(ggplot2)))
+suppressMessages(suppressWarnings(library(gridExtra)))
+
+# Definir nombres de las capas
+layer_names <- c("Horseplay", "Arguments", "Friendship", "Antagonism")
+
+# Crear gráficos
+plot_list <- list()
+for (k in 1:K) {
+  # Crear gráfico de la matriz de adyacencia
+  adj_df <- as.data.frame(as.table(y[, , k]))
+  adj_df$Var1 <- as.numeric(adj_df$Var1) # Convertir índices a números
+  adj_df$Var2 <- as.numeric(adj_df$Var2)
+  adj_plot <- ggplot(adj_df, aes(as.factor(Var1), as.factor(Var2), fill = as.factor(Freq))) +
+    geom_tile() +
+    scale_fill_manual(values = c("white", "red")) +
+    labs(title = paste(layer_names[k], "- Adyacencia"), x = "Nodo", y = "Nodo") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "none")
+
+  # Crear el gráfico de probabilidades estimadas
+  P_df <- as.data.frame(as.table(P_avg[[k]]))
+  P_df$Var1 <- as.numeric(P_df$Var1) # Convertir índices a números
+  P_df$Var2 <- as.numeric(P_df$Var2)
+  prob_plot <- ggplot(P_df, aes(as.factor(Var1), as.factor(Var2), fill = Freq)) +
+    geom_tile() +
+    scale_fill_gradient(low = "white", high = "blue", name = "Prob") +
+    labs(title = paste(layer_names[k], "- Probabilidades"), x = "Nodo", y = "Nodo") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+  # Almacenar los gráficos
+  plot_list[[2 * k - 1]] <- adj_plot
+  plot_list[[2 * k]] <- prob_plot
+}
+
+# Mostrar gráficos en un diseño 4x2
+grid.arrange(grobs = plot_list, ncol = 2, nrow = 4)
+```
+
+
+#### Estadísticos de prubea {-}
+
+
+Este procedimiento **simula redes aleatorias para cada capa en cada iteración del MCMC** utilizando los parámetros estimados (\(\mu_k\) y \(\delta_{i,k}\)). A partir de estas simulaciones, se **calculan métricas estructurales clave**, como **densidad**, **transitividad** y **asortatividad**. 
+
+Los **valores observados en las redes reales** se comparan directamente con las **distribuciones obtenidas de las simulaciones**, evaluando así la capacidad del modelo para replicar las características estructurales de las redes. 
+
+El resultado se presenta en un gráfico que incluye **estimaciones puntuales**, **intervalos de credibilidad al 95%**, y los **valores observados**, proporcionando una representación visual clara para **evaluar el ajuste del modelo**.
+
+
+```{r test stats, echo=T, eval=F}
+# Cargar bibliotecas necesarias
+suppressMessages(suppressWarnings(library(igraph)))
+suppressMessages(suppressWarnings(library(ggplot2)))
+suppressMessages(suppressWarnings(library(gridExtra)))
+
+# Definir nombres de las capas
+layer_names <- c("Horseplay", "Arguments", "Friendship", "Antagonism")
+
+# Simular redes y calcular métricas estructurales
+set.seed(123)
+n_iter <- dim(samples$mu)[1]
+
+# Inicializar almacenamiento para métricas
+density_sim <- matrix(0, nrow = n_iter, ncol = K)
+transitivity_sim <- matrix(0, nrow = n_iter, ncol = K)
+assortativity_sim <- matrix(0, nrow = n_iter, ncol = K)
+
+for (iter in 1:n_iter) {
+  for (k in 1:K) {
+    # Simular matriz de adyacencia
+    P_sim <- matrix(0, n, n)
+    for (i in 1:(n - 1)) {
+      for (j in (i + 1):n) {
+        prob <- pnorm(samples$mu[iter, k] + samples$delta[iter, i, k] + samples$delta[iter, j, k])
+        P_sim[i, j] <- rbinom(1, 1, prob)
+        P_sim[j, i] <- P_sim[i, j]
+      }
+    }
+
+    # Crear grafo simulado
+    graph_sim <- graph_from_adjacency_matrix(P_sim, mode = "undirected")
+
+    # Calcular métricas
+    density_sim[iter, k] <- edge_density(graph_sim)
+    transitivity_sim[iter, k] <- transitivity(graph_sim, type = "global")
+    assortativity_sim[iter, k] <- assortativity_degree(graph_sim, directed = FALSE)
+  }
+}
+save(density_sim, transitivity_sim, assortativity_sim, file = "test_multilayer_wiring.RData")
+```
+
+
+```{r load test stats, echo=F, eval=T}
+load("C:/Users/User/Dropbox/UN/networks/test_multilayer_wiring.RData")
+```
+
+
+```{r viz test stats, echo=F, fig.align='center', fig.width=4, fig.height=12}
+# Calcular estadísticas resumen
+metrics_summary <- function(sim_values) {
+  data.frame(
+    Mean = apply(sim_values, 2, mean, na.rm = T),
+    Lower = apply(sim_values, 2, quantile, probs = 0.025, na.rm = T),
+    Upper = apply(sim_values, 2, quantile, probs = 0.975, na.rm = T)
+  )
+}
+
+summary_density <- metrics_summary(density_sim)
+summary_transitivity <- metrics_summary(transitivity_sim)
+summary_assortativity <- metrics_summary(assortativity_sim)
+
+# Valores observados
+observed_density <- apply(y, 3, function(mat) edge_density(graph_from_adjacency_matrix(mat, mode = "undirected")))
+observed_transitivity <- apply(y, 3, function(mat) transitivity(graph_from_adjacency_matrix(mat, mode = "undirected"), type = "global"))
+observed_assortativity <- apply(y, 3, function(mat) assortativity_degree(graph_from_adjacency_matrix(mat, mode = "undirected"), directed = FALSE))
+
+# Crear gráficos
+plot_metrics <- function(summary, observed, title, y_label) {
+  data <- data.frame(
+    Layer = layer_names,
+    Mean = summary$Mean,
+    Lower = summary$Lower,
+    Upper = summary$Upper,
+    Observed = observed
+  )
+  ggplot(data, aes(x = Layer)) +
+    geom_point(aes(y = Observed), color = "red", size = 3) +
+    geom_point(aes(y = Mean), color = "blue", size = 3) +
+    geom_linerange(aes(ymin = Lower, ymax = Upper), color = "blue") +
+    labs(title = title, y = y_label, x = "Capas") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+}
+
+density_plot <- plot_metrics(summary_density, observed_density, "Densidad", "Densidad")
+transitivity_plot <- plot_metrics(summary_transitivity, observed_transitivity, "Transitividad", "Transitividad")
+assortativity_plot <- plot_metrics(summary_assortativity, observed_assortativity, "Asortatividad", "Asortatividad")
+
+# Mostrar gráficos en diseño 3x1
+grid.arrange(density_plot, transitivity_plot, assortativity_plot, ncol = 1)
+```
+

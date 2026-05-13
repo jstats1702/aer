@@ -1,0 +1,595 @@
+---
+title: "Modelo de grafos aleatorios generalizado"
+author: 
+- Juan Sosa PhD
+- Email   jcsosam@unal.edu.co
+- GitHub  https://github.com/jstats1702 
+date: ""
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cerulean
+    highlight: kate
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introducción
+
+El **modelo de Erdös–Rényi** se puede generalizar como sigue:
+
+1. Definir la colección de todos los grafos con un **orden fijo** $n$ que **posean una característica determinada**.
+2. Asignar la **misma probabilidad** a cada uno de los grafos de esta colección.
+
+¿Cuál es esa característica en el modelo de Erdös–Rényi?
+
+Definición **implícita** del modelo.
+
+Una característica popular corresponde a una **secuencia de grado fija** $d_{1},\ldots,d_{n}$ (en forma ordenada).
+
+El grado medio en este caso es $\bar{d} = 2s/n$, y por lo tanto, $\sum_{i=1}^n d_i = 2s$, donde $s=\sum_{i<j} y_{i,j}$ es número de aristas.
+
+Los grafos de la colección con un **orden fijo** $n$ y una **secuencia de grado fija** $d_{(1)},\ldots,d_{(n)}$ tienen el **mismo número de aristas** $s$. Por lo tanto, esta colección está **contenida estrictamente** dentro de la colección de grafos generados a partir del modelo de Erdös–Rényi.
+
+Todas las demás características **varían libremente** en la medida que lo permita la secuencia de grados elegida.
+
+Las rutinas tipo `sample_[...]` en `igraph` ofrecen más alternativas para generar modelos de grafos aleatorios generalizados.
+
+
+# Ejemplo: Método vl
+
+
+**El método VL**, propuesto por **Fabien Viger** y **Matthieu Latapy**, es un **algoritmo eficiente** para generar **redes no dirigidas, conexas y simples** (es decir, **sin bucles ni aristas múltiples**). Este método garantiza que las redes generadas cumplen con un **grado objetivo** previamente especificado para cada nodo, preservando las **propiedades estructurales deseadas**.
+
+El método se basa en asignar y conectar nodos de forma que se respeten las siguientes restricciones clave:
+
+1. **Distribución de Grado Especificada**: 
+   - Se parte de un **vector de grados deseados** para los nodos, que puede provenir de **datos empíricos** o ser definido por el usuario.
+
+2. **Red Simple**: 
+   - Sin bucles (\(i \to i\)): no se permiten conexiones de un nodo consigo mismo.  
+   - Sin aristas múltiples (\((i \to j)\)): cada par de nodos puede estar conectado por **una única arista**.
+
+3. **Red Conexa**: 
+   - Garantiza que **todos los nodos están conectados**, ya sea de forma directa o indirecta, a través de una **cadena de aristas**.   
+
+
+## Algoritmo
+
+1. Se parte de una secuencia de grados \(d_1,\ldots,d_n\).
+
+2. Se construye un grafo simple no dirigido que tenga exactamente esa secuencia de grados.
+
+3. El grafo inicial puede no ser conectado. El algoritmo aplica **recableados** (*edge swaps*) con el fin de conectar las componentes sin modificar los grados de los nodos.
+
+4. Una vez se obtiene un grafo simple y conectado, el algoritmo aplica un procedimiento Monte Carlo basado en intercambios aleatorios de aristas. Estos intercambios preservan la secuencia de grados. Por ejemplo, si existen las aristas:
+\[
+(a,b), (c,d),
+\]
+el algoritmo puede reemplazarlas por
+\[
+(a,d), (c,b),
+\]
+siempre que no se creen lazos, aristas múltiples ni se rompa la conectividad del grafo.
+
+5. Después de muchos intercambios, se obtiene un grafo aleatorio dentro del conjunto de grafos simples, conectados y con la misma secuencia de grados. Esta operación conserva los grados porque cada nodo pierde una arista y gana otra.
+
+Debe entenderse como un método **aproximadamente** uniforme, no como un muestreo uniforme exacto en sentido estricto.
+
+
+```{r}
+suppressMessages(suppressWarnings(library(igraph)))
+# secuencia de grado
+sec <- c(2, 2, 2, 2, 4, 3, 3, 3, 3, 6)
+# simulación
+set.seed(42)
+g1 <- sample_degseq(out.deg = sec, method = "vl")
+g2 <- sample_degseq(out.deg = sec, method = "vl")
+# vl method by Fabien Viger and Matthieu Latapy
+# generates undirected, connected simple graphs 
+```
+
+
+```{r, fig.width=12, fig.height=6, fig.align='center'}
+# gráfico
+par(mfrow = c(1,2))
+igraph_options(vertex.size = 12, vertex.frame.color = 1, edge.color = "darkgray")
+set.seed(42)
+plot(g1, layout = layout_with_kk)
+set.seed(42)
+plot(g2, layout = layout_with_kk)
+# se satisface la condicion?
+all(degree(g1) == sec)
+all(degree(g2) == sec)
+# isomorfos?
+isomorphic(g1, g2)
+# numero de aristas
+c(sum(sec), 2*ecount(g1), 2*ecount(g2))
+# grado medio
+c(mean(sec), 2*ecount(g1)/vcount(g1), 2*ecount(g2)/vcount(g2))
+```
+
+
+## Ejemplo: Distribución de grado de la ley de potencias 
+
+La **distribución de la ley de potencias** (*power law distribution*) señala que la distribución del grado $d$ es de la forma
+$$
+f_d = \mathrm{c}\,d^{-\alpha}\,,\qquad \mathrm{c}>0\,,\qquad \alpha>1\,,
+$$
+lo que en escala log corresponde a
+$$
+\log f_d = \log \mathrm{c} - \alpha\log d\,.
+$$
+$\mathrm{c}$ se denomina constante de normalización y $\alpha$ exponente de la ley de potencias (similar a la **distribución de Pareto**).
+
+
+```{r, fig.width=6, fig.height=6, fig.align='center'}
+# distribución de grado de la ley de potencias (power law degree distribution)
+set.seed(42)
+sec <- sample(x = 1:100, size = 100, replace = TRUE, prob = (1:100)^-2)  # c = 1 y alpha = 2
+table(sec)
+sum(sec)
+# distribución de grado exponencial (exponential degree distribution)
+# sec <- sample(x = 1:100, size = 100, replace = TRUE, prob = exp(-0.5*(1:100)))
+# corrección si la suma de la secuencia de grado es impar 
+if (sum(sec) %% 2 != 0) sec[1] <- sec[1] + 1
+# simulación
+g <- sample_degseq(out.deg = sec, method = "vl")
+# se satisface la condición?
+all(degree(g) == sec)
+# gráfico
+igraph_options(vertex.label = NA, vertex.size = 6, edge.color = "darkgray", vertex.frame.color = 1)
+set.seed(42)
+plot(g, layout = layout_with_kk)
+```
+
+
+```{r, fig.width=8, fig.height=4, fig.align='center'}
+# grado
+d <- degree(g)
+# distribución de grado
+dd <- degree_distribution(g)
+# gráfico
+par(mfrow = c(1,2))
+plot(NA, NA, 
+     type = "n", 
+     xlim = c(0,50), 
+     ylim = c(0,0.17), 
+     xlab = "Grado", 
+     ylab = "Densidad", 
+     main = "Distribución de grado")
+
+hist(d, freq = F, border = 4, col = adjustcolor(4, 0.3), add = T)
+ind <- dd != 0
+plot(x = log((0:max(d))[ind]), y = log(dd[ind]), 
+     pch = 16, 
+     cex = 1.1, 
+     col = adjustcolor(4, 0.8), 
+     xlab = "Log-grado", 
+     ylab = "Log-densidad", 
+     main = "Distribución de grado (log-log)")
+abline(a = log(1), b = -2, col = adjustcolor("gray", 0.7), lwd = 2)
+```
+
+
+# Ejemplo: Zachary
+
+Red de **interacciones sociales** entre los miembros de un club de karate.
+
+Estos datos fueron recolectados para **estudiar la fragmentación** que sufrió el club en dos clubes diferentes debido a una disputa entre el director y el administrador.
+
+$y_{i,j} = 1$ si los miembros $i$ y $j$ tuvieron una **interacción social** en el club y $y_{i,j} = 0$ en otro caso.
+
+Una descripción completa de los datos se puede encontrar [aquí](https://rdrr.io/cran/igraphdata/man/karate.html).
+
+Disponible en el paquete `igraphdata` de R.
+
+Zachary, W. W. (1977). **An information flow model for conflict and fission in small groups**. Journal of anthropological research, 33(4), 452-473.
+
+
+```{r}
+# install.packages("igraphdata")
+suppressMessages(suppressWarnings(library(igraphdata)))
+# data
+data(karate)
+karate <- upgrade_graph(karate)
+# la representación de datos internos a veces cambia entre versiones
+```
+
+
+```{r, fig.height = 6, fig.width = 12, fig.align='center'}
+# visualización
+par(mfrow = c(1,2))
+set.seed(42)
+l = layout_with_fr(karate)
+
+plot(karate, 
+     layout = l, 
+     vertex.size = 14, 
+     edge.color = "black", 
+     vertex.frame.color = "black", 
+     vertex.label.color = "black", 
+     main = "Zachary")
+
+corrplot::corrplot(corr = as.matrix(as_adjacency_matrix(graph = karate, names = F)), 
+                   col.lim = c(0,1), 
+                   method = "color", 
+                   tl.col = "black", 
+                   addgrid.col = "gray", 
+                   cl.pos = "r", 
+                   col = colorRampPalette(c("blue","white","black"))(200))
+```
+
+
+```{r}
+suppressMessages(suppressWarnings(library(igraph)))
+# orden
+(n <- vcount(karate))
+# tamaño
+(m <- ecount(karate))
+# densidad
+(den <- edge_density(karate))
+# distribución de grado
+(sec <- degree(karate))
+mean(sec)
+2*m/n
+```
+
+
+```{r}
+# probabilidades de interacción
+# Modelo 1: Modelo de Erdos-Renyi
+# Modelo 2: Modelo de grafos aleatorios generalizado
+B <- 1000
+IP1 <- matrix(data = 0, nrow = n, ncol = n)
+IP2 <- matrix(data = 0, nrow = n, ncol = n)
+for (b in 1:B) {
+  IP1 <- IP1 + as.matrix(as_adjacency_matrix(sample_gnm(n = n, m = m, directed = F, loops = F)))/B
+  IP2 <- IP2 + as.matrix(as_adjacency_matrix(sample_degseq(out.deg = sec, method = "vl")))/B
+}
+```
+
+
+
+```{r, fig.height = 6, fig.width = 12, fig.align='center'}
+# viz
+par(mfrow = c(1,2))
+Y <- as.matrix(as_adjacency_matrix(graph = karate, names = F))
+
+corrplot::corrplot(corr = IP1, 
+                   col.lim = c(0,1), 
+                   method = "color", 
+                   tl.pos = "n", 
+                   addgrid.col = "gray", 
+                   cl.pos = "r",
+                   col = colorRampPalette(c("blue","white","red"))(200))
+title(sub = "M. Erdos-Renyi")
+
+corrplot::corrplot(corr = IP2, 
+                   col.lim = c(0,1), 
+                   method = "color", 
+                   tl.pos = "n", 
+                   addgrid.col = "gray", 
+                   cl.pos = "r")
+title(sub = "M. Grafos Aleatorio Generalizado")
+```
+
+
+# Ejemplo: Zachary (cont.)
+
+
+```{r}
+# simulación
+# Modelo 1: Modelo de Erdos-Renyi
+# Modelo 2: Modelo de grafos aleatorios generalizado
+B <- 1000
+dens <- NULL
+tran <- NULL
+asso <- NULL
+diam <- NULL
+set.seed(123)
+for (b in 1:B) {
+  # modelos
+  g1 <- sample_gnm(n = n, m = m, directed = F, loops = F)  # M1
+  g2 <- sample_degseq(out.deg = sec, method = "vl")        # M2
+  # estadísticos estructurales
+  dens <- rbind(dens, c(edge_density(g1), edge_density(g2)))
+  tran <- rbind(tran, c(transitivity(g1), transitivity(g2)))
+  asso <- rbind(asso, c(assortativity_degree(g1), assortativity_degree(g2)))
+  diam <- rbind(diam, c(diameter(g1), diameter(g2)))
+}
+head(dens)  # constante!
+head(tran)
+head(asso)
+head(diam)
+```
+
+
+```{r, fig.width=8, fig.height=4, fig.align='center'}
+# valores observados
+(t0 <- transitivity(karate))
+
+par(mfrow = c(1,2), mar = c(2.75,2.75,1.5,0.5), mgp = c(1.7,0.7,0))
+# transitividad
+hist(tran[,1], 
+     freq = F, 
+     col = 2, 
+     border = 2, 
+     xlim = c(0,0.4), 
+     ylim = c(0,20), 
+     xlab = "Transitividad", 
+     ylab = "Densidad", 
+     main = "M. Erdos-Renyi")
+abline(v = t0, col = "gray", lwd = 3)
+
+hist(tran[,2], 
+     freq = F, 
+     col = 4, 
+     border = 4, 
+     xlim = c(0,0.4), 
+     ylim = c(0,20), 
+     xlab = "Transitividad", 
+     ylab = "Densidad", 
+     main = "M. Grafos Aleatorio Generalizado")
+abline(v = t0, col = "gray", lwd = 3)
+```
+
+
+```{r, fig.width=8, fig.height=4, fig.align='center'}
+# valores observados
+(t0 <- assortativity_degree(karate))
+
+par(mfrow = c(1,2), mar = c(2.75,2.75,1.5,0.5), mgp = c(1.7,0.7,0))
+# transitividad
+hist(asso[,1], 
+     freq = F, 
+     col = 2, 
+     border = 2, 
+     xlim = c(-0.6,0.3), 
+     ylim = c(0,10), 
+     xlab = "Asortatividad", 
+     ylab = "Densidad", 
+     main = "M. Erdos-Renyi")
+abline(v = t0, col = "gray", lwd = 3)
+
+hist(asso[,2], 
+     freq = F, 
+     col = 4, 
+     border = 4, 
+     xlim = c(-0.6,0.3), 
+     ylim = c(0,10), 
+     xlab = "Asortatividad", 
+     ylab = "Densidad", 
+     main = "M. Grafos Aleatorio Generalizado")
+abline(v = t0, col = "gray", lwd = 3)
+```
+
+
+```{r, fig.width=8, fig.height=4, fig.align='center'}
+# valores observados
+(t0 <- diameter(karate))
+par(mfrow = c(1,2), mar = c(2.75,2.75,1.5,0.5), mgp = c(1.7,0.7,0))
+# diámetro
+plot(table(factor(x = diam[,1], levels = 1:10))/B, 
+     type = "h",
+     lwd = 3, 
+     ylim = c(0,0.8),
+     col = 2, 
+     cex.axis = 0.9, 
+     xlab = "Diametro", 
+     ylab = "Densidad", 
+     main = "M. Erdos-Renyi")
+
+plot(table(factor(x = diam[,2], levels = 1:10))/B, 
+     type = "h", 
+     lwd = 3, 
+     ylim = c(0,0.8), 
+     col = 4, 
+     cex.axis = 0.9, 
+     xlab = "Diametro",
+     ylab = "Densidad", 
+     main = "M. Grafos Aleatorio Generalizado")
+```
+
+
+## Ejemplo: Zachary (cont.)
+
+
+```{r}
+# simulación
+# Modelo 1: Modelo de Erdos-Renyi
+# Modelo 2: Modelo de grafos aleatorios generalizado
+B <- 1000
+nc <- NULL
+set.seed(123)
+for (b in 1:B) {
+  # modelos
+  g1 <- sample_gnm(n = n, m = m, directed = F, loops = F)  # M1
+  g2 <- sample_degseq(out.deg = sec, method = "vl")        # M2
+  # numero de comunidades
+  nc <- rbind(nc, c(length(cluster_fast_greedy(graph = g1)), length(cluster_fast_greedy(graph = g2))))
+}
+head(nc)
+```
+
+
+```{r, fig.height = 6, fig.width = 6, fig.align='center'}
+# comunidades observadas
+kc <- cluster_fast_greedy(karate)
+
+set.seed(1)
+plot(x = kc, y = karate, 
+     mark.groups = NULL, 
+     edge.color = "black", 
+     vertex.size = 10, 
+     vertex.frame.color = "black", 
+     vertex.label = NA)
+```
+
+
+```{r, fig.width=8, fig.height=4, fig.align='center'}
+# valores observados
+par(mfrow = c(1,2), mar = c(2.75,2.75,1.5,0.5), mgp = c(1.7,0.7,0))
+# número de comunidades
+plot(table(factor(x = nc[,1], levels = 1:10))/B, 
+     type = "h", 
+     lwd = 3, 
+     ylim = c(0,0.6), 
+     col = 2, 
+     cex.axis = 0.9, 
+     xlab = "Comunidades", 
+     ylab = "Densidad", 
+     main = "M. Erdos-Renyi")
+
+plot(table(factor(x = nc[,2], levels = 1:10))/B, 
+     type = "h", 
+     lwd = 3, 
+     ylim = c(0,0.6), 
+     col = 4, 
+     cex.axis = 0.9, 
+     xlab = "Comunidades", 
+     ylab = "Densidad", 
+     main = "M. Grafos Aleatorio Generalizado")
+```
+
+
+## Ejemplo: Zachary (cont.)
+
+
+### Datos {-}
+
+
+```{r}
+Y <- as.matrix(as_adjacency_matrix(graph = karate))
+y <- Y[lower.tri(Y)]
+g <- graph_from_adjacency_matrix(adjmatrix = Y, mode = "undirected")
+```
+
+
+### Conformación de folds {-}
+
+
+```{r, fig.width=4, fig.height=4, fig.align='center'}
+# orden
+(n <- vcount(g))
+# número de diadas
+(M <- n*(n-1)/2)
+# número de folds
+L <- 5
+# conformación de folds
+set.seed(42)
+fold_index_vec <- sample(x = 1:L, size = M, replace = T)
+fold_index_mat <- matrix(data = 0, nrow = n, ncol = n)
+fold_index_mat[lower.tri(fold_index_mat)] <- fold_index_vec
+# distribución de folds
+(tab <- table(fold_index_vec))
+# viz de folds a través de la matriz de adyacencia
+corrplot::corrplot(corr = fold_index_mat/L, 
+                   col.lim = c(0,1), 
+                   method = "color", 
+                   tl.pos = "n", 
+                   cl.pos = "n")
+# distribución de enlaces por fold
+y <- Y[lower.tri(Y)]
+tmp <- NULL
+for (l in 1:L)
+  tmp <- rbind(tmp, table(y[fold_index_vec == l])/tab[l])
+round(tmp, 3)
+```
+
+
+### Probabilidades de interacción en cada fold {-}
+
+
+```{r}
+# validacion cruzada
+# para comparar los modelos los folds tienen que ser iguales/comparables
+# Modelo 1: Modelo de Erdos-Renyi
+# Modelo 2: Modelo de grafos aleatorios generalizado
+IP1 <- vector(mode = "list", L)
+IP2 <- vector(mode = "list", L)
+B <- 1000
+set.seed(123)
+for (l in 1:L) {
+  # datos de entrenamiento
+  y_train <- y  
+  y_train[fold_index_vec == l] <- NA
+  Y_train <- matrix(data = 0, nrow = n, ncol = n)
+  Y_train[lower.tri(Y_train)] <- y_train
+  Y_train <- Y_train + t(Y_train)
+  # ------------------------ Modelo 1 ------------------------
+  # ajuste del modelo
+  theta_hat <- mean(y_train, na.rm = T)
+  # predecir
+  n_test <- tab[l]
+  inter_prob <- rep(0, n_test)
+  for (b in 1:B)
+    inter_prob <- inter_prob + rbinom(n = n_test, size = 1, prob = theta_hat)/B
+  IP1[[l]] <- inter_prob
+  # ------------------------ Modelo 2 ------------------------
+  # ajuste del modelo
+  sec <- rowSums(x = Y_train, na.rm = T)
+  # correcciones
+  sec[sec == 0] <- 1
+  if (sum(sec) %% 2 != 0) sec[1] <- sec[1] + 1
+  # predecir
+  n_test <- tab[l]
+  inter_prob <- rep(0, n_test)
+  for (b in 1:B) {
+    YY <- as.matrix(as_adjacency_matrix(sample_degseq(out.deg = sec, method = "vl")))
+    yy <- YY[lower.tri(YY)]
+    inter_prob <- inter_prob + yy[fold_index_vec == l]/B
+  }
+  IP2[[l]] <- inter_prob
+}
+```
+
+
+### Curvas ROC {-}
+
+
+```{r, fig.width=8, fig.height=4, fig.align='center'}
+par(mfrow = c(1,2), mar = c(2.75,2.75,1.5,0.5), mgp = c(1.7,0.7,0))
+# Modelo 1: curvas ROC y AUCs
+IP <- IP1
+aucs <- NULL
+plot(NA, NA, xlim = c(0,1), ylim = c(0,1), xlab = "Tasa Falsos Positivos", ylab = "Tasa verdaderos positivos", main = "M. Erdos Renyi")
+abline(a = 0, b = 1, col = "gray", lwd = 2)
+for (l in 1:L) {
+  # datos de prueba
+  y_test <- y[fold_index_vec == l]
+  # rendimiento
+  pred <- ROCR::prediction(predictions = IP[[l]], labels = y_test)
+  perf <- ROCR::performance(prediction.obj = pred, measure = "tpr", x.measure = "fpr")
+  # ROC
+  lines(x = perf@x.values[[1]], y = perf@y.values[[1]], type = "l", col = 2)
+  # AUC
+  perf <- ROCR::performance(prediction.obj = pred, measure = "auc")
+  aucs[l] <- perf@y.values[[1]]
+}
+text(x = 0.7, y = 0.05, labels = paste0("AUC = ", round(mean(aucs), 4)), cex = 1.5)
+# Modelo 2: curvas ROC y AUCs
+IP <- IP2
+aucs <- NULL
+plot(NA, NA, xlim = c(0,1), ylim = c(0,1), xlab = "Tasa Falsos Positivos", ylab = "Tasa verdaderos positivos", main = "M. Grafos Aleatorio Generalizado")
+abline(a = 0, b = 1, col = "gray", lwd = 2)
+for (l in 1:L) {
+  # datos de prueba
+  y_test <- y[fold_index_vec == l]
+  # rendimiento
+  pred <- ROCR::prediction(predictions = IP[[l]], labels = y_test)
+  perf <- ROCR::performance(prediction.obj = pred, measure = "tpr", x.measure = "fpr")
+  # ROC
+  lines(x = perf@x.values[[1]], y = perf@y.values[[1]], type = "l", col = 4)
+  # AUC
+  perf <- ROCR::performance(prediction.obj = pred, measure = "auc")
+  aucs[l] <- perf@y.values[[1]]
+}
+text(x = 0.7, y = 0.05, labels = paste0("AUC = ", round(mean(aucs), 4)), cex = 1.5)
+```
+
