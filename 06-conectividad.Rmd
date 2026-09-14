@@ -1,9 +1,9 @@
 ---
-title: "Caracterización de conectividad"
-author: 
+title: "Caracterización de la conectividad"
+author:
 - Juan Sosa PhD
 - Email   jcsosam@unal.edu.co
-- GitHub  https://github.com/jstats1702 
+- GitHub  https://github.com/jstats1702
 date: ""
 output:
   html_document:
@@ -18,363 +18,580 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 # Introducción
 
-La **cohesión** o **conectividad** se refiere a la medida en que **subconjuntos de vértices específicos son cohesivos (adherentes)** respecto a la relación que define las aristas.
+La **cohesión** describe el grado en que los vértices de una red forman subconjuntos internamente conectados o estructuralmente robustos. 
+
+La **conectividad** describe específicamente la existencia de caminos entre vértices y la resistencia de la red a la eliminación de vértices o aristas.
+
+Estas ideas pueden estudiarse desde diferentes escalas: 
+
+- Los **clanes** describen cohesión extrema en subconjuntos de vértices. 
+- Las **díadas** y **tríadas** caracterizan configuraciones locales. 
+- La **densidad**, la **transitividad** y la **reciprocidad** resumen patrones globales o locales de conexión. 
+- Los **$k$-cores**, las **componentes**, la **conectividad nodal** y la **conectividad por aristas** permiten estudiar la robustez estructural de la red.
+
+A menos que se indique lo contrario, las definiciones de densidad, transitividad, clanes y conectividad se presentan para **grafos simples** (sin bucles ni aristas múltiples).
+
+Cuando los datos originales contienen múltiples relaciones entre un mismo par de vértices, es **necesario decidir explícitamente** si se agregan, ponderan o binarizan antes de aplicar estas medidas.
 
 
 # *Cliques*
 
-Un enfoque para definir la **cohesión de una red** es mediante la **especificación de subgrafos** de interés.
+Un enfoque clásico para estudiar la **cohesión local** consiste en identificar subgrafos particularmente densos.
 
-Un **clan** (*clique*) $C$ de un grafo $G=(V,E)$ es un subconjunto de vértices tal que cada par de vértices distintos son adyacentes, i.e., el subgrafo de $G$ **inducido** por $C$ es un **grafo completo**. 
+Un **clan** (*clique*) $C \subseteq V$ de un grafo no dirigido $G=(V,E)$ es un subconjunto de vértices tal que cada par de vértices distintos de $C$ es adyacente. Equivalentemente, el subgrafo de $G$ inducido por $C$ es un **grafo completo**.
 
-Clanes de tamaños más grandes incluyen clanes de tamaños más pequeños. 
+Si un clan tiene tamaño $k$, entonces contiene $\binom{k}{r}$ clanes de tamaño $r$ para cada $1 \leq r < k$. Por esta razón, contar todos los clanes puede producir una cantidad muy grande de subgrafos incluso en redes de tamaño moderado.
 
-¿Cuántos clanes?
-
-```{r, eval = TRUE, echo=FALSE, out.width="35%", fig.pos = 'H', fig.align = 'center'}
+```{r, eval=TRUE, echo=FALSE, out.width="35%", fig.pos='H', fig.align='center'}
 knitr::include_graphics("06_clique_ejemplo.png")
 ```
 
-
 ```{r}
-# librerias
+# Paquetes
 suppressMessages(suppressWarnings(library(igraph)))
 suppressMessages(suppressWarnings(library(corrplot)))
+suppressMessages(suppressWarnings(library(igraphdata)))
+suppressMessages(suppressWarnings(library(sand)))
 ```
 
-
 ```{r, fig.align='center'}
-# datos
-g <- make_graph(
-       edges = c(1,2,1,3,1,4,1,5,2,3,2,4,2,5,3,4,3,5,4,5,6,7,6,8,7,8,9,10,1,6,2,9,7,9), 
-       directed = F
-     )
-Y <- as.matrix(as_adjacency_matrix(graph = g, names = F))
+# Datos
+g_clique <- make_graph(
+  edges = c(
+    1, 2, 1, 3, 1, 4, 1, 5,
+    2, 3, 2, 4, 2, 5,
+    3, 4, 3, 5, 4, 5,
+    6, 7, 6, 8, 7, 8,
+    9, 10, 1, 6, 2, 9, 7, 9
+  ),
+  directed = FALSE
+)
+
+Y <- as.matrix(as_adjacency_matrix(g_clique, sparse = FALSE))
 ```
 
-
 ```{r, fig.align='center'}
-# visualización
-par(mfrow = c(1,2), mar = c(4, 3, 3, 1))
+# Visualización
+par(mfrow = c(1, 2), mar = c(4, 3, 3, 1))
 set.seed(42)
 
-plot(g, 
-     vertex.size = 20, 
-     vertex.color = 0, 
-     vertex.label.color = "black", 
-     edge.color = "blue4")
+plot(
+  g_clique,
+  vertex.size = 20,
+  vertex.color = 0,
+  vertex.label.color = "black",
+  edge.color = "blue4"
+)
 
-corrplot(corr = Y, 
-         col.lim = c(0,1), 
-         method = "color", 
-         tl.col = "black", 
-         addgrid.col = "gray", 
-         cl.pos = "n")
+corrplot(
+  corr = Y,
+  col.lim = c(0, 1),
+  method = "color",
+  tl.col = "black",
+  addgrid.col = "gray",
+  cl.pos = "n"
+)
 ```
-
 
 ```{r}
-# orden
-vcount(g)
-# tamaño
-ecount(g)
-# clan?
-c1 <- induced_subgraph(graph = g, vids = c(6,7,8))
-ecount(c1) == choose(n = vcount(c1), k = 2)
-# frecuencias de clanes
-table(sapply(X = cliques(graph = g, min = 1, max = 10), FUN = length))
+# Orden y tamaño
+vcount(g_clique)
+ecount(g_clique)
+
+# ¿Los vértices 6, 7 y 8 forman un clan?
+g_sub <- induced_subgraph(graph = g_clique, vids = c(6, 7, 8))
+
+ecount(g_sub) == choose(vcount(g_sub), 2)
+
+# Frecuencia de clanes por tamaño
+clique_sizes <- vapply(
+  cliques(g_clique, min = 1),
+  FUN = length,
+  FUN.VALUE = integer(1)
+)
+
+table(clique_sizes)
 ```
 
-
-
-Un **clan maximal** (*maximal clique*) es un clan que no se puede extender incluyendo algún otro vértice.
+Un **clan maximal** (*maximal clique*) es un clan que no está contenido estrictamente en otro clan.
 
 ```{r}
-# clanes maximales
-max_cliques(graph = g)
+# Clanes maximales
+max_cliques(g_clique)
 ```
 
-Un **clan máximo** (*maximum clique*) es el clan maximal más grande.
+Un **clan máximo** (*maximum clique*) es un clan de cardinalidad máxima entre todos los clanes del grafo.
 
-El **número clan** (*clique number*) es el tamaño del clan máximo.
+El **número clan** (*clique number*), denotado por $\omega(G)$, es el tamaño de un clan máximo.
 
 ```{r}
-# clanes máximos
-largest_cliques(graph = g)
-# número clan
-clique_num(graph = g)
+# Clanes máximos
+largest_cliques(g_clique)
+
+# Número clan
+clique_num(g_clique)
 ```
 
-En la práctica, **clanes "grandes" son escasos**, ya que requieren que el grafo sea denso, dado que las **redes reales tienden a ser dispersas** (*sparse*).
+Todo clan máximo es maximal, pero un clan maximal no tiene que ser máximo.
+
+La enumeración de clanes maximales puede ser computacionalmente costosa. En redes grandes suele ser preferible calcular únicamente el número clan, restringir el tamaño de los clanes buscados o utilizar estructuras menos restrictivas, como los $k$-cores.
 
 
-## Ejemplo: Interacciones sociales
+## Ejemplo. Interacciones sociales
 
 Red de **interacciones sociales** entre los miembros de un club de karate.
 
-Estos datos fueron recolectados para **estudiar la fragmentación** que sufrió el club en dos clubes diferentes debido a una disputa entre el director y el administrador.
+Los datos fueron recolectados para estudiar la fragmentación del club en dos grupos después de una disputa entre el director y el administrador.
 
-$y_{i,j} = 1$ si los miembros $i$ y $j$ tuvieron una **interacción social** en el club y $y_{i,j} = 0$ en otro caso.
+$y_{i,j}=1$ si los miembros $i$ y $j$ tuvieron una interacción social y $y_{i,j}=0$ en otro caso.
 
 Una descripción completa de los datos se puede encontrar [aquí](https://rdrr.io/cran/igraphdata/man/karate.html).
 
 Disponible en el paquete `igraphdata` de R.
 
-Zachary, W. W. (1977). **An information flow model for conflict and fission in small groups**. Journal of anthropological research, 33(4), 452-473.
-
+Zachary, W. W. (1977). **An information flow model for conflict and fission in small groups.** *Journal of Anthropological Research*, 33(4), 452--473.
 
 ```{r}
-# install.packages("igraphdata")
-suppressMessages(suppressWarnings(library(igraphdata)))
-
-# data
+# Datos
 data(karate)
 karate <- upgrade_graph(karate)
-# la representación de datos internos a veces cambia entre versiones
 ```
-
 
 ```{r}
-# orden
+# Orden
 vcount(karate)
-# tamaño
+
+# Tamaño
 ecount(karate)
-# dirigida?
+
+# ¿Dirigida?
 is_directed(karate)
-# ponderada?
+
+# ¿Ponderada?
 is_weighted(karate)
+
+# ¿Simple?
+is_simple(karate)
 ```
 
-
-```{r, fig.height = 6, fig.width = 6, fig.align='center'}
-# visualización
+```{r, fig.height=6, fig.width=6, fig.align='center'}
+# Visualización
 par(mar = c(4, 3, 3, 1))
 
 set.seed(123)
-plot(karate, 
-     layout = layout_with_dh, 
-     vertex.size = 10, 
-     vertex.frame.color = "black", 
-     vertex.label.color = "black", 
-     main = "Interacciones sociales")
+plot(
+  karate,
+  layout = layout_with_dh,
+  vertex.size = 10,
+  vertex.frame.color = "black",
+  vertex.label.color = "black",
+  main = "Interacciones sociales"
+)
 ```
-
 
 ```{r}
-# clanes máximos
-largest_cliques(graph = karate)
-# número clan
-clique_num(graph = karate)
+# Clanes máximos
+largest_cliques(karate)
+
+# Número clan
+clique_num(karate)
 ```
 
+La red tiene **dos clanes máximos de tamaño 5**. 
 
-## Ejemplo: Interacciones proteína-proteína
+Ambos comparten a **Actor 2, Mr Hi, Actor 4 y Actor 3**, quienes forman un núcleo completamente conectado. 
 
-Red de **interacción de proteínas** de levadura. 
+El quinto integrante es **Actor 8** en uno de los clanes y **Actor 14** en el otro. 
 
-Las interacciones proteína-proteína prometen revelar aspectos del sistema regulatorio que subyace a la función celular.
-
-Los nodos corresponden a proteínas y solo se consideran aquellas interacciones que tienen una confianza "moderada" y "alta". 
-
-Una descripción completa de los datos se puede encontrar [aquí](http://www.nature.com/nature/journal/v417/n6887/suppinfo/nature750.html).
-
-Disponible en el paquete `igraphdata` de R.
-
-Von Mering, C., Krause, R., Snel, B., Cornell, M., Oliver, S. G., Fields, S., & Bork, P. (2002). **Comparative assessment of large-scale data sets of protein–protein interactions.** Nature, 417(6887), 399-403.
+El **número clan es 5**, es decir, no existe un grupo de más de cinco miembros en el que todos interactúen entre sí.
 
 
-```{r, eval = TRUE, echo=FALSE, out.width="50%", fig.pos = 'H', fig.align = 'center'}
-knitr::include_graphics("05_yeast.png")
-```
+## Ejemplo. Blogs políticos franceses
 
+Red no dirigida de **blogs políticos franceses** construida a partir de una instantánea tomada en octubre de 2006 antes de la elección presidencial francesa de 2007.
+
+Los vértices representan blogs y una arista indica que existe una relación de referencia entre dos blogs en la versión agregada no dirigida de la red. Cada blog tiene además una clasificación de afiliación política.
+
+La red contiene 192 vértices y 1431 aristas.
+
+Una descripción completa de los datos se puede encontrar [aquí](https://search.r-project.org/CRAN/refmans/sand/html/fblog.html).
+
+Disponible en el paquete `sand` de R.
+
+Latouche, P., Birmelé, E., & Ambroise, C. (2011). **Overlapping stochastic block models with application to the French political blogosphere.** *The Annals of Applied Statistics*, 5(1), 309--336.
 
 ```{r}
-# datos
-data(yeast)
-yeast <- upgrade_graph(yeast)
-# la representación de datos internos a veces cambia entre versiones
+# Datos
+data(fblog)
+fblog <- upgrade_graph(fblog)
 ```
-
 
 ```{r}
-# orden
-vcount(yeast)
-# tamaño
-ecount(yeast)
-# dirigida?
-is_directed(yeast)
-# ponderada?
-is_weighted(yeast)
+# Orden
+vcount(fblog)
+
+# Tamaño
+ecount(fblog)
+
+# ¿Dirigida?
+is_directed(fblog)
+
+# ¿Ponderada?
+is_weighted(fblog)
+
+# ¿Simple?
+is_simple(fblog)
 ```
 
+```{r, fig.height=6, fig.width=7, fig.align='center'}
+# Afiliación política
+party <- as.factor(V(fblog)$PolParty)
+
+# Grado de los vértices
+deg <- degree(fblog)
+
+# Tamaño de los vértices según el grado
+vertex_size <- 4 + 8*sqrt(deg/max(deg))
+
+# Colores según afiliación política
+party_colors <- hcl.colors(
+  n = nlevels(party),
+  palette = "Dark 3"
+)
+
+# Etiquetas
+labels <- rep(NA, vcount(fblog))
+
+# Layout
+set.seed(123)
+lay <- layout_with_fr(fblog)
+
+# Visualización
+par(mar = c(1, 1, 3, 1))
+
+plot(
+  fblog,
+  layout = lay,
+  vertex.size = vertex_size,
+  vertex.color = party_colors[as.integer(party)],
+  vertex.frame.color = "white",
+  vertex.frame.width = 0.7,
+  vertex.label = labels,
+  vertex.label.cex = 0.65,
+  vertex.label.color = "black",
+  vertex.label.dist = 0.5,
+  edge.color = adjustcolor("gray40", alpha.f = 0.18),
+  edge.width = 0.6,
+  main = "Blogs políticos franceses"
+)
+
+# Leyenda
+legend(
+  "topleft",
+  legend = levels(party),
+  col = party_colors,
+  pch = 19,
+  pt.cex = 1.2,
+  cex = 0.75,
+  bty = "n",
+  title = "Afiliación política"
+)
+```
 
 ```{r}
-# número clan
-clique_num(graph = yeast)
+# Número clan
+clique_num(fblog)
+
+# Número de clanes maximales
+count_max_cliques(fblog)
 ```
 
+El ejemplo ilustra que una red puede contener muchos clanes maximales sin que el clan máximo represente una fracción grande del conjunto de vértices. 
 
-El número clan es relativamente pequeño (incluso para redes "grandes").
+Por esta razón, el número clan debe interpretarse junto con el tamaño y la densidad de la red.
 
 
 # Díadas y tríadas
 
-Otras cantidades de interés son las **díadas** y las **tríadas**.
+Las **díadas** y **tríadas** describen la estructura local de una red a partir de subgrafos inducidos por conjuntos de dos y tres vértices, respectivamente.
 
-¿Cuáles son los estados diádicos no dirigidos y dirigidos? 
 
-¿Y los triádicos?
+### Estados diádicos
 
-### Estados triádicos no dirigidos (*undirected triadic motifs*)
+En un grafo   simple, una díada puede encontrarse en uno de dos estados, **conectada** o **nula**, dependiendo de si existe o no una arista entre sus dos vértices.
 
-```{r, eval = TRUE, echo=FALSE, out.width="43%", fig.pos = 'H', fig.align = 'center'}
+En un dígrafo simple, una díada puede encontrarse en uno de tres estados:
+
+* **Mutua**, cuando existen los dos arcos entre los vértices.
+* **Asimétrica**, cuando existe exactamente uno de los dos arcos posibles.
+* **Nula**, cuando no existe ningún arco entre los vértices.
+
+
+### Estados triádicos no dirigidos
+
+Para un conjunto de tres vértices de un grafo no dirigido simple existen **cuatro clases isomorfas de subgrafos inducidos**, correspondientes a configuraciones con 0, 1, 2 o 3 aristas.
+
+Las configuraciones con 0 o 1 arista son no conexas. 
+
+Las dos configuraciones conexas corresponden a un **camino de longitud 2** y a un **triángulo**.
+
+```{r, eval=TRUE, echo=FALSE, out.width="43%", fig.pos='H', fig.align='center'}
 knitr::include_graphics("06_undirected_triadic_motifs.jpg")
 ```
 
-### Estados triádicos dirigidos (*directed triadic motifs*)
 
-```{r, eval = TRUE, echo=FALSE, out.width="58%", fig.pos = 'H', fig.align = 'center'}
+### Estados triádicos dirigidos
+
+En un dígrafo simple existen **16 clases isomorfas de tríadas inducidas**. 
+
+La notación de Davis y Leinhardt (*The Structure of Positive Interpersonal Relations in Small Groups*, 1972) identifica cada clase mediante tres dígitos que indican, respectivamente, el número de díadas **mutuas**, **asimétricas** y **nulas**. Como una tríada contiene exactamente tres pares no ordenados de vértices, estos tres números siempre suman 3.
+
+Por ejemplo, `021` representa una tríada con 0 díadas mutuas, 2 díadas asimétricas y 1 díada nula.
+
+Cuando varias configuraciones tienen los mismos conteos diádicos, se utilizan letras para distinguir sus orientaciones:
+
+* **D** (*down*) indica una configuración en la que dos arcos salen de un mismo vértice.
+* **U** (*up*) indica una configuración en la que dos arcos llegan a un mismo vértice.
+* **C** (*cyclic*) indica una configuración que contiene un ciclo dirigido.
+* **T** (*transitive*) indica una configuración transitiva.
+
+```{r, eval=TRUE, echo=FALSE, out.width="58%", fig.pos='H', fig.align='center'}
 knitr::include_graphics("06_directed_triadic_motifs.jpg")
 ```
 
-- Dado que una tríada tiene 3 pares no ordenados de nodos, los dígitos siempre suman 3. Por ejemplo, 021 significa 0 díadas mutuas, 2 díadas unidireccionales y 1 díada no conectada.
+### Censos diádico y triádico
 
-- **D** (Down) indica una **configuración descendente**, en la que un nodo dirige arcos hacia otros dos nodos. Por ejemplo, \(A \to B\) y \(A \to C\).
-
-- **U** (Up) indica una **configuración ascendente**, en la que dos nodos dirigen arcos hacia un mismo nodo. Por ejemplo, \(A \to C\) y \(B \to C\).
-
-- **T** (Transitive) indica una **configuración transitiva**, en la que si un nodo se relaciona con un segundo y este con un tercero, entonces también existe relación entre el primero y el tercero. Por ejemplo, \(A \to B\), \(B \to C\) y \(A \to C\).
-
-- **C** (Cyclic) indica una **configuración cíclica**, en la que los tres nodos forman un ciclo dirigido. Por ejemplo, \(A \to B\), \(B \to C\) y \(C \to A\).
-
-Davis, J.A. and Leinhardt, S. (1972). **The Structure of Positive Interpersonal Relations in Small Groups.** In J. Berger (Ed.), Sociological Theories in Progress, Volume 2, 218-251. Boston: Houghton Mifflin.
-
-Un **censo de los estados diádicos** o **triádicos** proporciona una medida de la conectividad de una red.
-
-### Puntuaciónes estandarizadas (*z-scores*)
-
-La **puntuación estandarizada normalizada** de un motivo triádico dirigido mide **qué tan más o menos frecuente** es ese motivo en la red observada, **respecto a lo esperado por azar** bajo un modelo nulo (una versión aleatorizada de la red original usada como referencia).
-
-Para cada motivo \(k\), primero se calcula
+El **censo diádico** cuenta el número de díadas mutuas, asimétricas y nulas presentes en un dígrafo. Para una red dirigida simple con $n$ vértices, estos conteos satisfacen
 $$
-Z_k = \frac{N_k^{\text{obs}} - \textsf{E}(N_k^{\text{rand}})}{\textsf{SD}(N_k^{\text{rand}})},
+N_{\mathrm{mut}} + N_{\mathrm{asym}} + N_{\mathrm{null}}
+=
+\binom{n}{2}.
 $$
-donde \(N_k^{\text{obs}}\) es el número observado de ocurrencias del motivo, mientras que \(\textsf{E}(N_k^{\text{rand}})\) y \(\textsf{SD}(N_k^{\text{rand}})\) se estiman a partir de redes aleatorizadas. Luego, estos puntajes se normalizan como
+
+El **censo triádico** cuenta cuántas tríadas pertenecen a cada una de las 16 clases isomorfas. Como cada subconjunto de tres vértices induce exactamente una de estas configuraciones,
 $$
-\hat{z}_k = \frac{Z_k}{\sqrt{\sum_j Z_j^2}}.
+\sum_{k=1}^{16} N_k
+=
+\binom{n}{3},
 $$
-De esta forma, \(\hat{z}_k > 0\) indica que el motivo aparece más de lo esperado por azar, \(\hat{z}_k < 0\) indica que aparece menos de lo esperado, y su magnitud refleja su importancia relativa dentro del perfil global de motivos de la red.
+donde $N_k$ denota el número de tríadas observadas que pertenecen a la clase isomorfa $k$.
 
-## Ejemplo: Blogs de SIDA
-
-Red de **blogs de SIDA, pacientes y sus redes de apoyo**. 
-
-Un enlace dirigido de un blog a otro indica que el primero tiene un enlace al segundo en su página web. 
-
-Una descripción completa de los datos se puede encontrar [aquí](https://rdrr.io/cran/sand/man/aidsblog.html).
-
-Disponible en el paquete `sand` de R.
-
-Miller, H. J. (2007). **Societies and cities in the age of instant access**. In Societies and cities in the age of instant access (pp. 3-28). Springer, Dordrecht.
+Estos censos proporcionan una descripción de la **estructura local de conectividad** de la red y permiten estudiar propiedades como reciprocidad, transitividad, jerarquía y formación de ciclos.
 
 
-```{r}
-# librerías
-suppressMessages(suppressWarnings(library(sand)))
-```
+## Ejemplo. Red de correos electrónicos de Enron
 
+La red de **correos electrónicos de Enron** contiene comunicaciones entre direcciones de correo del conjunto de datos hecho público durante la investigación de Enron.
 
-```{r}
-# data
-data(aidsblog)
-aidsblog <- upgrade_graph(aidsblog)
-# la representación de datos internos a veces cambia entre versiones
-```
+Los vértices representan direcciones de correo y cada arista dirigida corresponde a un mensaje enviado desde una dirección hacia otra. 
 
+La red original contiene aristas múltiples porque una misma persona puede enviar varios mensajes a otra. 
+
+Para estudiar díadas, tríadas y reciprocidad como propiedades de una red binaria, se eliminan los bucles y se colapsan las aristas múltiples.
+
+Una descripción completa de los datos se puede encontrar [aquí](https://search.r-project.org/CRAN/refmans/igraphdata/html/enron.html).
+
+Disponible en el paquete `igraphdata` de R.
+
+Priebe, C. E., Conroy, J. M., Marchette, D. J., & Park, Y. (2005). **Scan statistics on Enron graphs.** *Computational and Mathematical Organization Theory*, 11(3), 229--247.
 
 ```{r}
-# orden
-vcount(aidsblog)
-# tamaño
-ecount(aidsblog)
-# dirigida?
-is_directed(aidsblog)
-# ponderada?
-is_weighted(aidsblog)
+# Datos
+data(enron)
+enron <- upgrade_graph(enron)
 ```
-
-
-```{r, fig.height = 6, fig.width = 6, fig.align='center'}
-# visualización
-set.seed(123)
-par(mfrow = c(1,1), mar = c(4, 3, 3, 1))
-plot(aidsblog, 
-     layout = layout_with_kk, 
-     vertex.label = NA, vertex.size = 5, 
-     vertex.frame.color = 1, 
-     edge.arrow.size = 0.5, 
-     main = "")
-```
-
 
 ```{r}
-# simple?
-is_simple(aidsblog)
-# simplificación
-aidsblog <- simplify(aidsblog)
+# Orden
+vcount(enron)
+
+# Tamaño
+ecount(enron)
+
+# ¿Dirigida?
+is_directed(enron)
+
+# ¿Ponderada?
+is_weighted(enron)
+
+# ¿Simple?
+is_simple(enron)
 ```
 
-
 ```{r}
-# censo de estados diádicos
-#   mut   The number of pairs with mutual connections.
-#   asym  The number of pairs with non-mutual connections.
-#   null  The number of pairs with no connection between them.
-dyad_census(aidsblog)
-# censo de estados triádicos
-#   003   A,B,C, the empty graph.
-#   012   A->B, C, the graph with a single directed edge.
-#   102   A<->B, C, the graph with a mutual connection between two vertices.
-#   021D  A<-B->C, the out-star.
-#   021U  A->B<-C, the in-star.
-#   021C  A->B->C, directed line.
-#   111D  A<->B<-C.
-#   111U  A<->B->C.
-#   030T  A->B<-C, A->C.
-#   030C  A<-B<-C, A->C.
-#   201   A<->B<->C.
-#   120D  A<-B->C, A<->C.
-#   120U  A->B<-C, A<->C.
-#   120C  A->B->C, A<->C.
-#   210   A->B<->C, A<->C.
-#   300   A<->B<->C, A<->C, the complete graph.
-
-# etiquetas de las 16 tríadas dirigidas
-triad_labels <- c(
-  "003",  "012",  "102",  "021D", "021U", "021C",
-  "111D", "111U", "030T", "030C", "201",
-  "120D", "120U", "120C", "210",  "300"
+# Red binaria simple
+enron_bin <- simplify(
+  enron,
+  remove.multiple = TRUE,
+  remove.loops = TRUE,
+  edge.attr.comb = "ignore"
 )
 
-# censo de triadas
-obs_counts <- triad_census(aidsblog)
-names(obs_counts) <- triad_labels
+# Orden
+vcount(enron_bin)
 
-obs_counts
+# Tamaño
+ecount(enron_bin)
+
+# ¿Simple?
+is_simple(enron_bin)
 ```
 
+```{r, fig.height=6, fig.width=7, fig.align='center'}
+# Versión no dirigida para detectar comunidades y construir el layout
+enron_und <- as_undirected(enron_bin, mode = "collapse")
+
+# Comunidades mediante el algoritmo de Louvain
+com <- cluster_louvain(enron_und)
+
+# Comunidad de cada vértice
+membership_com <- membership(com)
+
+# Número de comunidades
+n_com <- length(unique(membership_com))
+
+# PageRank
+pr <- page_rank(enron_bin)$vector
+
+# Tamaño de los vértices según PageRank
+vertex_size <- 3 + 12*sqrt(pr/max(pr))
+
+# Colores según comunidad
+community_colors <- hcl.colors(n = n_com, palette = "Dark 3")
+
+# Color de cada vértice
+vertex_color <- community_colors[membership_com]
+
+# Etiquetas
+labels <- rep(NA, vcount(enron_bin))
+
+# Layout
+set.seed(123)
+lay <- layout_with_dh(enron_und,)
+
+# Visualización
+par(mar = c(1, 1, 3, 1))
+
+plot(
+  enron_bin,
+  layout = lay,
+  vertex.size = 2.5 + 6*sqrt(pr/max(pr)),
+  vertex.color = vertex_color,
+  vertex.frame.color = "white",
+  vertex.frame.width = 0.4,
+  vertex.label = NA,
+  edge.color = adjustcolor("gray30", alpha.f = 0.20),
+  edge.width = 0.4,
+  edge.arrow.size = 0.18,
+  edge.arrow.width = 0.4,
+  edge.curved = 0.05,
+  main = "Correos electrónicos"
+)
+```
 
 ```{r}
-# número de redes nulas
+# Censo diádico
+dyads <- dyad_census(enron_bin)
+dyads
+
+# Verificación
+a <- unlist(dyads)
+sum(a) == choose(vcount(enron_bin), 2)
+```
+
+En la red de correos de Enron se observan 913 díadas mutuas, 1184 asimétricas y 14 739 nulas. 
+
+La mayoría de los pares de actores no intercambian correos, mientras que entre los pares conectados existe una presencia importante de reciprocidad.
+
+```{r}
+# Etiquetas de las 16 tríadas dirigidas
+triad_labels <- c(
+  "003", "012", "102", "021D", "021U", "021C",
+  "111D", "111U", "030T", "030C", "201",
+  "120D", "120U", "120C", "210", "300"
+)
+
+# Censo triádico
+obs_counts <- triad_census(enron_bin)
+names(obs_counts) <- triad_labels
+obs_counts
+
+# Verificación
+sum(obs_counts) == choose(vcount(enron_bin), 3)
+```
+
+La distribución está fuertemente dominada por tríadas **dispersas**. De las \(1\,021\,384=\binom{184}{3}\) tríadas posibles, aproximadamente **68.6 %** son de tipo `003`, es decir, no contienen ningún arco. Le siguen `012` (**14.7 %**) y `102` (**11.6 %**), correspondientes a configuraciones con una sola relación dirigida o una relación mutua, respectivamente.
+
+Las configuraciones más estructuradas, como las transitivas (`030T`), cíclicas (`030C`) o completamente conectadas (`300`), son mucho menos frecuentes. Esto refleja la **baja densidad de la red de correos**. 
+
+Sin embargo, estos conteos por sí solos no permiten determinar qué tríadas están sobre o subrepresentadas; para ello es necesario compararlas con un **modelo nulo** (colección de redes dirigidas aleatorias que conservan la misma secuencia de grados de entrada y de salida que la red observada de Enron).
+
+
+## Comparación con un modelo nulo
+
+El conteo observado de un motivo depende fuertemente del tamaño, la densidad y la distribución de grados de la red. Por esta razón, una frecuencia grande no implica por sí sola que una configuración esté sobrerrepresentada.
+
+Una estrategia consiste en comparar la red observada con una colección de redes aleatorias que preservan las secuencias de grados de entrada y salida. 
+
+Para cada tríada $k$, se calcula
+$$
+Z_k =
+\frac{N_k^{\mathrm{obs}} - \operatorname{E}(N_k^{\mathrm{null}})}
+{\operatorname{SD}(N_k^{\mathrm{null}})}.
+$$
+
+Un valor positivo indica sobrerrepresentación respecto al modelo nulo y un valor negativo indica subrepresentación. 
+
+El valor $|Z_k| \gtrsim 2$ puede utilizarse como regla descriptiva basada en una aproximación normal (no debe interpretarse como una prueba formal de significancia).
+
+Para **comparar perfiles de motivos entre redes** se puede normalizar el vector de puntuaciones como
+$$
+\widehat{Z}_k =
+\frac{Z_k}{\sqrt{\sum_j Z_j^2}}.
+$$
+
+Esta normalización conserva el patrón relativo de sobrerrepresentación y subrepresentación, pero **no conserva la escala de una puntuación estandarizada**. 
+
+El criterio $|Z| \gtrsim 2$ no puede aplicarse a $\widehat{Z}_k$, cuyos valores están necesariamente entre $-1$ y $1$.
+
+El **valor \(p\) de Monte Carlo** cuantifica qué tan extremo es el conteo observado de una tríada respecto a los conteos obtenidos bajo el modelo nulo.
+
+Sea \(N_k^{\mathrm{obs}}\) el conteo observado de la tríada \(k\) y \(N_k^{(1)},\ldots,N_k^{(B)}\) los conteos obtenidos de \(B\) redes generadas bajo el modelo nulo. Las probabilidades de cola se estiman mediante
+$$
+p_{\mathrm{upper}}
+=
+\frac{1+\sum_{b=1}^{B} I\left(N_k^{(b)}\geq N_k^{\mathrm{obs}}\right)}
+{B+1}
+\qquad\text{y}\qquad
+p_{\mathrm{lower}}
+=
+\frac{1+\sum_{b=1}^{B} I\left(N_k^{(b)}\leq N_k^{\mathrm{obs}}\right)}
+{B+1}.
+$$
+
+El valor \(p\) bilateral de Monte Carlo se calcula como
+$$
+p_{\mathrm{MC}}
+=
+\min\left\{1,\,
+2\min\left(p_{\mathrm{upper}},p_{\mathrm{lower}}\right)
+\right\}.
+$$
+
+Un valor pequeño, por ejemplo \(p_{\mathrm{MC}}<0.05\), indica evidencia de que la tríada está **sobre o subrepresentada** respecto al modelo nulo, dependiendo de si su conteo observado es mayor o menor que el esperado.
+
+```{r}
+# Número de redes nulas
 B <- 1000
 
-# grados de salida y entrada del grafo observado
-out_deg <- igraph::degree(aidsblog, mode = "out")
-in_deg  <- igraph::degree(aidsblog, mode = "in")
+# Grados de salida y entrada
+out_deg <- degree(enron_bin, mode = "out")
+in_deg  <- degree(enron_bin, mode = "in")
 
-# matriz para guardar los censos triádicos bajo el modelo nulo
+# Censos triádicos bajo el modelo nulo
 null_counts <- matrix(
   NA_real_,
   nrow = B,
@@ -382,359 +599,599 @@ null_counts <- matrix(
   dimnames = list(NULL, triad_labels)
 )
 
-# redes nulas dirigidas con la misma secuencia de grados
 set.seed(123)
 for (b in seq_len(B)) {
-  g_null <- igraph::sample_degseq(
+  g_null <- sample_degseq(
     out.deg = out_deg,
-    in.deg  = in_deg,
-    method  = "edge.switching.simple"
+    in.deg = in_deg,
+    method = "edge.switching.simple"
   )
-  
-  null_counts[b, ] <- igraph::triad_census(g_null)
+
+  null_counts[b, ] <- triad_census(g_null)
 }
 
-# media y desviación estándar bajo el modelo nulo
+# Media y desviación estándar bajo el modelo nulo
 mu_null <- colMeans(null_counts)
-sd_null <- apply(X = null_counts, MARGIN = 2, FUN = sd)
+sd_null <- apply(null_counts, 2, sd)
 
-# puntuaciones Z
-# puntuaciones Z
+# Puntuaciones Z
 z_scores <- ifelse(
   sd_null > 0,
   (obs_counts - mu_null) / sd_null,
   NA_real_
 )
 
-# versión normalizada
-z_scores_norm <- z_scores / sqrt(sum(z_scores^2, na.rm = TRUE))
+# Perfil normalizado
+z_norm_const  <- sqrt(sum(z_scores^2, na.rm = TRUE))
+z_scores_norm <- if (z_norm_const > 0) {
+  z_scores / z_norm_const
+} else {
+  rep(NA_real_, length(z_scores))
+}
 
-# tabla de resultados
+# Valores p de Monte Carlo de dos colas
+obs_mat <- matrix(
+  obs_counts,
+  nrow = B,
+  ncol = length(obs_counts),
+  byrow = TRUE
+)
+
+p_upper <- (1 + colSums(null_counts >= obs_mat)) / (B + 1)
+p_lower <- (1 + colSums(null_counts <= obs_mat)) / (B + 1)
+p_mc    <- pmin(1, 2 * pmin(p_upper, p_lower))
+
+# Resultados
 triad_z <- data.frame(
-  triad   = triad_labels,
-  obs     = as.numeric(obs_counts),
-  mean    = mu_null,
-  sd      = sd_null,
-  z       = z_scores,
-  z_norm  = z_scores_norm,
+  triad     = triad_labels,
+  obs       = as.numeric(obs_counts),
+  mean_null = round(mu_null, 3),
+  sd_null   = round(sd_null, 3),
+  z         = round(z_scores, 3),
+  z_norm    = round(z_scores_norm, 3),
+  p_mc      = round(p_mc, 3),
   row.names = NULL
 )
 
-# tabla
 triad_z
 ```
 
+```{r, fig.height=5, fig.width=9, fig.align='center'}
+# Visualización
+par(mfrow = c(1, 2), mar = c(8, 4, 3, 1))
 
-```{r, fig.align='center'}
-# visualización
-par(mfrow = c(1, 1), mar = c(8, 4, 3, 1))
+barplot(
+  height = triad_z$z,
+  names.arg = triad_z$triad,
+  las = 2,
+  ylab = "Z-score",
+  main = "Puntuaciones Z"
+)
+abline(h = c(-2, 0, 2), lty = c(2, 1, 2), col = 2)
+
 barplot(
   height = triad_z$z_norm,
   names.arg = triad_z$triad,
   las = 2,
-  ylab = "Z-score normalizado",
-  main = "Puntuaciones normalizadas de motivos triádicos dirigidos"
+  ylab = "Perfil normalizado",
+  main = "Perfil de motivos"
 )
-abline(h = 0, col = 2)
+abline(h = 0)
 ```
+     
+Respecto al modelo nulo que conserva los grados de entrada y salida:
 
+* La sobrerrepresentación de **`003`** indica que existen más ternas de empleados completamente desconectadas de lo esperado, lo que sugiere una estructura **segmentada** de la comunicación.
+* La sobrerrepresentación de **`102`** muestra una fuerte presencia de **intercambios recíprocos entre pares** que no involucran directamente a un tercer actor.
+* La subrepresentación de **`021D`, `021U` y `021C`** indica que las configuraciones simples de envío o recepción alrededor de tres actores son menos frecuentes de lo esperado.
+* La subrepresentación de **`030T`** sugiere menor **cierre transitivo**: que \(A\) escriba a \(B\) y \(B\) a \(C\) no implica con tanta frecuencia que \(A\) escriba también a \(C\).
+* La escasez de **`030C`** indica que los **ciclos dirigidos de comunicación entre tres actores** son particularmente poco frecuentes.
 
-- Valores con \(|z| \gtrsim 2\) sugieren diferencias importantes frente al modelo nulo.
+La red parece organizarse más alrededor de **interacciones recíprocas entre pares y grupos relativamente separados**, y menos alrededor de estructuras triádicas densas, transitivas o cíclicas, incluso después de controlar por los grados de entrada y salida.
 
-- Se observan más tríadas \(003\) y \(102\) de lo esperado por azar.
-
-- Se observan menos tríadas \(012\), \(021D\), \(021C\) y \(030T\) de lo esperado por azar.
-
-- La tríada \(111U\) muestra una sobrerrepresentación débil, cercana al umbral de significancia.
-
-- Las tríadas \(021U\), \(111D\) y \(030C\) no muestran evidencia clara de desviación frente al modelo nulo.
-
-- La red parece más dispersa y con menor presencia de estructuras triádicas organizadas, especialmente de tipo transitivo.
-
-- La gran mayoría de los estados son nulos y de los que no lo son, casi todos son asimétricos, lo que indica una unilateralidad (asimetría) preponderante en la manera en que los blogs se referencian.
-
+     
 # Densidad
 
-La **densidad** (*density*) de un grafo se define como la frecuencia relativa de las aristas observadas respecto al potencial de aristas.
+La **densidad** (*density*) mide la proporción de aristas observadas respecto al número máximo de aristas posibles.
 
-Para un subgrafo $H=(V_H,E_H)$ del grafo $G=(V,E)$, la densidad se calcula como
+Para un grafo simple no dirigido $G=(V,E)$ con $n=|V|$ vértices y $m=|E|$ aristas,
 $$
-\textsf{den(H)}=\frac{|E_H|}{|V_H|(|V_H|-1)/2}\,.
+\operatorname{den}(G)
+=
+\frac{m}{\binom{n}{2}}
+=
+\frac{2m}{n(n-1)}.
 $$
-En el caso de un **digrafo** el denominador debe ser $|V_H|(|V_H|-1)$.
 
-La densidad asume valores entre 0 y 1 y se puede interpretar como una medida de qué tan cerca se encuentra $H$ de ser un clan.
+Para un dígrafo simple sin bucles,
+$$
+\operatorname{den}(G)
+=
+\frac{m}{n(n-1)}.
+$$
+
+La densidad toma valores entre 0 y 1 únicamente bajo estas convenciones de grafo simple. 
+
+En multigrafos, contar aristas múltiples directamente puede producir valores que ya no admiten esta interpretación.
+
+En un grafo no dirigido, una densidad cercana a 1 indica que el grafo está cerca de ser completo. 
+
+La densidad depende del tamaño de la red y del mecanismo con que se observan las relaciones. Por esta razón, comparar densidades entre redes de tamaños o contextos muy diferentes requiere cautela.
 
 
-## Ejemplo: Interacciones sociales
-
-
-```{r, fig.align='center'}
-# densidad
-ecount(karate)/(vcount(karate)*(vcount(karate)-1)/2)
-edge_density(graph = karate)
-mean(Y[lower.tri(Y, diag = F)])
-mean(Y[upper.tri(Y, diag = F)])
-```
-
+## Ejemplo. Interacciones sociales
 
 ```{r}
-# ego networks
-g_1  <- induced_subgraph(graph = karate, vids = neighborhood(graph = karate, order = 1, nodes = 1) [[1]])
-g_34 <- induced_subgraph(graph = karate, vids = neighborhood(graph = karate, order = 1, nodes = 34)[[1]])
+# Densidad
+edge_density(karate)
+
+# Cálculo directo
+2 * ecount(karate) / (vcount(karate) * (vcount(karate) - 1))
+
+# A partir de la matriz de adyacencia
+Y_karate <- as.matrix(as_adjacency_matrix(karate, sparse = FALSE))
+mean(Y_karate[lower.tri(Y_karate, diag = FALSE)])
 ```
 
+La densidad también puede calcularse sobre subgrafos para comparar cohesión local.
+
+La **red ego de orden 1** de un vértice \(v\) es el subgrafo inducido por \(v\) y todos sus vecinos inmediatos. Formalmente, si $N(v)=\{u\in V:(u,v)\in E\}$, entonces la red ego de orden 1 de \(v\) es
+$$
+G_v=G\big(\{v\}\cup N(v)\big).
+$$
+Por lo tanto, contiene al vértice focal \(v\), sus vecinos y todas las aristas existentes entre estos vértices.
 
 ```{r}
-# densidades
-edge_density(graph = g_1)
-edge_density(graph = g_34)
+# Redes ego de orden 1
+ego_graphs <- make_ego_graph(
+  karate,
+  order = 1,
+  nodes = c(1, 34)
+)
+
+g_1  <- ego_graphs[[1]]
+g_34 <- ego_graphs[[2]]
+
+# Densidades
+edge_density(g_1)
+edge_density(g_34)
 ```
+
 
 # Transitividad global
 
-Una **tripla** está constituida por tres nodos que están conectados por dos (tripla abierta) o tres (tripla cerrada) aristas.
+Una **tripla conectada** centrada en un vértice $v$ corresponde a un par de vecinos de $v$. Por lo tanto, un vértice de grado $k_v$ participa como centro en $\binom{k_v}{2}$ triplas conectadas.
 
-La **transitividad** (*transitivity*) de un grafo se cuantifica por medio del **coeficiente de agrupamiento** (*clustering coeffitient*) que se calcula como
-$$
-\textsf{cl} (G) =\frac{\text{no. triplas cerradas}}{\text{no. triplas}} =\frac{3\times \text{no. triángulos}}{\text{no. triplas}} = \frac{3\tau_\triangle(G)}{\tau_3(G)}\,,
-$$
-donde $\tau_\triangle(G)$ es el **número de triángulos** de $G$ y $\tau_3(G)$ es el **número de triplas**.
+Una tripla es **cerrada** si sus tres vértices forman un triángulo.
 
-El coeficiente de agrupamiento es una **medida de agrupamiento global** que caracteriza la propensión con la que las triplas forman triángulos.
+La **transitividad global** o **coeficiente de agrupamiento global** se define como la proporción de triplas conectadas que están cerradas formando triángulos, es decir, 
+$$
+C(G)
+=
+\frac{3\,T}{\sum_{v \in V}\binom{k_v}{2}},
+$$
+donde $T$ es el número de triángulos (conjuntos de tres vértices en el que cada par está conectado por una arista). 
+
+El factor 3 aparece porque cada triángulo contiene tres triplas conectadas, una centrada en cada vértice.
+
+La transitividad global cuantifica la propensión de dos vecinos de un mismo vértice a estar conectados entre sí.
+
+En `igraph`, `transitivity(graph, type = "global")` ignora la dirección de las aristas si se aplica a un dígrafo. Para estudiar cierre triádico propiamente dirigido es preferible utilizar el censo triádico.
 
 
 ## Ejemplo
 
 ```{r}
-# datos
-h <- make_graph(edges = c(1,2,1,3,2,3,1,4), directed = F)
+# Datos
+g_trans <- make_graph(
+  edges = c(1, 2, 1, 3, 2, 3, 1, 4),
+  directed = FALSE
+)
 ```
 
-
 ```{r, fig.align='center'}
-# visualización
+# Visualización
 set.seed(123)
-plot(h, 
-     vertex.size = 20, 
-     vertex.color = 0, 
-     vertex.label.color = "black", 
-     edge.color = "blue4")
+plot(
+  g_trans,
+  vertex.size = 20,
+  vertex.color = 0,
+  vertex.label.color = "black",
+  edge.color = "blue4"
+)
 ```
-
 
 ```{r}
-# número de triángulos por vértice
-count_triangles(graph = h)
-# vértices que son parte de un triángulo
-triangles(graph = h)
-# conteos de estados triádicos
-# Las clases no conexas no se consideran motivos y por eso aparecen como NA
-# NA NA <camino_de_3_nodos> <triangulo>
-# Clase 0: subgrafo vacío, NA
-# Clase 1: un solo enlace, NA
-# Clase 2: camino de longitud 2 o “V”
-# Clase 3: triángulo
-(mot <- motifs(graph = h, size = 3))
-# transitividad
-3*mot[4]/(mot[3] + 3*mot[4])
-transitivity(graph = h, type = "global")
+# Triángulos por vértice
+count_triangles(g_trans)
+
+# Lista de triángulos
+matrix(triangles(g_trans), nrow = 3)
+
+# Número total de triángulos
+T <- length(triangles(g_trans)) / 3
+
+# Número de triplas conectadas
+tau <- sum(choose(degree(g_trans), 2))
+
+# Transitividad global
+3 * T / tau
+transitivity(g_trans, type = "global")
 ```
 
-- \(\{1,2,3\}\) induce un triángulo, porque están las aristas \(1-2\), \(1-3\) y \(2-3\).
+En esta red, $\{1,2,3\}$ forma un triángulo. 
 
-- \(\{1,2,4\}\) induce un camino de longitud 2, porque están \(1-2\) y \(1-4\), pero no \(2-4\).
+Las configuraciones $\{1,2,4\}$ y $\{1,3,4\}$ forman triplas abiertas centradas en el vértice 1. 
 
-- \(\{1,3,4\}\) induce otro camino de longitud 2, porque están \(1-3\) y \(1-4\), pero no \(3-4\).
-
-- \(\{2,3,4\}\) induce un subgrafo con una sola arista, \(2-3\), y el nodo \(4\) aislado, así que no es conexo y no cuenta como motivo.
+El subconjunto $\{2,3,4\}$ no forma una tripla conectada porque el vértice 4 está aislado dentro del subgrafo inducido.
 
 
 ## Ejemplo
 
 ```{r}
-# datos
-g <- make_graph(edges = c(1,2,1,3,1,4,1,5,2,3,2,4,2,5,3,4,3,5,4,5,6,7,6,8,7,8,9,10,1,6,2,9,7,9), directed = F)
+# Datos
+g_trans2 <- g_clique
 ```
-
 
 ```{r, fig.align='center'}
-# visualización
+# Visualización
 set.seed(42)
-plot(g, 
-     vertex.size = 20, 
-     vertex.color = 0, 
-     vertex.label.color = "black",
-     edge.color = "blue4")
+plot(
+  g_trans2,
+  vertex.size = 20,
+  vertex.color = 0,
+  vertex.label.color = "black",
+  edge.color = "blue4"
+)
 ```
 
-
 ```{r}
-# número de triángulos por vértice
-count_triangles(graph = g)
-# vértices que son parte de un triángulo
-sort(triangles(graph = g))
-# conteos de estados triádicos
-(mot <- motifs(graph = g, size = 3))
-# transitividad global
-3*mot[4]/(mot[3] + 3*mot[4])
-transitivity(graph = g, type = "global")
+# Triángulos por vértice
+count_triangles(g_trans2)
+
+# Número total de triángulos
+T <- length(triangles(g_trans2)) / 3
+
+# Número de triplas conectadas
+tau <- sum(choose(degree(g_trans2), 2))
+
+# Transitividad global
+3 * T / tau
+transitivity(g_trans2, type = "global")
 ```
 
 
 # Transitividad local
 
-El **coeficiente de agrupamiento** del vértice $v\in V$ se define teniendo en cuenta la incidencia de $v$ en las aristas que conforman las triplas:
-$$
-\textsf{cl}(v) = \frac{\text{no. triplas cerradas que incluyen a $v$}}{k_v(k_v-1)/2}\,,
-$$
-donde $k_v$ es el grado del nodo $v$.
+El **coeficiente de agrupamiento local** del vértice $v$ mide qué proporción de pares de vecinos de $v$ están conectados entre sí.
 
-El coeficiente de agrupamiento de un vértice es una **medida de agrupamiento local** que cuantifica qué tan cerca están los vecinos del vértice de ser un clan.
-
-Alternativamente, el  **coeficiente de agrupamiento global** también se puede definir como el promedio de los coeficientes de agrupamiento locales de todos los vértices:
+Si $t_v$ es el número de triángulos que contienen a $v$ y $k_v$ es su grado, entonces
 $$
-\textsf{cl} (G) = \frac{1}{|V|}\sum_{v\in V} \textsf{cl}(v)\,.
+C_v
+=
+\frac{t_v}{\binom{k_v}{2}}
+=
+\frac{2t_v}{k_v(k_v-1)},
 $$
+para $k_v \geq 2$.
 
-## Ejemplo
+Cuando $k_v<2$, el denominador es cero y el coeficiente no está definido. `igraph` devuelve `NaN` por defecto para estos vértices.
 
 ```{r}
-# datos
-g <- make_graph(edges = c(1,2,1,3,1,4,1,5,2,3,2,4,2,5,3,4,3,5,4,5,6,7,6,8,7,8,9,10,1,6,2,9,7,9), directed = F)
+# Transitividad local
+t_v <- count_triangles(g_trans2)
+k_v <- degree(g_trans2)
+
+2 * t_v / (k_v * (k_v - 1))
+transitivity(g_trans2, type = "local")
+```
+
+Existen dos medidas globales relacionadas, pero **no equivalentes**, de agrupamiento en una red.
+
+La **transitividad global** otorga mayor peso a los vértices que participan como centro en un mayor número de triplas conectadas.
+
+En contraste, el **promedio de los coeficientes de agrupamiento locales** asigna el mismo peso a cada vértice con grado al menos 2,
+
+$$
+\overline{C}
+=
+\frac{1}{|V_2|}
+\sum_{v \in V_2} C_v,
+\qquad
+V_2=\{v\in V:k_v\geq2\}.
+$$
+
+
+```{r}
+# Transitividad global
+transitivity(g_trans2, type = "global")
+
+# Promedio de transitividades locales
+mean(
+  transitivity(g_trans2, type = "local"),
+  na.rm = TRUE
+)
+
+# Implementación directa en igraph
+transitivity(g_trans2, type = "average")
 ```
 
 
-```{r, fig.align='center'}
-# visualización
-set.seed(42)
-plot(g, 
-     vertex.size = 20, 
-     vertex.color = 0, 
-     vertex.label.color = "black", 
-     edge.color = "blue4")
-```
-
+## Ejemplo. Interacciones sociales
 
 ```{r}
-# intransitividad local del vértice 1
-count_triangles(graph = g)
-degree(graph = g)
-6/(5*(5-1)/2)
-transitivity(graph = g, type = "local")
-# transitividad global alternativa
-mean(transitivity(graph = g, type = "local", vids = V(g)), na.rm = T)
+# Transitividad global
+transitivity(karate, type = "global")
+
+# Transitividad local de los vértices 1 y 34
+transitivity(
+  karate,
+  type = "local",
+  vids = c(1, 34)
+)
+
+# Promedio de transitividades locales
+transitivity(karate, type = "average")
 ```
-
-
-## Ejemplo: Interacciones sociales
-
-```{r}
-# transitividad
-transitivity(graph = karate, type = "global")
-# intransitividad local
-transitivity(karate, type = "local", vids = c(1, 34))
-``` 
 
 
 # Reciprocidad
 
-Un concepto exclusivo de los dígrafos es la **reciprocidad**, i.e., la propensión con la que hay reciprocidad de aristas en la red. 
+La **reciprocidad** es una propiedad exclusiva de redes dirigidas y mide la tendencia a que una relación $i \to j$ esté acompañada por la relación opuesta $j \to i$.
 
-Las frecuencias se pueden calcular respecto al número de díadas o de aristas:
+Sea $M$ el número de díadas mutuas y $A$ el número de díadas asimétricas.
+
+La reciprocidad basada en aristas es
 $$
-\textsf{rec}(G) = \frac{\text{no. aristas reciprocas}}{\text{no. aristas}}\,,
-$$
-o alternativamente,
-$$
-\textsf{rec}(G) = \frac{\text{no. diadas reciprocas}}{\text{no. diadas no reciprocas}}\,.
+r_{\mathrm{edge}}
+=
+\frac{2M}{2M+A}.
 $$
 
+Esta cantidad es la proporción de aristas dirigidas cuya contraparte opuesta también está presente. Corresponde a `reciprocity(graph, mode = "default")`.
 
-## Ejemplo: Blogs de SIDA
+La reciprocidad basada en díadas conectadas es
+$$
+r_{\mathrm{dyad}}
+=
+\frac{M}{M+A}.
+$$
+
+Esta cantidad es la proporción de pares conectados que son mutuos. Corresponde a `reciprocity(graph, mode = "ratio")`.
+
+Estas dos medidas no son equivalentes y deben identificarse explícitamente al reportar resultados.
+
+
+## Ejemplo. Red de correos electrónicos de Enron
 
 ```{r}
-# reciprocidad (aristas)
-reciprocity(aidsblog, mode = "default")
-# reciprocidad (díadas)
-reciprocity(aidsblog, mode = "ratio")
+# Reciprocidad basada en aristas
+reciprocity(enron_bin, mode = "default")
+
+# Reciprocidad basada en díadas conectadas
+reciprocity(enron_bin, mode = "ratio")
+
+# Verificación a partir del censo diádico
+M <- unname(dyads$mut)
+A <- unname(dyads$asym)
+
+2 * M / (2 * M + A)
+M / (M + A)
 ```
 
 
-# Conectividad
+# $k$-cores
 
-Típicamente, una de las componentes conectadas de un grafo $G=(V,E)$ domina a las demás en magnitud. Tal componente se denomina **componente gigante** (*giant component*).
+Un **$k$-core** es un subgrafo maximal en el que todos los vértices tienen grado al menos $k$ dentro del propio subgrafo.
 
-En la práctica, la atención se restringe a la componente gigante para llevar a cabo tanto el análisis como el modelamiento.
+Los $k$-cores están anidados. El $(k+1)$-core siempre está contenido en el $k$-core. 
 
-Un grafo \(G=(V,E)\) se llama **\(k\)-conectado por vértices** si, para todo subconjunto de vértices \(X \subset V\) con \(|X| < k\), el subgrafo inducido por \(V \setminus X\) permanece conectado.
+La **coreness** de un vértice es el mayor valor de $k$ para el cual el vértice pertenece al $k$-core.
 
-La **conectividad nodal** de un grafo \(G=(V,E)\) es el mayor entero \(k\) tal que \(G\) es \(k\)-conectado por vértices. Equivalentemente, corresponde al menor número de vértices cuya eliminación desconecta el grafo.
+A diferencia de un clan, un $k$-core no exige que todos sus vértices estén conectados entre sí. Por esta razón, los $k$-cores son una herramienta menos restrictiva y con frecuencia más útil para identificar núcleos cohesivos en redes grandes.
 
-Un grafo \(G=(V,E)\) se llama **\(k\)-conectado por aristas** si, para todo subconjunto de aristas \(F \subset E\) con \(|F| < k\), el grafo \((V, E \setminus F)\) permanece conectado.
+```{r}
+# Coreness en la red de karate
+core_karate <- coreness(karate)
+table(core_karate)
+max(core_karate)
+```
 
-La **conectividad por aristas** de un grafo \(G=(V,E)\) es el mayor entero \(k\) tal que \(G\) es \(k\)-conectado por aristas. Equivalentemente, corresponde al menor número de aristas cuya eliminación desconecta el grafo.
+```{r, fig.height=6, fig.width=6, fig.align='center'}
+# Visualización según coreness
+set.seed(123)
+plot(
+  karate,
+  layout = layout_with_fr,
+  vertex.size = 6 + 2 * core_karate,
+  vertex.color = core_karate + 1,
+  vertex.label.color = "black",
+  main = "Coreness"
+)
+```
 
-Un vértice que al ser removido desconecta el grafo se denomina **vértice de corte** (*cut vertex*) o **punto de articulación** (*articulation point*). 
 
-La identificación de tales vértices proporciona una idea de dónde es vulnerable una red.
+# Conectividad y vulnerabilidad estructural
+
+Un grafo es **conectado** si existe un camino entre todo par de vértices.
+
+Una **componente conectada** es un subgrafo conectado maximal. 
+
+En muchas redes reales existe una componente considerablemente más grande que las demás, denominada **componente gigante** (*giant component*). Sin embargo, no debe suponerse automáticamente que las componentes pequeñas carecen de interés. Excluirlas puede eliminar información sustantiva del análisis.
+
+En un dígrafo se distinguen dos conceptos:
+
+- Una componente es **débilmente conectada** si es conectada al ignorar la dirección de las aristas.
+- Una componente es **fuertemente conectada** si cada vértice es alcanzable desde cualquier otro mediante caminos dirigidos.
+
+
+## Conectividad nodal y por aristas
+
+Un grafo $G=(V,E)$ es **$k$-conectado por vértices** si permanece conectado después de eliminar cualquier conjunto de menos de $k$ vértices.
+
+La **conectividad nodal**, denotada por $\kappa(G)$, es el menor número de vértices cuya eliminación desconecta el grafo.
+
+Un grafo es **$k$-conectado por aristas** si permanece conectado después de eliminar cualquier conjunto de menos de $k$ aristas.
+
+La **conectividad por aristas**, denotada por $\lambda(G)$, es el menor número de aristas cuya eliminación desconecta el grafo.
+
+Un **punto de articulación** (*articulation point*) es un vértice cuya eliminación incrementa el número de componentes conectadas.
+
+Un **puente** (*bridge*) es una arista cuya eliminación incrementa el número de componentes conectadas.
+
+La identificación de puntos de articulación y puentes permite localizar vulnerabilidades estructurales de la red.
 
 
 ## Ejemplo
 
 ```{r}
-# datos
-f <- make_graph(edges = c(1,2,1,3,2,3,1,4,4,5), directed = F)
+# Datos
+g_conn <- make_graph(
+  edges = c(1, 2, 1, 3, 2, 3, 1, 4, 4, 5),
+  directed = FALSE
+)
 ```
-
 
 ```{r, fig.align='center'}
-# visualización
+# Visualización
 set.seed(123)
-plot(f, 
-     vertex.size = 20, 
-     vertex.color = 0, 
-     vertex.label.color = "black", 
-     edge.color = "blue4")
+plot(
+  g_conn,
+  vertex.size = 20,
+  vertex.color = 0,
+  vertex.label.color = "black",
+  edge.color = "blue4"
+)
 ```
-
 
 ```{r}
-# red conectada?
-is_connected(f)
-# conectividad nodal
-vertex_connectivity(f)
-# conectividad por aristas
-edge_connectivity(f)
-# puntos de articulación
-articulation_points(f)
+# ¿La red es conexa?
+is_connected(g_conn)
+
+# Conectividad nodal
+vertex_connectivity(g_conn)
+
+# Conectividad por aristas
+edge_connectivity(g_conn)
+
+# Puntos de articulación
+articulation_points(g_conn)
+
+# Puentes
+bridges(g_conn)
 ```
 
 
-## Ejemplo: Interacciones proteína-proteína
+## Ejemplo. Blogs políticos franceses
 
 ```{r}
-# red conectada?
-is_connected(yeast)
-# componentes
-componentes <- decompose(yeast)
-length(componentes)
-table(sapply(X = componentes, FUN = vcount))
-# tamaño de la componte gigante
-max(sapply(X = componentes, FUN = vcount))
-max(sapply(X = componentes, FUN = vcount))/vcount(yeast)
-# componente gigante
-yeast_gc <- decompose(yeast)[[1]]
-# conectividad nodal
-vertex_connectivity(yeast_gc)
-# conectivaidad por aristas
-edge_connectivity(yeast_gc)
-# puntos de articulación
-yeast_cv <- articulation_points(yeast_gc)
-length(yeast_cv)
-length(yeast_cv)/vcount(yeast_gc)
+# Componentes conectadas
+comp_fblog <- components(fblog)
+
+# Número de componentes conectadas
+comp_fblog$no
+
+# Tamaño de las componentes conectadas
+sort(comp_fblog$csize, decreasing = TRUE)
+
+# Proporción de vértices en la componente gigante
+max(comp_fblog$csize) / vcount(fblog)
+
+# Componente gigante
+fblog_gc <- largest_component(fblog)
+
+# Orden de la componente gigante
+vcount(fblog_gc)
+
+# Tamaño de la componente gigante
+ecount(fblog_gc)
 ```
 
-Se requiere la eliminación de un solo vértice o una sola arista para dividir el componente gigante en componentes adicionales.
+```{r}
+# Conectividad nodal de la componente gigante
+vertex_connectivity(fblog_gc)
 
-Aproximadamente el 15\% de los vértices son puntos de articulación.
+# Conectividad por aristas de la componente gigante
+edge_connectivity(fblog_gc)
+
+# Grado mínimo de la componente gigante
+min(degree(fblog_gc))
+```
+
+```{r}
+# Puntos de articulación de la componente gigante
+fblog_ap <- articulation_points(fblog_gc)
+
+# Número de puntos de articulación
+length(fblog_ap)
+
+# Proporción de puntos de articulación
+length(fblog_ap) / vcount(fblog_gc)
+
+# Puentes de la componente gigante
+fblog_br <- bridges(fblog_gc)
+
+# Número de puentes
+length(fblog_br)
+```
+
+El análisis de la componente gigante permite estudiar su robustez interna. 
+
+La proporción de puntos de articulación y el número de puentes complementan la conectividad nodal y por aristas porque indican cuántos elementos individuales son estructuralmente críticos.
+
+
+## Ejemplo. Red dirigida de Enron
+
+En redes dirigidas es importante diferenciar conectividad débil y fuerte.
+
+```{r}
+# Componentes débilmente conectadas
+comp_enron_weak <- components(enron_bin, mode = "weak")
+
+# Número de componentes débilmente conectadas
+comp_enron_weak$no
+
+# Tamaño de las componentes débilmente conectadas
+sort(comp_enron_weak$csize, decreasing = TRUE)
+
+# Componentes fuertemente conectadas
+comp_enron_strong <- components(enron_bin, mode = "strong")
+
+# Número de componentes fuertemente conectadas
+comp_enron_strong$no
+
+# Tamaño de las componentes fuertemente conectadas
+sort(comp_enron_strong$csize, decreasing = TRUE)
+```
+
+La diferencia entre ambas descomposiciones cuantifica hasta qué punto la orientación de las relaciones restringe la alcanzabilidad dentro de la red.
+
+
+# Bloques cohesivos
+
+La **cohesión estructural** también puede estudiarse mediante una jerarquía basada en conectividad nodal. Un subconjunto es más cohesivo cuanto mayor es el número mínimo de vértices cuya eliminación se requiere para desconectarlo.
+
+Los **bloques cohesivos** (*cohesive blocks*) identifican subconjuntos maximales anidados con niveles crecientes de conectividad nodal. Esta construcción permite describir una jerarquía de cohesión dentro de la red.
+
+Moody, J., & White, D. R. (2003). **Structural cohesion and embeddedness: A hierarchical concept of social groups.** *American Sociological Review*, 68(1), 103--127.
+
+```{r}
+# Bloques cohesivos en la red de karate
+karate_cb <- cohesive_blocks(karate)
+karate_cb
+
+# Cohesión de cada bloque
+cohesion(karate_cb)
+
+# Máximo nivel de cohesión de cada vértice
+max_cohesion(karate_cb)
+```
+
+La salida muestra una **estructura jerárquica de bloques cohesivos** en la red del club de Karate:
+
+* `B-1` contiene los **34 vértices** y tiene cohesión 1. Por lo tanto, existe al menos un vértice cuya eliminación desconecta la red.
+* Dentro de `B-1` aparecen dos bloques con **cohesión 2**: `B-2`, con 28 vértices, y `B-3`, con 6. En cada uno deben eliminarse al menos dos vértices para producir una desconexión.
+* A su vez, estos bloques contienen subconjuntos aún más robustos. `B-5`, `B-6` y `B-8` tienen **cohesión 3**, mientras que `B-4` y `B-7` alcanzan **cohesión 4**.
+* `B-4` y `B-7`, ambos con 5 vértices, corresponden a los **núcleos estructuralmente más cohesivos** de la red.
+* Las cadenas de `o` indican los vértices que pertenecen a cada bloque.
+* En síntesis, aunque la red completa es relativamente vulnerable, contiene **núcleos internos considerablemente más robustos**, con conectividad nodal de hasta 4.
