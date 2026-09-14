@@ -45,7 +45,7 @@ Un **clan** (*clique*) $C \subseteq V$ de un grafo no dirigido $G=(V,E)$ es un s
 
 Si un clan tiene tamaño $k$, entonces contiene $\binom{k}{r}$ clanes de tamaño $r$ para cada $1 \leq r < k$. Por esta razón, contar todos los clanes puede producir una cantidad muy grande de subgrafos incluso en redes de tamaño moderado.
 
-```{r, eval=TRUE, echo=FALSE, out.width="35%", fig.pos='H', fig.align='center'}
+```{r, eval=TRUE, echo=FALSE, out.width="75%", fig.pos='H', fig.align='center'}
 knitr::include_graphics("06_clique_ejemplo.png")
 ```
 
