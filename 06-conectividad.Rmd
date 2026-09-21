@@ -9,6 +9,7 @@ output:
   html_document:
     toc: true
     toc_float: true
+    code_folding: hide
     theme: cerulean
     highlight: kate
     mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
@@ -983,8 +984,6 @@ M / (M + A)
 # $k$-cores
 
 Un **$k$-core** es un subgrafo maximal en el que todos los vértices tienen grado al menos $k$ dentro del propio subgrafo.
-
-Los $k$-cores están anidados. El $(k+1)$-core siempre está contenido en el $k$-core. 
 
 La **coreness** de un vértice es el mayor valor de $k$ para el cual el vértice pertenece al $k$-core.
 
