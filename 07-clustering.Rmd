@@ -263,219 +263,181 @@ En `igraph::compare()` se encuentran:
 - `rand`: índice de Rand no ajustado.
 
 
-# Ejemplo empírico: red de correo electrónico
+# Ejemplo: red de blogs políticos franceses
 
-Se utiliza la red **email-Eu-core**, construida a partir de comunicaciones por correo electrónico entre miembros de una institución europea de investigación. 
+Se utiliza la red **fblog**, una subred de blogs políticos franceses obtenida a partir de una instantánea de más de 1.100 blogs tomada en octubre de 2006.
 
-Los vértices representan personas y existe un arco de \(i\) a \(j\) si \(i\) envió al menos un correo electrónico a \(j\).
+Los vértices representan blogs y las aristas representan hipervínculos entre ellos. La red disponible en `sand` es **no dirigida** y contiene una afiliación política externa para cada blog.
 
-Cada persona pertenece a uno de **42 departamentos**, lo que proporciona etiquetas externas con las cuales comparar las comunidades detectadas. 
+Estas afiliaciones se utilizan como **etiquetas externas de referencia** y no necesariamente coinciden con una única partición estructural de la red.
 
-Estas etiquetas constituyen una **referencia externa** y no necesariamente coinciden con una única partición estructural de la red.
+Para el análisis se eliminan autoenlaces y aristas múltiples y se conserva la **componente conexa más grande**.
 
-Para este análisis se construye una red **simple no dirigida**: dos personas se consideran conectadas si existió comunicación en al menos una dirección. Posteriormente se conserva la componente conexa más grande.
-
-Datos tomados de Stanford Network Analysis Project (SNAP).
-
+**Fuente:** paquete `sand`, objeto `fblog`, basado en datos del proyecto *Observatoire Présidentielle*.
 
 ## Carga y preparación de los datos
 
-```{r datos-email}
+```{r datos-fblog}
 # Librerías
-library(igraph)
+suppressMessages(suppressWarnings(library(igraph))) 
+suppressMessages(suppressWarnings(library(sand)))
+suppressMessages(suppressWarnings(library(RSpectra)))
 
-# Directorio para almacenar los datos.
-data_dir <- "data_email_eu"
-if (!dir.exists(data_dir)) dir.create(data_dir)
+# Cargar la red
+data(fblog, package = "sand")
 
-# Archivos de SNAP.
-base_url <- "https://snap.stanford.edu/data/"
+# Actualizar el objeto a la versión actual de igraph
+g_fblog <- upgrade_graph(fblog)
 
-edge_url <- paste0(base_url, "email-Eu-core.txt.gz")
+# Limpiar las etiquetas políticas
+V(g_fblog)$PolParty <- trimws(V(g_fblog)$PolParty)
 
-label_url <- paste0(base_url, "email-Eu-core-department-labels.txt.gz")
-
-edge_file <- file.path(data_dir, "email-Eu-core.txt.gz")
-
-label_file <- file.path(data_dir, "email-Eu-core-department-labels.txt.gz")
-
-# Descargar los archivos únicamente si no existen localmente.
-if (!file.exists(edge_file)) {
-  download.file(
-    edge_url,
-    destfile = edge_file,
-    mode = "wb",
-    quiet = TRUE
-  )
-}
-
-if (!file.exists(label_file)) {
-  download.file(
-    label_url,
-    destfile = label_file,
-    mode = "wb",
-    quiet = TRUE
-  )
-}
-
-# Leer la lista de aristas.
-con_edges <- gzfile(edge_file, open = "rt")
-
-edges <- read.table(
-  con_edges,
-  header = FALSE,
-  col.names = c("from", "to")
-)
-
-close(con_edges)
-
-# Leer las etiquetas departamentales.
-con_labels <- gzfile(label_file, open = "rt")
-
-labels <- read.table(
-  con_labels,
-  header = FALSE,
-  col.names = c("id", "department")
-)
-
-close(con_labels)
-
-# Los identificadores se manejan como caracteres.
-edges$from <- as.character(edges$from)
-edges$to   <- as.character(edges$to)
-labels$id  <- as.character(labels$id)
-
-# Red dirigida original.
-g_email_directed <- graph_from_data_frame(
-  d = edges,
-  directed = TRUE,
-  vertices = labels
-)
-
-# Conversión a red no dirigida.
-g_email_undirected <- as_undirected(g_email_directed, mode = "collapse")
-
-# Eliminar autoenlaces y posibles aristas múltiples.
-g_email_undirected <- simplify(
-  g_email_undirected,
+# Eliminar autoenlaces y aristas múltiples
+g_fblog <- simplify(
+  g_fblog,
   remove.multiple = TRUE,
   remove.loops = TRUE
 )
 
-# Identificar la componente conexa más grande.
-comp_email <- components(g_email_undirected)
+# Identificar la componente conexa más grande
+comp_fblog <- components(g_fblog)
+largest_component <- which.max(comp_fblog$csize)
+keep_vertices <- which(comp_fblog$membership == largest_component)
 
-largest_component <- which.max(comp_email$csize)
+# Red utilizada en el análisis
+g_fblog <- induced_subgraph(g_fblog, vids = keep_vertices)
 
-keep_vertices <- which(comp_email$membership == largest_component)
-
-# Red utilizada en el análisis.
-g_email <- induced_subgraph(g_email_undirected, vids = keep_vertices)
-
-# Etiquetas externas.
-ground_truth <- as.integer(factor(V(g_email)$department))
-
-ground_truth_factor <- factor(V(g_email)$department)
-
-K_truth <- length(unique(ground_truth))
+# Etiquetas externas
+ground_truth_factor <- factor(V(g_fblog)$PolParty)
+ground_truth <- as.integer(ground_truth_factor)
+party_names <- levels(ground_truth_factor)
+K_truth <- length(party_names)
 ```
 
 
 ## Características de la red
 
-```{r resumen-email}
-cat("Número de vértices:", vcount(g_email), "\n")
-cat("Número de aristas:", ecount(g_email), "\n")
-cat("Red dirigida:", is_directed(g_email), "\n")
-cat("Red ponderada:", is_weighted(g_email), "\n")
-cat("Número de componentes:", components(g_email)$no, "\n")
-cat("Grado promedio:", round(mean(degree(g_email)), 2), "\n")
-cat("Densidad:", round(edge_density(g_email), 4), "\n")
-cat("Número de departamentos:", K_truth, "\n")
+```{r resumen-fblog}
+cat("Número de vértices:", vcount(g_fblog), "\n")
+cat("Número de aristas:", ecount(g_fblog), "\n")
+cat("Red dirigida:", is_directed(g_fblog), "\n")
+cat("Red ponderada:", is_weighted(g_fblog), "\n")
+cat("Número de componentes:", components(g_fblog)$no, "\n")
+cat("Grado promedio:", round(mean(degree(g_fblog)), 2), "\n")
+cat("Densidad:", round(edge_density(g_fblog), 4), "\n")
+cat("Número de afiliaciones políticas:", K_truth, "\n")
 ```
 
-Los departamentos presentan tamaños diferentes, lo cual permite estudiar la detección de comunidades en presencia de **grupos desbalanceados**.
+Las afiliaciones políticas presentan tamaños diferentes, lo cual permite estudiar la detección de comunidades en presencia de **grupos desbalanceados**.
 
-```{r tamanos-departamentos, fig.height=5, fig.width=10, fig.align='center'}
-department_sizes <- sort(
+```{r tamanos-partidos, fig.height=5, fig.width=10, fig.align='center'}
+# Calcular el tamaño de cada afiliación política
+party_sizes <- sort(
   table(ground_truth_factor),
   decreasing = TRUE
 )
 
+# Acrónimos de las afiliaciones políticas
+party_acronyms <- c(
+  "Cap21" = "CAP21",
+  "Commentateurs Analystes" = "CA",
+  "Les Verts" = "LV",
+  "liberaux" = "LIB",
+  "Parti Radical de Gauche" = "PRG",
+  "PCF - LCR" = "PCF-LCR",
+  "PS" = "PS",
+  "UDF" = "UDF",
+  "UMP" = "UMP"
+)
+
+# Reemplazar los nombres por acrónimos
+names(party_sizes) <- party_acronyms[names(party_sizes)]
+
+# Visualizar la distribución de tamaños
 barplot(
-  department_sizes,
-  las = 2,
-  cex.names = 0.65,
+  party_sizes,
+  las = 1,
+  cex.names = 0.8,
   border = NA,
-  xlab = "Departamento",
-  ylab = "Número de vértices",
-  main = "Tamaño de los departamentos"
+  xlab = "Afiliación política",
+  ylab = "Número de blogs",
+  main = "Tamaño de las afiliaciones políticas"
 )
 ```
 
-
 ## Visualización de la red
 
-Se visualiza la red utilizando las **etiquetas externas** correspondientes a los departamentos.
+Se visualiza la red utilizando las **etiquetas externas** correspondientes a las afiliaciones políticas.
 
-```{r plot-email-ground-truth, fig.height=7, fig.width=10, fig.align='center'}
+```{r plot-fblog-ground-truth, fig.height=7, fig.width=10, fig.align='center'}
 # Diseño
 set.seed(2026)
-layout_email <- layout_nicely(g_email)
+layout_fblog <- layout_with_fr(g_fblog)
 
-# Etiquetas
+# Colores
 truth_colors <- hcl.colors(K_truth, palette = "Dynamic")
 
 # Visualización
 plot(
-  g_email,
-  layout = layout_email,
+  g_fblog,
+  layout = layout_fblog,
   vertex.label = NA,
-  vertex.size = 3,
-  vertex.color = truth_colors[ground_truth],
-  vertex.frame.color = NA,
-  edge.color = adjustcolor(1, alpha.f = 0.15),
-  edge.width = 0.2,
-  main = paste0("Departamentos: ", K_truth, " grupos de referencia")
+  vertex.size = 5,
+  vertex.color = adjustcolor(truth_colors[ground_truth], 0.8),
+  vertex.frame.color = "black",
+  edge.color = adjustcolor(1, alpha.f = 0.5),
+  edge.width = 0.4,
+  main = paste0(
+    "Afiliaciones políticas: ",
+    K_truth,
+    " grupos de referencia"
+  )
+)
+
+legend(
+  "topleft",
+  legend = party_names,
+  pch = 21,
+  pt.bg = truth_colors,
+  pt.cex = 1.2,
+  bty = "n",
+  ncol = 1,
+  cex = 0.8
 )
 ```
 
 
 ## Matriz de adyacencia
 
-La matriz de adyacencia puede ordenarse según las etiquetas departamentales para examinar la presencia de estructura de bloques.
+La matriz de adyacencia puede ordenarse según las afiliaciones políticas para examinar la presencia de estructura de bloques.
 
-```{r matriz-email, fig.height=7, fig.width=7, fig.align='center'}
+```{r matriz-fblog, fig.height=7, fig.width=7, fig.align='center'}
 # Matriz de adyacencia
-A_email <- as_adjacency_matrix(g_email, sparse = TRUE)
+A_fblog <- as_adjacency_matrix(g_fblog, sparse = TRUE)
 
-# Ordenar vértices por departamento
+# Ordenar vértices por afiliación política
 order_truth <- order(ground_truth)
-
-A_ordered <- A_email[order_truth, order_truth]
-
-n_email <- nrow(A_ordered)
+A_ordered <- A_fblog[order_truth, order_truth]
+n_fblog <- nrow(A_ordered)
 
 # Visualizar la matriz ordenada
 image(
-  x = seq_len(n_email),
-  y = seq_len(n_email),
-  z = t(as.matrix(A_ordered[n_email:1, ])),
+  x = seq_len(n_fblog),
+  y = seq_len(n_fblog),
+  z = t(as.matrix(A_ordered[n_fblog:1, ])),
   col = c("white", "red"),
   axes = FALSE,
-  xlab = "Vértices ordenados",
-  ylab = "Vértices ordenados",
-  main = "Matriz de adyacencia ordenada por departamento"
+  xlab = "",
+  ylab = "",
+  main = "Matriz de adyacencia ordenada por afiliación política"
 )
 
-# Tamaños y límites de los departamentos
-department_ordered <- ground_truth[order_truth]
-
-block_sizes <- as.numeric(table(department_ordered))
-
+# Tamaños y límites de los grupos
+party_ordered <- ground_truth[order_truth]
+block_sizes <- as.numeric(table(party_ordered))
 block_limits <- cumsum(block_sizes)
 
-# Delimitar los bloques departamentales
+# Delimitar los bloques
 for (cut_point in block_limits[-length(block_limits)]) {
   abline(
     v = cut_point + 0.5,
@@ -484,7 +446,7 @@ for (cut_point in block_limits[-length(block_limits)]) {
   )
 
   abline(
-    h = n_email - cut_point + 0.5,
+    h = n_fblog - cut_point + 0.5,
     lwd = 0.5,
     col = "gray60"
   )
@@ -493,12 +455,12 @@ for (cut_point in block_limits[-length(block_limits)]) {
 box()
 ```
 
-La presencia de bloques sobre la diagonal sugiere una estructura **asortativa**, con mayor concentración de relaciones entre personas del mismo departamento.
+La presencia de bloques sobre la diagonal sugiere una estructura **asortativa**, con mayor concentración de relaciones entre blogs con la misma afiliación política.
 
 
 ## Aplicación de algoritmos de detección de comunidades
 
-Se aplican varios algoritmos basados en principios diferentes. 
+Se aplican varios algoritmos basados en principios diferentes.
 
 Los algoritmos pueden agruparse según su principio principal en:
 
@@ -510,37 +472,39 @@ Los algoritmos pueden agruparse según su principio principal en:
 
 El método **Leading eigenvector** también puede interpretarse como jerárquico divisivo, ya que divide recursivamente la red.
 
+```{r algoritmos-fblog, cache=TRUE}
+# Fast greedy
+comm_fast_greedy <- cluster_fast_greedy(g_fblog)
 
-```{r algoritmos-email, cache=TRUE}
-# Fast greedy.
-comm_fast_greedy <- cluster_fast_greedy(g_email)
+# Leading eigenvector
+comm_leading_eigen <- cluster_leading_eigen(g_fblog)
 
-# Leading eigenvector.
-comm_leading_eigen <- cluster_leading_eigen(g_email)
+# Walktrap
+comm_walktrap <- cluster_walktrap(g_fblog)
 
-# Walktrap.
-comm_walktrap <- cluster_walktrap(g_email)
-
-# Louvain.
+# Louvain
 set.seed(1001)
-comm_louvain <- cluster_louvain(g_email)
+comm_louvain <- cluster_louvain(g_fblog)
 
-# Leiden.
+# Leiden
 set.seed(1002)
-comm_leiden <- cluster_leiden(g_email, objective_function = "modularity")
+comm_leiden <- cluster_leiden(
+  g_fblog,
+  objective_function = "modularity"
+)
 
-# Propagación de etiquetas.
+# Propagación de etiquetas
 set.seed(1003)
-comm_label_prop <- cluster_label_prop(g_email)
+comm_label_prop <- cluster_label_prop(g_fblog)
 
-# Infomap.
+# Infomap
 set.seed(1004)
-comm_infomap <- cluster_infomap(g_email)
+comm_infomap <- cluster_infomap(g_fblog)
 ```
 
 El número de comunidades identificado por cada procedimiento puede ser diferente.
 
-```{r numero-comunidades-email}
+```{r numero-comunidades-fblog}
 data.frame(
   metodo = c(
     "fast greedy",
@@ -563,17 +527,16 @@ data.frame(
 )
 ```
 
-Una diferencia entre el número de comunidades detectadas y los **42 departamentos** no implica un error. 
+Una diferencia entre el número de comunidades detectadas y las **`r K_truth` afiliaciones políticas** no implica un error.
 
-Los departamentos son una clasificación externa, mientras que los algoritmos identifican grupos a partir de la **estructura relacional** de la red.
+Las afiliaciones constituyen una clasificación externa, mientras que los algoritmos identifican grupos a partir de la **estructura relacional** de la red.
 
 
 ## Agrupamiento espectral
 
 Además de los métodos anteriores, se implementa explícitamente un procedimiento de **agrupamiento espectral** basado en el Laplaciano simétricamente normalizado, con el fin de ilustrar directamente la construcción espectral de las comunidades.
 
-
-```{r funcion-espectral}
+```{r funcion-espectral-fblog}
 spectral_clustering <- function(graph, k, n_eigenvalues = 60, seed = 1) {
 
   if (k < 2 || k >= vcount(graph)) {
@@ -630,16 +593,15 @@ spectral_clustering <- function(graph, k, n_eigenvalues = 60, seed = 1) {
 }
 ```
 
-Para facilitar la comparación con las **etiquetas externas**, se fija inicialmente \(K=42\). 
+Para facilitar la comparación con las **etiquetas externas**, se fija inicialmente \(K=\) `r K_truth`.
 
 Así, las particiones tienen el mismo número de grupos; en un análisis completamente no supervisado, \(K\) debe seleccionarse sin utilizar etiquetas externas.
 
-
-```{r aplicar-espectral-email, cache=TRUE}
-spectral_email <- spectral_clustering(
-  g_email,
+```{r aplicar-espectral-fblog, cache=TRUE}
+spectral_fblog <- spectral_clustering(
+  g_fblog,
   k = K_truth,
-  n_eigenvalues = 60,
+  n_eigenvalues = min(60, vcount(g_fblog) - 1),
   seed = 1005
 )
 ```
@@ -647,51 +609,70 @@ spectral_email <- spectral_clustering(
 
 ## Representación espectral
 
-El objeto `spectral_email$embedding` contiene la **representación espectral normalizada** utilizada posteriormente por \(k\)-medias. 
+El objeto `spectral_fblog$embedding` contiene la **representación espectral normalizada** utilizada posteriormente por \(k\)-medias.
 
 Vértices con patrones de conexión similares tienden a ubicarse próximos en este espacio.
 
 A continuación se muestran dos de sus primeras coordenadas no triviales, coloreadas según las **etiquetas externas**.
 
-```{r embedding-email, fig.height=6, fig.width=8, fig.align='center'}
+```{r embedding-fblog, fig.height=6, fig.width=8, fig.align='center'}
+# Visualización de la representación esepctral
 plot(
-  spectral_email$embedding[, 2],
-  spectral_email$embedding[, 3],
+  spectral_fblog$embedding[, 2],
+  spectral_fblog$embedding[, 3],
   pch = 19,
   col = truth_colors[ground_truth],
-  cex = 0.65,
+  cex = 0.85,
   xlab = expression(z[2]),
   ylab = expression(z[3]),
   main = "Representación espectral"
+)
+
+legend(
+  "topright",
+  legend = party_names,
+  pch = 19,
+  col = truth_colors,
+  bty = "n",
+  ncol = 2,
+  cex = 0.7
 )
 ```
 
 
 ## Eigengap
 
-Los autovalores almacenados en `spectral_email$eigenvalues` permiten explorar el número de comunidades. 
+Los autovalores almacenados en `spectral_fblog$eigenvalues` permiten explorar el número de comunidades.
 
 Un **salto pronunciado** entre \(\lambda_K\) y \(\lambda_{K+1}\) sugiere un valor plausible para \(K\).
 
-El criterio anterior selecciona
+El criterio selecciona
 $$
 \widehat K_{\mathrm{eigengap}}
 =
 \arg\max_k
 \big(\lambda_{k+1}-\lambda_k\big),
 $$
-entre los autovalores examinados. 
+entre los autovalores examinados.
 
 Este valor debe interpretarse como una **guía exploratoria**, no como una estimación definitiva del número de comunidades.
 
-```{r eigengap-email, fig.height=5.5, fig.width=8, fig.align='center'}
-lambda_email <- spectral_email$eigenvalues
+```{r eigengap-fblog, fig.height=5.5, fig.width=8, fig.align='center'}
+lambda_fblog <- spectral_fblog$eigenvalues
 
 # Diferencias entre autovalores consecutivos
-eigen_gaps <- diff(lambda_email)
+eigen_gaps <- diff(lambda_fblog)
+
+# Excluir K = 1
+candidate_k <- 2:(length(lambda_fblog) - 1)
 
 # Tres eigengaps más grandes
-top_gaps <- head(order(eigen_gaps, decreasing = TRUE), 3)
+top_gaps <- head(
+  candidate_k[
+    order(eigen_gaps[candidate_k], decreasing = TRUE)
+  ],
+  3
+)
 
 cat(
   "Valores de K sugeridos por los tres mayores eigengaps:",
@@ -701,12 +682,12 @@ cat(
 
 # Visualización del espectro
 plot(
-  seq_along(lambda_email),
-  lambda_email,
+  seq_along(lambda_fblog),
+  lambda_fblog,
   type = "b",
   pch = 19,
   cex = 0.6,
-  xlab = "índice",
+  xlab = "Índice",
   ylab = expression(lambda[k]),
   main = "Autovalores del laplaciano normalizado"
 )
@@ -714,8 +695,20 @@ plot(
 # Resaltar los tres mayores eigengaps
 for (j in seq_along(top_gaps)) {
   k <- top_gaps[j]
-  
-  abline(v =  k, col = j, lty = 2)
+
+  abline(
+    v = k + 0.5,
+    col = j,
+    lty = 2
+  )
+
+  text(
+    x = k + 0.5,
+    y = lambda_fblog[k + 1],
+    labels = paste0("K = ", k),
+    pos = 3,
+    cex = 0.75
+  )
 }
 ```
 
@@ -728,7 +721,7 @@ El **índice de Rand ajustado (ARI)** se utiliza como medida externa principal. 
 
 La **modularidad** se reporta como medida interna complementaria, pero no debe emplearse como único criterio para evaluar una partición.
 
-```{r funcion-evaluacion-email}
+```{r funcion-evaluacion-fblog}
 evaluate_partition <- function(
   graph,
   truth,
@@ -754,8 +747,8 @@ evaluate_partition <- function(
 }
 ```
 
-```{r comparacion-email}
-partitions_email <- list(
+```{r comparacion-fblog}
+partitions_fblog <- list(
   "fast greedy" = membership(comm_fast_greedy),
   "leading eigen" = membership(comm_leading_eigen),
   "walktrap" = membership(comm_walktrap),
@@ -763,22 +756,22 @@ partitions_email <- list(
   "leiden" = membership(comm_leiden),
   "label propagation" = membership(comm_label_prop),
   "infomap" = membership(comm_infomap),
-  "espectral" = spectral_email$membership
+  "espectral" = spectral_fblog$membership
 )
 
-results_email <- do.call(
+results_fblog <- do.call(
   rbind,
   Map(
     f = function(memb, name) {
       evaluate_partition(
-        graph = g_email,
+        graph = g_fblog,
         truth = ground_truth,
         membership = memb,
         method_name = name
       )
     },
-    memb = partitions_email,
-    name = names(partitions_email)
+    memb = partitions_fblog,
+    name = names(partitions_fblog)
   )
 )
 
@@ -790,15 +783,18 @@ numeric_columns <- c(
   "split_join"
 )
 
-results_email[, numeric_columns] <- round(results_email[, numeric_columns], 3)
+results_fblog[, numeric_columns] <- round(
+  results_fblog[, numeric_columns],
+  3
+)
 
 knitr::kable(
-  results_email,
+  results_fblog,
   align = c("l", "r", "r", "r", "r", "r", "r"),
   caption = paste0(
-    "Comparación de las particiones con los ",
+    "Comparación de las particiones con las ",
     K_truth,
-    " departamentos."
+    " afiliaciones políticas."
   )
 )
 ```
@@ -807,14 +803,12 @@ Para **ARI** y **NMI**, valores mayores indican mayor concordancia; para **VI** 
 
 Las **etiquetas externas** no necesariamente coinciden con la **partición relacional**, pues describen una clasificación sustantiva distinta de la estructura de enlaces.
 
-Las particiones difieren frente a los **42 departamentos**. El método **espectral** logra mayor concordancia externa, mientras **Leiden** alcanza alta modularidad y ofrece el mejor equilibrio estructural. **Walktrap** sobresegmenta y **Label propagation** colapsa la red.
-
 
 ## Visualización de las particiones
 
 Para facilitar la comparación se utiliza la **misma disposición de los vértices** en todas las visualizaciones.
 
-```{r funcion-plot-particion}
+```{r funcion-plot-particion-fblog}
 plot_partition <- function(graph, layout, membership, title) {
 
   # Número de comunidades y colores
@@ -827,17 +821,17 @@ plot_partition <- function(graph, layout, membership, title) {
     graph,
     layout = layout,
     vertex.label = NA,
-    vertex.size = 2.8,
+    vertex.size = 5,
     vertex.color = palette[color_index],
-    vertex.frame.color = NA,
-    edge.color = adjustcolor("gray40", alpha.f = 0.05),
-    edge.width = 0.2,
+    vertex.frame.color = "black",
+    edge.color = adjustcolor("black", alpha.f = 0.5),
+    edge.width = 0.35,
     main = paste0(title, " (K = ", k, ")")
   )
 }
 ```
 
-```{r plot-particiones-email, fig.height=10, fig.width=12, fig.align='center'}
+```{r plot-particiones-fblog, fig.height=10, fig.width=12, fig.align='center'}
 par(
   mfrow = c(2, 2),
   mar = c(0.5, 0.5, 2.5, 0.5)
@@ -845,55 +839,54 @@ par(
 
 # Etiquetas externas
 plot(
-  g_email,
-  layout = layout_email,
+  g_fblog,
+  layout = layout_fblog,
   vertex.label = NA,
-  vertex.size = 2.8,
+  vertex.size = 5,
   vertex.color = truth_colors[ground_truth],
-  vertex.frame.color = NA,
-  edge.color = adjustcolor("gray40", alpha.f = 0.05),
-  edge.width = 0.2,
-  main = paste0("Departamentos (K = ", K_truth, ")")
+  vertex.frame.color = "black",
+  edge.color = adjustcolor("black", alpha.f = 0.5),
+  edge.width = 0.35,
+  main = paste0("Afiliaciones políticas (K = ", K_truth, ")")
 )
 
 # Louvain
 plot_partition(
-  g_email,
-  layout_email,
+  g_fblog,
+  layout_fblog,
   membership(comm_louvain),
   "Louvain"
 )
 
 # Leiden
 plot_partition(
-  g_email,
-  layout_email,
+  g_fblog,
+  layout_fblog,
   membership(comm_leiden),
   "Leiden"
 )
 
 # Espectral
 plot_partition(
-  g_email,
-  layout_email,
-  spectral_email$membership,
+  g_fblog,
+  layout_fblog,
+  spectral_fblog$membership,
   "Espectral"
 )
 ```
 
-Las etiquetas de las comunidades son **arbitrarias**. 
+Las etiquetas de las comunidades son **arbitrarias**.
 
 Un mismo número no necesariamente identifica el mismo grupo entre distintos algoritmos.
 
 
 ## Sensibilidad al parámetro de resolución
 
-Los algoritmos **Louvain** y **Leiden** permiten controlar la resolución mediante \(\gamma\). 
+Los algoritmos **Louvain** y **Leiden** permiten controlar la resolución mediante \(\gamma\).
 
 En `igraph`, el valor por defecto es \(\gamma=1\). Valores mayores suelen producir **más comunidades y de menor tamaño**, mientras que valores menores generan **menos comunidades y de mayor tamaño**.
 
-
-```{r sensibilidad-resolucion-email, cache=TRUE}
+```{r sensibilidad-resolucion-fblog, cache=TRUE}
 # Valores del parámetro de resolución
 resolution_grid <- c(0.5, 0.75, 1, 1.25, 1.5, 2)
 
@@ -912,7 +905,7 @@ for (i in seq_along(resolution_grid)) {
   # Louvain
   set.seed(2000 + i)
   fit_louvain <- cluster_louvain(
-    g_email,
+    g_fblog,
     resolution = gamma
   )
 
@@ -923,7 +916,7 @@ for (i in seq_along(resolution_grid)) {
     gamma = gamma,
     K = length(unique(memb_louvain)),
     Q_gamma = modularity(
-      g_email,
+      g_fblog,
       memb_louvain,
       resolution = gamma,
       directed = FALSE
@@ -940,7 +933,7 @@ for (i in seq_along(resolution_grid)) {
   # Leiden
   set.seed(3000 + i)
   fit_leiden <- cluster_leiden(
-    g_email,
+    g_fblog,
     objective_function = "modularity",
     resolution = gamma,
     n_iterations = 2
@@ -953,7 +946,7 @@ for (i in seq_along(resolution_grid)) {
     gamma = gamma,
     K = length(unique(memb_leiden)),
     Q_gamma = modularity(
-      g_email,
+      g_fblog,
       memb_leiden,
       resolution = gamma,
       directed = FALSE
@@ -984,7 +977,8 @@ knitr::kable(
 )
 ```
 
-```{r plot-resolucion-email, fig.height=5.5, fig.width=10, fig.align='center'}
+
+```{r plot-resolucion-fblog, fig.height=5.5, fig.width=10, fig.align='center'}
 par(mfrow = c(1, 2))
 
 for (method_name in c("louvain", "leiden")) {
@@ -1005,16 +999,18 @@ for (method_name in c("louvain", "leiden")) {
   # Número de grupos de referencia
   abline(h = K_truth, lty = 2)
 }
+
+par(mfrow = c(1, 1))
 ```
 
 
 ## Estabilidad de los algoritmos
 
-Fijar una semilla garantiza la **reproducibilidad** de una ejecución, pero algunos algoritmos pueden variar entre corridas. 
+Fijar una semilla garantiza la **reproducibilidad** de una ejecución, pero algunos algoritmos pueden variar entre corridas.
 
 Para evaluar esta **estabilidad**, se repiten Louvain, Leiden y propagación de etiquetas sobre la misma red.
 
-```{r estabilidad-email, cache=TRUE}
+```{r estabilidad-fblog, cache=TRUE}
 N_stability <- 100
 
 # Almacenar resultados
@@ -1025,12 +1021,12 @@ for (b in seq_len(N_stability)) {
 
   # Louvain
   set.seed(40000 + b)
-  fit_louvain <- cluster_louvain(g_email)
+  fit_louvain <- cluster_louvain(g_fblog)
 
   # Leiden
   set.seed(50000 + b)
   fit_leiden <- cluster_leiden(
-    g_email,
+    g_fblog,
     objective_function = "modularity",
     resolution = 1,
     n_iterations = 2
@@ -1038,7 +1034,7 @@ for (b in seq_len(N_stability)) {
 
   # Propagación de etiquetas
   set.seed(60000 + b)
-  fit_label <- cluster_label_prop(g_email)
+  fit_label <- cluster_label_prop(g_fblog)
 
   fit_list <- list(
     louvain = fit_louvain,
@@ -1057,7 +1053,7 @@ for (b in seq_len(N_stability)) {
       metodo = method_name,
       K = length(unique(memb)),
       modularidad = modularity(
-        g_email,
+        g_fblog,
         memb,
         directed = FALSE
       ),
@@ -1076,7 +1072,7 @@ for (b in seq_len(N_stability)) {
 stability_results <- do.call(rbind, stability_results)
 ```
 
-```{r resumen-estabilidad-email}
+```{r resumen-estabilidad-fblog}
 stability_summary <- do.call(
   rbind,
   lapply(
@@ -1110,7 +1106,8 @@ knitr::kable(
 )
 ```
 
-```{r boxplot-estabilidad-email, fig.height=5.5, fig.width=9, fig.align='center'}
+
+```{r boxplot-estabilidad-fblog, fig.height=5.5, fig.width=9, fig.align='center'}
 # Orden de los métodos
 stability_results$metodo <- factor(
   stability_results$metodo,
@@ -1174,7 +1171,7 @@ Una distribución estrecha del ARI indica que el procedimiento produce resultado
 Este ejemplo destaca varios aspectos clave de la **detección de comunidades**:
 
 * Distintos algoritmos pueden producir **particiones diferentes**.
-* Las **etiquetas externas** no necesariamente coinciden con la estructura relacional.
+* Las **afiliaciones políticas externas** no necesariamente coinciden con la estructura relacional.
 * La **modularidad** es una medida interna útil, pero no un criterio universal.
 * **ARI, NMI y VI** permiten comparar las particiones con una clasificación externa.
 * El número de comunidades puede depender del **parámetro de resolución**.
