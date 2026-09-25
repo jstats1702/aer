@@ -1,0 +1,287 @@
+---
+title: "Taller #1"
+subtitle: "Redes bipartitas, proyecciones y patrones de preferencia en MovieLens"
+author: "Curso de Análisis Estadístico de Redes"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    code_folding: hide
+    df_print: paged
+    self_contained: true
+---
+
+<style>
+body {
+  font-size: 16px;
+  line-height: 1.62;
+}
+.main-container {
+  max-width: 1120px !important;
+}
+h1, h2, h3 {
+  font-weight: 650;
+  margin-top: 1.35em;
+}
+h1 {
+  border-bottom: 2px solid #e7e7e7;
+  padding-bottom: 0.22em;
+}
+h2 {
+  border-bottom: 1px solid #eeeeee;
+  padding-bottom: 0.16em;
+}
+blockquote {
+  border-left: 4px solid #4a6fa5;
+  background: #f7f9fc;
+  padding: 0.8em 1.1em;
+  color: #30343b;
+}
+.callout {
+  border: 1px solid #d9e2ef;
+  border-left: 5px solid #4a6fa5;
+  border-radius: 5px;
+  background: #f8fafc;
+  padding: 0.9em 1.1em;
+  margin: 1.1em 0;
+}
+.callout-warning {
+  border-left-color: #b36b00;
+  background: #fffaf2;
+}
+.callout-extra {
+  border-left-color: #5c6f68;
+  background: #f7faf8;
+}
+table {
+  width: 100%;
+}
+code {
+  font-size: 0.92em;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 9,
+  fig.height = 6,
+  out.width = "100%"
+)
+options(width = 100)
+```
+
+# Objetivo
+
+En este taller se analiza **MovieLens 1M**, un sistema de calificaciones de películas representable como una red bipartita, con usuarios y películas como los dos tipos de vértices y una arista cuando un usuario califica una película. El objetivo es realizar un estudio reproducible de los patrones de consumo y preferencia, prestando especial atención a las diferencias entre la red bipartita original y sus proyecciones.
+
+La pregunta general es:
+
+> **¿Cómo se organizan los patrones de consumo y preferencia en MovieLens, y qué conclusiones dependen de analizar la red bipartita original o sus proyecciones?**
+
+# Datos
+
+Se utilizará **MovieLens 1M**, un conjunto de datos de GroupLens Research con aproximadamente un millón de calificaciones realizadas por cerca de 6 000 usuarios sobre aproximadamente 4 000 películas.
+
+La fuente oficial es:
+
+- GroupLens: <https://grouplens.org/datasets/movielens/1m/>
+- Archivo: <https://files.grouplens.org/datasets/movielens/ml-1m.zip>
+- Documentación: <https://files.grouplens.org/datasets/movielens/ml-1m-README.txt>
+
+El conjunto contiene:
+
+- `ratings.dat`: usuario, película, calificación y tiempo;
+- `users.dat`: género, grupo de edad, ocupación y código postal;
+- `movies.dat`: título y géneros de cada película.
+
+Las calificaciones toman valores de 1 a 5. En la red completa, una arista indica que **existe una calificación**, no necesariamente una preferencia positiva. Esta distinción debe conservarse en todas las interpretaciones.
+
+<div class="callout">
+<strong>Referencia.</strong> Harper, F. M., & Konstan, J. A. (2015). The MovieLens Datasets: History and Context. <em>ACM Transactions on Interactive Intelligent Systems</em>, 5(4), 1–19.
+</div>
+
+Descargue y prepare los datos. Este código constituye únicamente el punto de partida; la construcción de las redes forma parte del taller.
+
+```{r datos}
+# Cargar paquetes
+library(data.table)
+library(igraph)
+library(Matrix)
+library(tidyverse)
+library(scales)
+
+# Crear el directorio de datos
+dir.create("data", showWarnings = FALSE)
+
+# Descargar y descomprimir MovieLens 1M
+ml_url <- "https://files.grouplens.org/datasets/movielens/ml-1m.zip"
+ml_zip <- "data/ml-1m.zip"
+
+if (!file.exists(ml_zip)) {
+  download.file(ml_url, ml_zip, mode = "wb")
+}
+
+if (!dir.exists("data/ml-1m")) {
+  unzip(ml_zip, exdir = "data")
+}
+
+ratings_file <- "data/ml-1m/ratings.dat"
+users_file <- "data/ml-1m/users.dat"
+movies_file <- "data/ml-1m/movies.dat"
+
+# Leer las calificaciones
+ratings <- fread(
+  ratings_file,
+  sep = ":",
+  header = FALSE,
+  select = c(1, 3, 5, 7)
+)
+
+setnames(
+  ratings,
+  c("user_id", "movie_id", "rating", "timestamp")
+)
+
+# Leer los atributos de los usuarios
+users <- fread(
+  users_file,
+  sep = ":",
+  header = FALSE,
+  select = c(1, 3, 5, 7, 9)
+)
+
+setnames(
+  users,
+  c("user_id", "gender", "age_group", "occupation", "zip")
+)
+
+# Leer los títulos y géneros de las películas
+movie_lines <- readLines(movies_file, encoding = "latin1")
+movie_fields <- stringr::str_match(
+  movie_lines,
+  "^([^:]*)::(.*)::([^:]*)$"
+)
+
+movies <- tibble(
+  movie_id = as.integer(movie_fields[, 2]),
+  title = movie_fields[, 3],
+  genres = movie_fields[, 4]
+)
+
+# Crear una variable temporal interpretable
+ratings <- ratings %>%
+  mutate(
+    datetime = as.POSIXct(
+      timestamp,
+      origin = "1970-01-01",
+      tz = "UTC"
+    )
+  )
+```
+
+<div class="callout callout-warning">
+<strong>Importante.</strong> La red es bipartita: usuarios y películas representan tipos de vértices diferentes y toda arista observada une vértices de tipos distintos. Las relaciones usuario-usuario o película-película existen únicamente después de una proyección y, por tanto, no deben interpretarse como relaciones observadas directamente.
+</div>
+
+# Actividades
+
+## Construcción
+
+Verifique dimensiones, identificadores, duplicados, valores faltantes, rango de calificaciones y correspondencia entre `ratings`, `users` y `movies`, contrastando las cifras principales con la documentación de GroupLens. Construya la red bipartita de interacciones con identificadores inequívocos para usuarios y películas, y compruebe que toda arista conecta vértices de tipos distintos.
+
+Construya además una red de preferencias positivas con calificaciones mayores o iguales a 4, compare su tamaño y densidad bipartita con la red completa y explique qué representa una arista cuando indica haber calificado, haber calificado positivamente o haber asignado 5 estrellas.
+
+## Descripción y visualización
+
+Caracterice usuarios y películas mediante distribuciones de grado y fuerza, interpretando el grado como actividad y popularidad observada, respectivamente. Compare tendencia central, dispersión, colas y concentración, distinga popularidad de valoración promedio e identifique los vértices que más cambian al restringir el análisis a preferencias positivas.
+
+Construya y ordene sustantivamente la matriz de incidencia usuario-película para identificar concentración y bloques de interacción. Defina de forma reproducible una subred informativa, represéntela preservando la bipartición y compare las visualizaciones de la red completa y de preferencias positivas, distinguiendo cambios estructurales de efectos producidos únicamente por la reducción de aristas.
+
+## Conectividad y distancias
+
+Analice componentes conexas, componente gigante, distancias geodésicas, distancia promedio, diámetro y excentricidad. Interprete caminos de longitudes 2, 3 y 4, y explique la paridad de las distancias entre usuarios, películas y vértices de distinto tipo a partir de la estructura bipartita.
+
+Identifique puentes y puntos de articulación y determine su relevancia estructural. Analice además los *k*-cores y compare la composición del núcleo más profundo entre usuarios y películas.
+
+## Cohesión bipartita
+
+Verifique la ausencia de triángulos y explique por qué la transitividad convencional no describe adecuadamente el cierre en una red bipartita. Estudie ciclos de longitud 4, o una medida equivalente, como indicador de redundancia o cierre bipartito, utilizando una subred computacionalmente manejable cuando sea necesario.
+
+Determine qué usuarios o películas participan con mayor frecuencia en estas configuraciones y compare la cohesión entre la red completa y la de preferencias positivas, sin equiparar automáticamente mayor cohesión con mayor similitud de gustos.
+
+## Proyecciones
+
+Sea \(\mathbf{B}\) la matriz binaria usuario-película. Construya las proyecciones \(\mathbf{B}\mathbf{B}^{\top}\) y \(\mathbf{B}^{\top}\mathbf{B}\), cuyos elementos fuera de la diagonal representan vecinos compartidos, conservando estos valores como pesos. Compare orden, tamaño, densidad y distribución de pesos, y explique por qué las proyecciones pueden ser considerablemente más densas que la red bipartita.
+
+Evalúe el efecto de vértices de grado alto sobre las coincidencias brutas y construya similitudes normalizadas, como Jaccard o coseno. Compare los pares más similares bajo ambos criterios y, si filtra aristas, justifique el umbral y evalúe la sensibilidad de las conclusiones con al menos otro valor razonable.
+
+## Caracterización de vértices
+
+Calcule grado, centralidad armónica o de cercanía cuando corresponda, intermediación, centralidad propia y coreness en la red bipartita y en ambas proyecciones. Compare los rankings mediante correlaciones de rangos y superposición de los primeros \(k\) vértices, justificando \(k\), e identifique cambios sustanciales entre representaciones.
+
+Compare grado con intermediación y centralidad propia para distinguir popularidad, capacidad de conexión e importancia asociada con vecinos relevantes. Evalúe además la estabilidad de los primeros \(k\) vértices entre la red completa y la de preferencias positivas.
+
+## Agrupamiento
+
+Detecte comunidades en las proyecciones de películas y usuarios mediante al menos dos algoritmos apropiados, comparando número de comunidades, tamaños, modularidad y estabilidad. Examine su composición según géneros cinematográficos para películas y según género, grupo de edad y ocupación para usuarios.
+
+Compare los resultados obtenidos con coincidencias brutas y similitudes normalizadas para evaluar el efecto de la popularidad. Aplique además un método de agrupamiento a una versión manejable de la red bipartita y contraste su interpretación con la de las proyecciones, considerando las limitaciones de la modularidad convencional en redes de dos modos.
+
+## Asortatividad y modelos nulos
+
+En la proyección de usuarios, estudie la asortatividad por género, grupo de edad y ocupación, interpretándola como asociación entre patrones de consumo y no como homofilia social observada. Compare la red completa con la de preferencias positivas y especifique el tratamiento de los valores faltantes.
+
+Evalúe la significancia mediante permutaciones de los atributos nodales manteniendo fija la proyección. En la red bipartita, analice además la asociación entre actividad de los usuarios y popularidad de las películas a través de las aristas.
+
+## Pérdida de información por proyección
+
+Seleccione triángulos de las proyecciones de usuarios y películas y reconstruya los vecinos bipartitos que generan cada arista, determinando si la aparente cohesión procede de un vecino común o de coincidencias diferentes. Explique por qué un triángulo en una proyección no implica necesariamente un único grupo cohesivo en la red original.
+
+Para algunas comunidades, evalúe además cuánto depende su cohesión de vértices de grado muy alto y discuta qué información estructural se pierde al realizar la proyección.
+
+## Extensión: similitud y recomendación
+
+Construya una regla simple de recomendación basada en similitud entre usuarios o películas. Separe previamente un conjunto de calificaciones positivas para evaluación y exclúyalo completamente de la construcción de similitudes y recomendaciones.
+
+Evalúe la recuperación de estas aristas mediante precisión en los primeros \(k\), *recall* en los primeros \(k\), o ambas medidas, y compare coincidencia bruta con similitud normalizada. Determine además si el procedimiento favorece sistemáticamente películas populares y relacione este resultado con la estructura de la red.
+
+# Discusión
+
+El informe debe terminar con una respuesta integrada a las siguientes cuestiones, sin organizar la conclusión como una lista de estadísticas:
+
+- ¿Cómo se distribuyen la actividad de los usuarios y la popularidad de las películas?
+- ¿Qué cambia al definir una relación como calificación frente a preferencia positiva?
+- ¿Qué propiedades de la red bipartita se conservan, transforman o pierden al proyectarla?
+- ¿Cuándo una proyección produce relaciones o estructuras plausibles visualmente pero conceptualmente engañosas?
+- ¿Qué películas y usuarios resultan centrales y qué aspecto estructural explica esa centralidad?
+- ¿Las comunidades obtenidas reflejan de manera interpretable géneros cinematográficos o perfiles de usuarios?
+- ¿Qué evidencia existe de asociación entre atributos de los usuarios y patrones de consumo?
+- ¿Hasta qué punto la normalización de la similitud evita que la popularidad domine los resultados?
+- ¿Qué implicaciones tienen estas diferencias para una regla simple de recomendación?
+
+Identifique y discuta al menos tres limitaciones del estudio que puedan afectar la interpretación o generalización de los resultados.
+
+# Producto final
+
+Entregue un informe reproducible en **R Markdown**, junto con el archivo `.Rmd` y su versión HTML.
+
+La versión HTML debe permitir mostrar u ocultar el código. El código debe ser claro, ordenado, reproducible y utilizar una sintaxis consistente que facilite su lectura, acompañado únicamente de comentarios breves y pertinentes. El documento debe ejecutarse completamente desde el archivo `.Rmd` sin requerir modificaciones manuales.
+
+Las interpretaciones, justificaciones metodológicas, explicaciones y conclusiones deben desarrollarse con suficiente detalle para sustentar el análisis, pero redactarse de manera concisa, directa y precisa, evitando descripciones redundantes de resultados que ya sean evidentes en tablas o figuras.
+
+No incluya salidas de R que no contribuyan al argumento. Cada tabla o figura debe responder una pregunta concreta y tener título, etiquetas y explicación suficiente para interpretarse sin leer el código. Toda conclusión basada en una proyección debe indicar explícitamente qué representa una arista en esa construcción.
+
+# Referencias complementarias
+
+- Newman, M. E. J. (2018). *Networks*. Oxford University Press.
+- Latapy, M., Magnien, C., & Del Vecchio, N. (2008). Basic notions for the analysis of large two-mode networks. *Social Networks*, 30(1), 31–48.
+- Borgatti, S. P., & Everett, M. G. (1997). Network analysis of 2-mode data. *Social Networks*, 19(3), 243–269.

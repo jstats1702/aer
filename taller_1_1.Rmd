@@ -1,0 +1,248 @@
+---
+title: "Taller #1"
+subtitle: "Estructura, dinámica y organización social en una red de contactos"
+author: "Curso de Análisis Estadístico de Redes"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    code_folding: hide
+    df_print: paged
+    self_contained: true
+---
+
+<style>
+body {
+  font-size: 16px;
+  line-height: 1.62;
+}
+.main-container {
+  max-width: 1120px !important;
+}
+h1, h2, h3 {
+  font-weight: 650;
+  margin-top: 1.35em;
+}
+h1 {
+  border-bottom: 2px solid #e7e7e7;
+  padding-bottom: 0.22em;
+}
+h2 {
+  border-bottom: 1px solid #eeeeee;
+  padding-bottom: 0.16em;
+}
+blockquote {
+  border-left: 4px solid #4a6fa5;
+  background: #f7f9fc;
+  padding: 0.8em 1.1em;
+  color: #30343b;
+}
+.callout {
+  border: 1px solid #d9e2ef;
+  border-left: 5px solid #4a6fa5;
+  border-radius: 5px;
+  background: #f8fafc;
+  padding: 0.9em 1.1em;
+  margin: 1.1em 0;
+}
+.callout-warning {
+  border-left-color: #b36b00;
+  background: #fffaf2;
+}
+.callout-extra {
+  border-left-color: #5c6f68;
+  background: #f7faf8;
+}
+table {
+  width: 100%;
+}
+code {
+  font-size: 0.92em;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 9,
+  fig.height = 6,
+  out.width = "100%"
+)
+options(width = 100)
+```
+
+# Objetivo
+
+En este taller se analiza una red temporal de contactos cara a cara entre estudiantes de una escuela secundaria de Marsella, Francia. El objetivo es llevar a cabo un estudio reproducible que utilice estadísticas relacionales para responder preguntas sustantivas sobre organización social, centralidad, cohesión, comunidades, homofilia y evolución temporal.
+
+La pregunta general es:
+
+> **¿Hasta qué punto la organización formal en clases determina la estructura de los contactos, qué estudiantes conectan distintas partes de la escuela y qué tan estable es esa estructura durante la semana?**
+
+# Datos
+
+Se utilizarán los datos **High School 2013** de SocioPatterns. Los contactos fueron registrados mediante sensores de proximidad durante cinco días, del 2 al 6 de diciembre de 2013. Los eventos son no dirigidos y la información temporal tiene resolución de 20 segundos. Los estudiantes pertenecen a nueve clases y se dispone de atributos de clase y género.
+
+La fuente oficial es:
+
+- SocioPatterns: <https://sociopatterns.org/datasets/high-school-contact-and-friendship-networks/>
+- Lista temporal original: <https://sociopatterns.org/assets/data/HighSchool2013_proximity_net.csv.gz>
+- Metadatos: <https://sociopatterns.org/assets/data/HighSchool2013_metadata.txt>
+
+Para garantizar reproducibilidad, en el taller se recomienda utilizar la versión incluida en el paquete de R **`remdata`**, disponible en <https://CRAN.R-project.org/package=remdata>.
+
+El objeto `highschool2013` contiene:
+
+- `edgelist`: episodios de contacto con instante de inicio, dos actores y duración;
+- `attributes`: identificador, clase y género;
+- `contacts`: contactos autodeclarados;
+- `friendship`: amistades autodeclaradas;
+- `facebook`: información parcial sobre relaciones en Facebook.
+
+La documentación actual de `remdata` reporta 67 613 episodios de contacto y 329 filas de atributos. El artículo original reporta 327 participantes en la medición mediante sensores. No imponga ninguna de estas cifras al construir la red. Verifique los identificadores presentes en cada fuente y documente cualquier diferencia encontrada.
+
+<div class="callout">
+<strong>Referencia.</strong> Mastrandrea, R., Fournet, J., & Barrat, A. (2015). Contact Patterns in a High School: A Comparison between Data Collected Using Wearable Sensors, Contact Diaries and Friendship Surveys. <em>PLOS ONE</em>, 10(9), e0136497. <https://doi.org/10.1371/journal.pone.0136497>
+</div>
+
+
+Cargue los datos y cree una variable temporal interpretable. Este código constituye únicamente el punto de partida; la construcción de las redes forma parte del taller.
+
+```{r datos}
+# Cargar paquetes
+library(remdata)
+library(igraph)
+library(tidyverse)
+library(scales)
+
+# Cargar los datos
+data("highschool2013", package = "remdata")
+
+# Preparar la lista temporal de contactos
+contacts <- highschool2013$edgelist %>%
+  mutate(
+    actor1 = as.character(actor1),
+    actor2 = as.character(actor2),
+    # Convertir el tiempo Unix a fecha y hora local
+    datetime = as.POSIXct(
+      time,
+      origin = "1970-01-01",
+      tz = "Europe/Paris"
+    ),
+    # Extraer el día de cada interacción
+    date = as.Date(datetime, tz = "Europe/Paris")
+  )
+
+# Preparar los atributos nodales
+nodes <- highschool2013$attributes %>%
+  rename(id = name) %>%
+  # Homogeneizar los identificadores con la lista de contactos
+  mutate(id = as.character(id))
+```
+
+<div class="callout callout-warning">
+<strong>Importante.</strong> En estos datos el peso natural de una arista es la duración acumulada del contacto. Una duración grande representa una interacción más intensa, no una mayor distancia. Por tanto, esos pesos no deben introducirse directamente como longitudes en algoritmos que involucren caminos mínimos.
+</div>
+
+# Actividades
+
+## Construcción
+
+Verifique la estructura y calidad de los datos, incluyendo dimensiones, identificadores, valores faltantes, lazos, duplicados, rango temporal y consistencia entre `edgelist` y `attributes`, y documente cualquier diferencia entre el número de actores reportado y observado. Construya redes diarias y semanales, binarias y ponderadas por duración acumulada del contacto, utilizando un universo consistente de vértices y justificando el tratamiento de estudiantes sin contactos.
+
+Explique qué información temporal se pierde al pasar de los eventos originales a redes diarias y, posteriormente, a una red semanal agregada.
+
+## Descripción y visualización
+
+Caracterice las redes diarias mediante orden, tamaño, actores activos, densidad, grado medio, fuerza media y distribuciones de grado y fuerza, identificando regularidades y cambios relevantes. Para la red semanal, construya una matriz de adyacencia ordenada por clase y una visualización del grafo con clase como color y una medida estructural como tamaño de vértice.
+
+Mantenga un mismo *layout* en las redes diarias. Si filtra aristas para mejorar la visualización, justifique el umbral y evalúe si la interpretación cambia al utilizar al menos otro valor razonable.
+
+## Distancias, subgrafos y conectividad
+
+Analice componentes conexas, componente gigante, distancias geodésicas, distancia promedio, diámetro, excentricidad, triángulos, transitividad global y local, cliques maximales, número clique y *k*-cores. Indique el subgrafo utilizado cuando una medida requiera conectividad y determine si los integrantes del clique máximo semanal coexistieron temporalmente.
+
+Compare distancias binarias con distancias ponderadas obtenidas mediante al menos dos transformaciones en las que mayor duración implique menor longitud. Analice además puentes, puntos de articulación, conectividad de vértices y de aristas, y compare coreness con grado para establecer si ambos identifican el mismo tipo de centralidad estructural.
+
+## Caracterización de vértices
+
+Calcule grado, fuerza, centralidad armónica o de cercanía, intermediación, centralidad propia, PageRank y coreness. Compare los rankings mediante correlaciones de Spearman y superposición de los primeros \(k\) vértices, justificando \(k\), e identifique estudiantes cuya posición cambie sustancialmente entre medidas.
+
+Examine el comportamiento de HITS en una red no dirigida y explique la relación entre hubs y autoridades. Calcule además, para cada estudiante, la proporción de vecinos pertenecientes a otras clases y compárela con su intermediación para evaluar su papel como conector entre grupos.
+
+## Roles entre comunidades
+
+Calcule para cada estudiante el coeficiente de participación
+
+\[
+P_i
+=
+1-
+\sum_{c=1}^{C}
+\left(\frac{k_{i,c}}{k_i}\right)^2,
+\]
+
+donde \(k_{i,c}\) es el número de vecinos de \(i\) pertenecientes a la clase \(c\) y \(k_i\) es su grado. Identifique estudiantes con valores altos y compárelos con aquellos de alta intermediación, explicando qué aspecto del papel estructural entre clases representa cada medida.
+
+## Agrupamiento
+
+Detecte comunidades mediante Louvain, *fast greedy* y *walktrap*, y compare las particiones según número de comunidades, tamaños y modularidad. Evalúe su concordancia entre sí y con las nueve clases académicas mediante al menos dos medidas apropiadas, por ejemplo Rand ajustado, información mutua normalizada o variación de información.
+
+Analice los estudiantes o grupos cuya asignación comunitaria difiera de la clase académica y determine si presentan características estructurales particulares.
+
+## Asortatividad y modelos nulos
+
+Estudie la asortatividad por clase, género y grado, especificando el tratamiento de valores faltantes de género. Construya una matriz de mezcla entre clases adecuadamente normalizada e identifique los pares con mayor interacción relativa.
+
+Evalúe la significancia de los patrones mediante dos modelos nulos. Primero, permute al menos 1 000 veces las etiquetas de clase, manteniendo fija la red, y compare la asortatividad observada con su distribución nula. Segundo, genere redes que preserven o aproximen la secuencia de grados y determine si la transitividad observada puede explicarse únicamente por dicha distribución.
+
+## Evolución temporal
+
+Compare diariamente número de aristas, densidad, grado medio, transitividad, tamaño relativo de la componente gigante, distancia promedio, modularidad y asortatividad por clase. Evalúe la estabilidad entre días consecutivos mediante similitud de Jaccard de aristas y vecinos, correlaciones de rankings y superposición de los primeros \(k\) vértices según las medidas de centralidad.
+
+Distinga entre redes diarias y redes acumuladas hasta cada día. Agregue además los contactos en ventanas de 10 minutos y examine la actividad intradiaria y la proporción de contactos entre clases, evitando atribuir horarios o actividades que no estén directamente respaldados por los datos.
+
+## Robustez
+
+Evalúe la robustez eliminando sucesivamente vértices según grado e intermediación y comparando los resultados con eliminaciones aleatorias repetidas. Después de cada eliminación registre el tamaño relativo de la componente gigante y una medida de eficiencia o distancia global.
+
+Compare estos resultados con puentes, puntos de articulación y coeficiente de participación, y discuta qué noción de vulnerabilidad o importancia estructural representa cada criterio.
+
+## Comparación con la amistad declarada
+
+Identifique los estudiantes que respondieron la encuesta de amistad y restrinja la comparación a las díadas para las cuales exista información interpretable. Construya versiones no dirigidas de la red de amistad considerando, al menos, relaciones reportadas por cualquiera de los estudiantes y relaciones recíprocas.
+
+Compare la duración acumulada del contacto entre amigos y no amigos, y cuantifique la superposición entre las redes de amistad y contacto mediante Jaccard u otra medida apropiada. Repita el análisis para distintos umbrales de duración y discuta las diferencias entre proximidad física, interacción social y amistad declarada.
+
+# Discusión
+
+El informe debe terminar con una respuesta integrada a las siguientes cuestiones, sin organizar la conclusión como una lista de estadísticas:
+
+- ¿Cuánto explica la clase académica la estructura de los contactos?
+- ¿Quiénes conectan las distintas clases y por qué?
+- ¿Las comunidades detectadas reproducen la organización formal de la escuela?
+- ¿Qué tan fuerte es la homofilia por clase y por género?
+- ¿La cohesión observada excede lo esperable bajo modelos nulos razonables?
+- ¿La estructura global y los actores centrales son estables durante la semana?
+- ¿Qué tan vulnerable es la conectividad frente a la eliminación de actores relevantes?
+- ¿Hasta qué punto la intensidad del contacto físico coincide con la amistad declarada?
+
+Identifique y discuta al menos tres limitaciones del estudio que puedan afectar la interpretación o generalización de los resultados.
+
+# Producto final
+
+Entregue un informe reproducible en **R Markdown**, junto con el archivo `.Rmd` y su versión HTML.
+
+La versión HTML debe permitir mostrar u ocultar el código. El código debe ser claro, ordenado, reproducible y utilizar una sintaxis consistente que facilite su lectura, acompañado únicamente de comentarios breves y pertinentes. El documento debe ejecutarse completamente desde el archivo `.Rmd` sin requerir modificaciones manuales.
+
+Las interpretaciones, justificaciones metodológicas, explicaciones y conclusiones deben desarrollarse con suficiente detalle para sustentar el análisis, pero redactarse de manera concisa, directa y precisa, evitando descripciones redundantes de resultados que ya sean evidentes en tablas o figuras.
+
+No incluya salidas de R que no contribuyan al argumento. Cada tabla o figura debe responder una pregunta concreta y tener título, etiquetas y explicación suficiente para interpretarse sin leer el código.

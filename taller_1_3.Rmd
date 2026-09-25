@@ -1,0 +1,264 @@
+---
+title: "Taller #1"
+subtitle: "Multiplexidad, agregación y roles sociales en una red multicapa"
+author: "Curso de Análisis Estadístico de Redes"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    code_folding: hide
+    df_print: paged
+    self_contained: true
+---
+
+<style>
+body {
+  font-size: 16px;
+  line-height: 1.62;
+}
+.main-container {
+  max-width: 1120px !important;
+}
+h1, h2, h3 {
+  font-weight: 650;
+  margin-top: 1.35em;
+}
+h1 {
+  border-bottom: 2px solid #e7e7e7;
+  padding-bottom: 0.22em;
+}
+h2 {
+  border-bottom: 1px solid #eeeeee;
+  padding-bottom: 0.16em;
+}
+blockquote {
+  border-left: 4px solid #4a6fa5;
+  background: #f7f9fc;
+  padding: 0.8em 1.1em;
+  color: #30343b;
+}
+.callout {
+  border: 1px solid #d9e2ef;
+  border-left: 5px solid #4a6fa5;
+  border-radius: 5px;
+  background: #f8fafc;
+  padding: 0.9em 1.1em;
+  margin: 1.1em 0;
+}
+.callout-warning {
+  border-left-color: #b36b00;
+  background: #fffaf2;
+}
+.callout-extra {
+  border-left-color: #5c6f68;
+  background: #f7faf8;
+}
+table {
+  width: 100%;
+}
+code {
+  font-size: 0.92em;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 9,
+  fig.height = 6,
+  out.width = "100%"
+)
+options(width = 100)
+```
+
+# Objetivo
+
+En este taller se analiza **AUCS**, una red multiplex de relaciones entre empleados de un departamento universitario, donde los mismos actores pueden estar conectados mediante trabajo, almuerzo, actividades de ocio, coautoría y Facebook. El objetivo es realizar un estudio reproducible de la estructura multicapa, prestando especial atención a la variación de los roles nodales entre contextos, la superposición y complementariedad de las capas y las consecuencias de agregarlas.
+
+La pregunta general es:
+
+> **¿Hasta qué punto la posición, las comunidades y la integración social de una persona dependen del tipo de relación observado, y qué información se pierde al representar todas las relaciones mediante una única red agregada?**
+
+# Datos
+
+Se utilizará la red multiplex **AUCS (Aarhus University Computer Science)** incluida en el paquete de R **`multinet`**. El conjunto contiene 61 actores y cinco capas no dirigidas:
+
+- `work`: relación de trabajo;
+- `lunch`: almuerzo habitual;
+- `leisure`: actividades de ocio;
+- `coauthor`: coautoría;
+- `facebook`: amistad en Facebook.
+
+El conjunto incluye atributos categóricos de los actores, entre ellos su **rol académico** y su **grupo de investigación**.
+
+Las fuentes de referencia son:
+
+- CRAN: <https://CRAN.R-project.org/package=multinet>
+- Documentación de `ml_aucs()`: <https://rdrr.io/cran/multinet/man/Predefined.html>
+- Descripción de los datos: <https://uuinfolab.github.io/data/>
+
+La documentación reporta 61 actores y 620 aristas distribuidas entre las cinco capas. Estas cifras deben verificarse directamente antes de realizar el análisis.
+
+<div class="callout">
+<strong>Referencia.</strong> Rossi, L., & Magnani, M. (2015). Towards effective visual analytics on multiplex and multilayer networks. <em>Chaos, Solitons & Fractals</em>, 72, 68–76.
+</div>
+
+Cargue los datos y prepare una representación `igraph` para cada capa. Este código constituye únicamente el punto de partida; la construcción y validación de las representaciones multicapa forman parte del taller.
+
+```{r datos}
+# Cargar paquetes
+library(multinet)
+library(igraph)
+library(tidyverse)
+library(scales)
+
+# Cargar la red multiplex
+aucs <- ml_aucs()
+
+# Identificar capas y atributos
+layer_names <- layers_ml(aucs)
+actors <- actors_ml(aucs, attributes = TRUE)
+
+# Crear una red igraph por capa
+layer_graphs <- setNames(
+  lapply(
+    layer_names,
+    function(layer) {
+      as.igraph(
+        aucs,
+        layers = layer,
+        all.actors = TRUE
+      )
+    }
+  ),
+  layer_names
+)
+```
+
+<div class="callout callout-warning">
+<strong>Importante.</strong> Las cinco capas representan mecanismos relacionales diferentes y no deben tratarse como muestras independientes de una misma red. Una arista de trabajo, coautoría, ocio o Facebook tiene un significado específico, aun cuando conecte al mismo par de actores.
+</div>
+
+# Actividades
+
+## Construcción
+
+Verifique número de actores, capas, aristas, dirección, atributos y actores activos por capa, contrastando las cifras con la documentación. Revise la codificación de rol y grupo de investigación, construya una tabla actor-capa y una lista única de aristas con `actor1`, `actor2` y `layer`, e identifique pares conectados en más de una relación.
+
+Construya una red agregada binaria, donde dos actores estén conectados si comparten al menos una relación, y una agregada ponderada, cuyo peso sea el número de capas compartidas. Mantenga un universo de actores consistente y explique qué información relacional conserva y pierde cada representación.
+
+## Descripción y visualización
+
+Caracterice cada capa mediante orden efectivo, tamaño, densidad, grado medio, distribución de grados, componentes, tamaño relativo de la componente gigante, transitividad, distancia promedio y diámetro cuando corresponda. Compare las capas mediante definiciones comunes, identifique diferencias en densidad, fragmentación, cierre y centralización, y estudie la estabilidad del grado de los actores mediante correlaciones de Spearman entre capas.
+
+Construya visualizaciones alineadas de las cinco capas, manteniendo posiciones y atributos visuales comparables, y una representación de la red agregada ponderada. Identifique actores o pares cuya interpretación cambie sustancialmente al agregar las relaciones y distinga patrones estructurales reales de aquellos producidos por la superposición de capas.
+
+## Superposición y redundancia
+
+Para dos capas \(\alpha\) y \(\beta\), defina la superposición de aristas mediante
+
+\[
+J_{\alpha,\beta}
+=
+\frac{|E_\alpha\cap E_\beta|}
+     {|E_\alpha\cup E_\beta|}.
+\]
+
+Calcule la matriz \(J_{\alpha,\beta}\), compárela con las correlaciones de grado e identifique capas redundantes o complementarias. Evalúe el número observado de aristas comunes frente a una referencia obtenida mediante rewireado que preserve aproximadamente las secuencias de grado, utilizando múltiples réplicas.
+
+Utilice `relevance_ml()`, `xrelevance_ml()` y `connective_redundancy_ml()` para estudiar la contribución exclusiva o redundante de cada capa a las redes personales. Identifique actores cuyas relaciones dependan principalmente de un contexto y aquellos con vínculos reiterados en varias capas.
+
+## Participación entre capas
+
+Sea \(k_i^{(\ell)}\) el grado del actor \(i\) en la capa \(\ell\). Calcule
+
+\[
+P_i^{(L)}
+=
+1-
+\sum_{\ell=1}^{L}
+\left(
+\frac{k_i^{(\ell)}}
+     {\sum_{h=1}^{L}k_i^{(h)}}
+\right)^2,
+\]
+
+e interprete valores bajos como actividad concentrada en pocas capas y valores altos como participación distribuida entre distintos tipos de relación.
+
+Compare este coeficiente con grado agregado, número de capas activas y `degree_deviation_ml()`. Identifique actores simultáneamente centrales y multicapa, así como actores cuya importancia agregada provenga casi exclusivamente de una relación.
+
+## Distancias, conectividad y robustez
+
+Analice componentes, distancias geodésicas, distancia promedio, diámetro, puentes, puntos de articulación y conectividad de vértices y aristas en cada capa cuando corresponda. Compare caminos mínimos entre actores seleccionados y determine qué relaciones mantienen conectada una mayor parte de la organización.
+
+Evalúe la robustez de la red agregada eliminando una capa a la vez y, posteriormente, combinaciones de dos capas. Registre los cambios en tamaño relativo de la componente gigante, distancia promedio y conectividad, e identifique capas indispensables o complementarias cuya eliminación conjunta produzca efectos particularmente importantes.
+
+## Cohesión y *k*-cores
+
+Compare triángulos, transitividad global y local, cliques y descomposición en *k*-cores entre capas y en la red agregada. Identifique actores que pertenecen a núcleos profundos en varias relaciones y aquellos cuya posición central aparece únicamente después de la agregación.
+
+Para los triángulos de la red agregada, determine cuáles están contenidos completamente en una sola capa y cuáles se forman combinando aristas de relaciones diferentes. Explique por qué un triángulo agregado no implica necesariamente la existencia de un grupo cohesivo bajo ningún contexto relacional particular.
+
+## Caracterización de vértices
+
+Calcule grado, intermediación, centralidad armónica, centralidad propia y coreness en cada capa y en la red agregada. Compare los rankings mediante correlaciones de rangos y superposición de los primeros \(k\) actores, justificando \(k\), e identifique perfiles contrastantes y actores cuya importancia cambie sustancialmente entre contextos.
+
+Construya perfiles multicapa de centralidad y defina un criterio reproducible para identificar *brokers* multicapa, entendidos como actores que conectan partes diferentes de la organización en más de una relación. Compare este criterio con la intermediación obtenida en la red agregada.
+
+## Agrupamiento
+
+Detecte comunidades separadamente en cada capa mediante al menos dos algoritmos apropiados y compare número de comunidades, tamaños, modularidad y estabilidad. Cuantifique la concordancia entre particiones mediante NMI, ARI u otra medida apropiada, y examine su relación con el grupo de investigación y el rol académico sin asumir correspondencia previa entre atributos y estructura relacional.
+
+Aplique además `glouvain_ml()` y al menos otro método multicapa, como `infomap_ml()`, y compare sus resultados con las particiones por capa y con la red agregada. Explore la sensibilidad de `glouvain_ml()` al acoplamiento entre capas e identifique actores cuya pertenencia comunitaria cambie según el tipo de relación.
+
+## Asortatividad y modelos nulos
+
+Estudie la asortatividad por grupo de investigación y rol académico en cada capa y en la red agregada, y construya matrices de mezcla que permitan identificar integración o concentración dentro de los grupos. Compare los patrones entre relaciones y determine si la agregación conserva, atenúa o modifica estas asociaciones.
+
+Evalúe la significancia mediante permutaciones de los atributos nodales manteniendo fija cada capa. Utilice estas distribuciones nulas para establecer si la mezcla observada difiere de la esperada bajo una asignación aleatoria de los atributos.
+
+## Consecuencias de la agregación
+
+Calcule para cada arista agregada su multiplicidad, definida como el número de capas en las que aparece, y determine si las relaciones presentes en varias capas ocupan posiciones estructurales distintas. Repita medidas relevantes utilizando únicamente aristas presentes en al menos dos capas y compare los resultados con los obtenidos en la unión binaria y la agregación ponderada.
+
+Para centralidad, comunidades y conectividad, identifique conclusiones robustas frente a la representación y conclusiones que dependan de la agregación. Seleccione al menos tres afirmaciones plausibles a partir de la red agregada y verifique explícitamente si están respaldadas por las capas individuales.
+
+# Discusión
+
+El informe debe terminar con una respuesta integrada a las siguientes cuestiones, sin organizar la conclusión como una lista de estadísticas:
+
+- ¿Qué capas son más similares y cuáles aportan información complementaria?
+- ¿Los actores centrales conservan su importancia entre distintos contextos?
+- ¿Qué relaciones son fundamentales para la conectividad de la organización?
+- ¿La estructura comunitaria es estable entre capas o depende del tipo de relación?
+- ¿La asociación por grupo de investigación o rol académico es consistente entre relaciones?
+- ¿Qué actores presentan roles genuinamente multicapa?
+- ¿Qué información se conserva, transforma o pierde al agregar las capas?
+- ¿Cuándo la red agregada produce estructuras que no existen en ninguna capa individual?
+- ¿Qué representación resulta apropiada para responder diferentes preguntas sobre la organización?
+
+Identifique y discuta al menos tres limitaciones del estudio que puedan afectar la interpretación o generalización de los resultados.
+
+# Producto final
+
+Entregue un informe reproducible en **R Markdown**, junto con el archivo `.Rmd` y su versión HTML.
+
+La versión HTML debe permitir mostrar u ocultar el código. El código debe ser claro, ordenado, reproducible y utilizar una sintaxis consistente que facilite su lectura, acompañado únicamente de comentarios breves y pertinentes. El documento debe ejecutarse completamente desde el archivo `.Rmd` sin requerir modificaciones manuales.
+
+Las interpretaciones, justificaciones metodológicas, explicaciones y conclusiones deben desarrollarse con suficiente detalle para sustentar el análisis, pero redactarse de manera concisa, directa y precisa, evitando descripciones redundantes de resultados evidentes en tablas o figuras.
+
+No incluya salidas de R que no contribuyan al argumento. Cada tabla o figura debe responder una pregunta concreta y permitir una comparación consistente entre capas. Siempre que utilice una red agregada, indique explícitamente si corresponde a la unión binaria, a la agregación ponderada o a otra regla de combinación.
+
+# Referencias complementarias
+
+- Dickison, M. E., Magnani, M., & Rossi, L. (2016). *Multilayer Social Networks*. Cambridge University Press.
+- Kivelä, M., Arenas, A., Barthelemy, M., Gleeson, J. P., Moreno, Y., & Porter, M. A. (2014). Multilayer networks. *Journal of Complex Networks*, 2(3), 203–271.
+- Mucha, P. J., Richardson, T., Macon, K., Porter, M. A., & Onnela, J. P. (2010). Community structure in time-dependent, multiscale, and multiplex networks. *Science*, 328(5980), 876–878.
