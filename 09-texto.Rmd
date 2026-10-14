@@ -1,1330 +1,2547 @@
 ---
-title: "Minería de texto"
-author: 
-- Juan Sosa PhD
-- Email   jcsosam@unal.edu.co
-- GitHub  https://github.com/jstats1702 
+title: "Análisis de texto y redes"
+author:
+  - Juan Sosa, PhD
+  - Email: jcsosam@unal.edu.co
+  - GitHub: https://github.com/jstats1702
 date: ""
 output:
   html_document:
     toc: true
     toc_float: true
+    number_sections: false
     theme: cerulean
     highlight: kate
+    code_folding: show
     mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.align = "center",
+  fig.width = 9,
+  fig.height = 5
+)
 
+required_packages <- c(
+  "tidyverse",
+  "tidytext",
+  "stopwords",
+  "igraph",
+  "quanteda",
+  "quanteda.textstats",
+  "glmnet",
+  "Matrix"
+)
+
+missing_packages <- required_packages[
+  !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
+]
+
+if (length(missing_packages) > 0) {
+  stop(
+    "Instale antes de compilar: ",
+    paste(missing_packages, collapse = ", ")
+  )
+}
+
+invisible(lapply(required_packages, library, character.only = TRUE))
+
+theme_set(theme_minimal(base_size = 12))
+set.seed(123)
+```
 
 # Introducción
 
-**Procesamiento de Lenguaje Natural** (*Natural Language Processing*, NLP) o **Lingüística Computacional** (*Computational Linguistics*) se refiere al conjunto de técnicas que permiten a los computadores analizar, estructurar y extraer información de textos en lenguaje humano.
+El **análisis computacional de texto** reúne procedimientos para transformar lenguaje no estructurado en representaciones que puedan describirse, compararse y modelarse estadísticamente. 
 
-El objetivo central del NLP no es que las máquinas “entiendan” el lenguaje como lo hacen los humanos, sino que puedan **identificar patrones, estructuras y relaciones lingüísticas** mediante procedimientos algorítmicos eficientes. 
+El propósito no es asumir que un algoritmo comprende el lenguaje como una persona, sino construir representaciones explícitas de **frecuencia**, **asociación**, **contexto**, **similitud** y **estructura**.
 
-Mientras que los humanos comprenden intuitivamente el significado, los computadores destacan por su capacidad para procesar grandes volúmenes de texto de forma sistemática.
-
-### Justificación
-
-A pesar del auge de la IA, el análisis de texto mediante minería y redes sigue siendo fundamental por su transparencia, control y rigor cuantitativo. 
-
-A diferencia de los modelos de lenguaje, estos métodos permiten trazar cada paso del análisis, adaptar criterios lingüísticos específicos y obtener evidencia empírica interpretable. Además, ofrecen herramientas complementarias para validar o enriquecer resultados generados por modelos más complejos. 
-
-Su estudio fortalece la comprensión del lenguaje desde una perspectiva estructurada, crítica y replicable. 
-
-Finalmente, no requiere grandes capacidades de cómputo ni infraestructura especializada, lo que lo hace accesible y eficiente para investigadores y estudiantes.
+Las técnicas de **redes de texto** complementan la minería de texto tradicional. En una representación de **bolsa de palabras** interesa principalmente cuánto aparece cada término; en una red interesa además **con qué otros términos aparece** y qué posición ocupa dentro de la estructura de asociaciones.
 
 ### Objetivos
 
-Detectar y jerarquizar términos relevantes dentro de un corpus textual.
+- preparar y tokenizar un corpus de manera reproducible;
+- distinguir **tokens**, **tipos léxicos**, **frecuencia** y **relevancia**;
+- comparar documentos mediante **Jaccard**, **similitud coseno** y **keyness**;
+- estudiar polaridad léxica reconociendo sus limitaciones;
+- construir redes de **bigramas** y **coocurrencia por ventanas**;
+- interpretar correctamente pesos, distancias, centralidades y comunidades;
+- evaluar la sensibilidad de una red textual a decisiones de construcción;
+- complementar las redes con **TF--IDF**, reducción de dimensión y representaciones densas;
+- usar texto como información explicativa en un **modelo predictivo regularizado**.
 
-Identificar y cuantificar relaciones semánticas entre palabras mediante técnicas estadísticas y de redes.
+# Caso de estudio: discursos de Petro y Duque ante la ONU
 
-# Discursos Petro y Duque ante la ONU
+Se comparan dos intervenciones ante la **Asamblea General de las Naciones Unidas**: la de **Gustavo Petro**, pronunciada el 20 de septiembre de 2022, y la de **Iván Duque**, pronunciada el 21 de septiembre de 2021. 
 
-Los discursos del presidente **Gustavo Petro** (2022) y del expresidente **Iván Duque** (2021), pronunciados ante la **Asamblea General de las Naciones Unidas**, constituyen las fuentes primarias del análisis. Ambos textos fueron procesados en su versión oficial publicada en medios institucionales y reproducidos sin modificaciones sustanciales. A partir de estos discursos se construyen representaciones cuantitativas del lenguaje mediante técnicas de **minería de texto** y análisis de **redes lingüísticas**, con el objetivo de identificar **patrones semánticos**, **relaciones entre conceptos clave** y **estructuras narrativas predominantes**.
+El análisis es **descriptivo y comparativo**, dado que con dos discursos no es posible separar el efecto del orador de diferencias de año, coyuntura, agenda internacional, longitud o propósito comunicativo.
 
-```{r, eval = TRUE, echo=FALSE, out.width="60%", fig.pos = 'H', fig.align = 'center'}
-knitr::include_graphics("09_petro_duque.jpg")
+```{r portada, echo=FALSE, out.width="60%"}
+if (file.exists("09_petro_duque.jpg")) {
+  knitr::include_graphics("09_petro_duque.jpg")
+}
 ```
 
-### Petro {-}
+Fuentes oficiales de referencia:
 
-- Fecha: 22 de septiembre de 2022
-- Fuente: https://cuestionpublica.com/descarga-el-discurso-del-presidente-gustavo-petro-en-la-onu/
+- Petro: https://digitallibrary.un.org/record/3996866 (77.ª Asamblea General, 20 de septiembre de 2022).
+- Duque: https://documents.un.org/access.nsf/get?DS=A%2F76%2FPV.3&Lang=E&OpenAgent= (76.ª Asamblea General, 21 de septiembre de 2021).
 
+# Importación y estructura del corpus
 
-### Duque {-} 
+Los archivos de texto deben leerse como **texto**, no como archivos separados por comas. Esto evita que las comas del discurso sean interpretadas accidentalmente como separadores de columnas.
 
-- Fecha: 21 de septiembre de 2021
-- Fuente: https://nuevayork-onu.mision.gov.co/newsroom/news/discurso-del-presidente-la-republica-colombia-ivan-duque-marquez-ante-la-asamblea
+```{r importar-textos}
+# Función para leer un discurso
+read_speech <- function(path, author) {
 
-# Importar texto
+  # Verifica que el archivo exista
+  if (!file.exists(path)) {
+    stop("No se encontró el archivo: ", path)
+  }
 
-```{r}
-##### Importar librerías ----
-suppressMessages(suppressWarnings(library(readr)))
-suppressMessages(suppressWarnings(library(tidyverse)))
+  # Lee el texto y asigna el autor
+  tibble(
+    author = author,
+    text = readr::read_file(
+      path,
+      locale = locale(encoding = "UTF-8")
+    )
+  )
+}
 
-# Notas:
-# - Los warnings se suprimen para evitar alertas por caracteres no UTF-8 o 
-#   líneas vacías.
-# - UTF-8 (8-bit Unicode Transformation Format) es un formato de codificación de 
-#   caracteres que permite representar todos los puntos de código válidos en 
-#   Unicode.
-
-##### Importar discurso de Gustavo Petro ----
-text_petro <- read_lines("discurso_onu_petro.txt")  # Leer líneas del archivo
-text_petro <- unlist(c(text_petro))                 # Convertir a vector de caracteres
-names(text_petro) <- NULL                           # Eliminar nombres de los elementos
-head(text_petro, n = 3)                             # Vista previa de las primeras líneas
-
-##### Importar discurso de Iván Duque ----
-text_duque <- read_lines("discurso_onu_duque.txt")
-text_duque <- unlist(c(text_duque))                 # Convertir a vector de caracteres
-names(text_duque) <- NULL
-head(text_duque, n = 3)
-```
-
-```{r}
-##### Convertir a data frame en formato tidy ----
-
-# Discurso de Gustavo Petro
-text_petro <- tibble(
-  line = seq_along(text_petro),   # Crear índice de línea
-  text = text_petro               # Texto original, línea por línea
+# Une los discursos en un solo objeto
+speeches <- bind_rows(
+  read_speech("discurso_onu_petro.txt", "Petro"),
+  read_speech("discurso_onu_duque.txt", "Duque")
 )
 
-# Inspección preliminar
-class(text_petro)
-dim(text_petro)
-head(text_petro, 3)
-
-# Nota: El texto aún no está normalizado ni tokenizado; es decir, no tiene una 
-# estructura analítica lista para NLP.
-
-# Discurso de Iván Duque
-text_duque <- tibble(
-  line = seq_along(text_duque),
-  text = text_duque
-)
+# Muestra los discursos
+speeches
 ```
 
-# Tokenización
+Para estudiar contexto local es conveniente dividir primero cada documento en **oraciones**. 
 
-El primer paso consiste en **almacenar el texto en un formato estructurado** que permita su análisis. En este contexto, un **token** representa la unidad mínima de análisis, generalmente una palabra.
+Así evitamos que una coocurrencia atraviese artificialmente el límite entre dos oraciones.
 
-La **tokenización básica** implica dividir el texto de modo que cada palabra (token) ocupe una línea. Por defecto, este proceso **elimina la puntuación y convierte el texto a minúsculas**, aunque **no remueve las tildes ni otros signos diacríticos**.
+```{r segmentar-oraciones}
+# Divide cada discurso en oraciones
+sentences <- speeches |>
+  unnest_tokens(
+    output = sentence,
+    input = text,
+    token = "sentences",
+    to_lower = FALSE
+  ) |>
 
-```{r}
-##### Importar librerías para tokenización ----
-suppressMessages(suppressWarnings(library(tidytext)))
-suppressMessages(suppressWarnings(library(magrittr)))
+  # Numera las oraciones dentro de cada discurso
+  group_by(author) |>
+  mutate(sentence_id = row_number()) |>
+  ungroup()
 
-##### Tokenización en formato tidy ----
-
-# ---------- Discurso de Gustavo Petro ----------
-text_petro %<>%
-  unnest_tokens(input = text, output = word) %>%   # Convertir a un token por fila
-  filter(!is.na(word))                             # Eliminar palabras vacías o NA
-
-class(text_petro)
-dim(text_petro)
-head(text_petro, n = 10)
-
-# ---------- Discurso de Iván Duque ----------
-text_duque %<>%
-  unnest_tokens(input = text, output = word) %>%
-  filter(!is.na(word))
-
-dim(text_duque)
-head(text_duque, n = 10)
+# Cuenta el número de oraciones por autor
+sentences |>
+  count(author, name = "n_sentences")
 ```
 
-# Normalización del texto
+# Tokenización y preprocesamiento
 
-**Limpieza del texto:** se recomienda aplicar los siguientes pasos de normalización y depuración lingüística:
+Un **token** es una ocurrencia concreta de una unidad lingüística. Un **tipo léxico** es una forma distinta. Por ejemplo, en *paz, vida, paz* hay tres tokens pero dos tipos léxicos.
 
-- Convertir todo el texto a minúsculas.  
-- Eliminar signos de puntuación.  
-- Remover símbolos especiales (por ejemplo, `#`, `%`, `$`).  
-- Eliminar números.  
-- Eliminar tildes y otros signos diacríticos.  
-- Reducir las palabras a su raíz común (stemming), conservando formas base como *comput* a partir de *computational*, *computers*, *computation*, etc.  
-- Eliminar *stopwords* (palabras vacías), como artículos, preposiciones y conjunciones.
+La **tokenización** utilizada aquí convierte a minúsculas y elimina puntuación. 
 
-```{r}
-##### Verificar presencia de números en el texto ----
+Se conservan **tildes** y demás caracteres del español porque forman parte de la escritura y, en algunos casos, distinguen palabras diferentes. 
 
-# ---------- Discurso de Gustavo Petro ----------
-text_petro %>%
-  filter(grepl(pattern = "[0-9]", x = word)) %>%  # Filtrar palabras que contienen números
-  count(word, sort = TRUE)                        # Contar frecuencia de cada token numérico
+Tampoco se aplica *stemming* por defecto, es decir, reducir palabras a raíces artificiales puede dificultar la interpretación de los nodos de una red.
 
-# ---------- Discurso de Iván Duque ----------
-text_duque %>%
-  filter(grepl(pattern = "[0-9]", x = word)) %>%
-  count(word, sort = TRUE)
-```
-
-```{r}
-##### Remover tokens que contienen números ----
-
-# ---------- Discurso de Gustavo Petro ----------
-text_petro %<>%
-  filter(!grepl(pattern = "[0-9]", x = word))  # Eliminar palabras que contienen dígitos
-
-dim(text_petro)  # Verificar dimensiones después del filtrado
-
-# ---------- Discurso de Iván Duque ----------
-text_duque %<>%
-  filter(!grepl(pattern = "[0-9]", x = word))
-
-dim(text_duque)
-```
-
-```{r}
-##### Cargar stop words incorporadas en tidytext ----
-
-# Tres diccionarios en inglés disponibles por defecto: onix, SMART y snowball
-data(stop_words)           # Cargar conjunto de stopwords
-class(stop_words)          # Clase del objeto
-dim(stop_words)            # Dimensiones (número de palabras y columnas)
-head(stop_words, n = 10)   # Vista preliminar
-table(stop_words$lexicon)  # Distribución por tipo de diccionario
-```
-
-```{r}
-###### Stop words en español ----
-
-# No hay diccionarios en español disponibles por defecto en tidytext.
-# Diccionario en español (con acentos) de COUNTWORDSFREE:
-#   http://countwordsfree.com/stopwords/spanish
-# Otras alternativas:
-#   - https://github.com/stopwords-iso/stopwords-es
-#   - Librería tm: stopwords("spanish")
-
-# El diccionario se conserva en el mismo formato que los de tidytext
+```{r tokenizar}
+# Carga las palabras vacías en español
 stop_words_es <- tibble(
-  word    = unlist(c(read.table("stop_words_spanish.txt", quote = "\"", comment.char = ""))),
-  lexicon = "custom"
+  word = stopwords::stopwords("es")
 )
 
-dim(stop_words_es)
-head(stop_words_es, n = 10)
+# Tokeniza cada oración en palabras
+tokens_full <- sentences |>
+  unnest_tokens(
+    output = word,
+    input = sentence,
+    token = "words",
+    to_lower = TRUE
+  ) |>
+
+  # Conserva únicamente palabras
+  filter(str_detect(word, "^\\p{L}+$"))
+
+# Elimina palabras vacías y términos de un carácter
+tokens_clean <- tokens_full |>
+  anti_join(stop_words_es, by = "word") |>
+  filter(str_length(word) > 1)
+
+# Resume tokens y tipos léxicos por autor
+summary_tokens <- tokens_full |>
+  summarise(
+    tokens = n(),
+    types = n_distinct(word),
+    .by = author
+  )
+
+# Muestra el resumen
+summary_tokens
 ```
 
-```{r}
-##### Remover stop words en español ----
+Las **stopwords** se eliminan cuando interesa enfatizar contenido léxico, pero no deben eliminarse mecánicamente en todos los análisis. Por ejemplo, pueden ser importantes para estudiar estilo, negación o sintaxis. 
 
-# ---------- Discurso de Gustavo Petro ----------
-text_petro %<>% 
-  anti_join(x = ., y = stop_words_es)  # Eliminar palabras vacías (stopwords)
-dim(text_petro)                        # Verificar dimensiones después del filtrado
-head(text_petro, n = 10)               # Vista preliminar
+Por eso conservamos tanto `tokens_full` como `tokens_clean`.
 
-# ---------- Discurso de Iván Duque ----------
-text_duque %<>% 
-  anti_join(x = ., y = stop_words_es)
-dim(text_duque)
-head(text_duque, n = 10)
+# Exploración léxica
+
+## Palabras más frecuentes
+
+La **frecuencia** indica cuánto aparece una palabra; no implica por sí sola importancia temática ni capacidad para distinguir documentos.
+
+```{r frecuencias}
+# Calcula la frecuencia de cada palabra por autor
+word_freq <- tokens_clean |>
+  count(author, word, sort = TRUE) |>
+  group_by(author) |>
+
+  # Calcula proporciones y posiciones en el ranking
+  mutate(
+    total = sum(n),
+    proportion = n / total,
+    rank = row_number()
+  ) |>
+  ungroup()
+
+# Selecciona las 12 palabras más frecuentes por autor
+top_words <- word_freq |>
+  filter(rank <= 12)
+
+# Muestra frecuencia y proporción
+top_words |>
+  select(author, word, n, proportion)
 ```
 
-```{r}
-##### Remover acentos del texto ----
+```{r grafico-frecuencias, fig.height=6}
+# Ordena las palabras dentro de cada autor
+top_words |>
+  mutate(
+    word = reorder_within(word, n, author)
+  ) |>
 
-# Crear lista de reemplazo para vocales acentuadas
-replacement_list <- list(
-  'á' = 'a',
-  'é' = 'e',
-  'í' = 'i',
-  'ó' = 'o',
-  'ú' = 'u'
+  # Construye el gráfico de barras
+  ggplot(aes(word, n)) +
+  geom_col() +
+  coord_flip() +
+
+  # Separa los resultados por autor
+  facet_wrap(
+    ~ author,
+    scales = "free"
+  ) +
+
+  # Restaura las etiquetas originales
+  scale_x_reordered() +
+
+  # Define títulos y etiquetas
+  labs(
+    x = NULL,
+    y = "Frecuencia",
+    title = "Palabras más frecuentes por discurso"
+  )
+```
+
+Las barras permiten comparar cantidades con mayor precisión que una nube de palabras. Una nube puede conservarse como recurso visual, pero no debe sustituir una comparación cuantitativa.
+
+## Similitud de vocabulario
+
+Sea $A$ el conjunto de tipos léxicos usados por Petro y $B$ el de Duque. La **similitud de Jaccard** mide la fracción de vocabulario compartido:
+
+\[
+J(A,B)=\frac{|A\cap B|}{|A\cup B|}.
+\]
+
+```{r jaccard}
+# Extrae el vocabulario de Petro
+vocab_petro <- tokens_clean |>
+  filter(author == "Petro") |>
+  distinct(word) |>
+  pull(word)
+
+# Extrae el vocabulario de Duque
+vocab_duque <- tokens_clean |>
+  filter(author == "Duque") |>
+  distinct(word) |>
+  pull(word)
+
+# Calcula la similitud de Jaccard
+jaccard <- length(intersect(vocab_petro, vocab_duque)) /
+  length(union(vocab_petro, vocab_duque))
+
+# Muestra el resultado
+tibble(jaccard = jaccard)
+```
+
+El índice de Jaccard es aproximadamente **0.088**, lo que indica que solo cerca del **8.8% de los tipos léxicos presentes en al menos uno de los dos discursos aparecen en ambos**. Esto sugiere una **baja similitud entre sus vocabularios**.
+
+Jaccard compara **presencia o ausencia** de tipos léxicos. 
+
+La **similitud coseno** entre dos vectores \(\boldsymbol{p}\) y \(\boldsymbol{q}\) se define como
+
+\[
+\operatorname{cos}(\boldsymbol{p},\boldsymbol{q})
+=
+\frac{\boldsymbol{p}^{\top}\boldsymbol{q}}
+{\|\boldsymbol{p}\|\,\|\boldsymbol{q}\|}.
+\]
+
+La **similitud coseno** compara los perfiles de frecuencias relativas: valores cercanos a 1 indican mayor similitud y valores cercanos a 0, mayor diferencia. Toma valores entre 0 y 1. Valores cercanos a 1 indican perfiles más similares; valores cercanos a 0, perfiles más diferentes.
+
+La **divergencia de Jensen--Shannon** entre dos distribuciones \(\boldsymbol{p}\) y \(\boldsymbol{q}\) se define como
+
+\[
+\operatorname{JS}(\boldsymbol{p},\boldsymbol{q})
+=
+\frac{1}{2}\operatorname{KL}(\boldsymbol{p}\,\|\,\boldsymbol{m})
++
+\frac{1}{2}\operatorname{KL}(\boldsymbol{q}\,\|\,\boldsymbol{m}),
+\qquad
+\boldsymbol{m}=\frac{\boldsymbol{p}+\boldsymbol{q}}{2},
+\]
+
+donde
+
+\[
+\operatorname{KL}(\boldsymbol{p}\,\|\,\boldsymbol{m})
+=
+\sum_i p_i \log_2\!\left(\frac{p_i}{m_i}\right).
+\]
+
+La **divergencia de Jensen--Shannon** cuantifica la diferencia entre dos distribuciones de frecuencias. Ttoma valores entre 0 y 1. Valores cercanos a 0 indican distribuciones similares; valores cercanos a 1, distribuciones diferentes.
+
+Ambas medidas son apropiadas para comparar perfiles léxicos y evitan interpretar los tipos de palabra como observaciones independientes.
+
+```{r coseno-js}
+# Construye la matriz de frecuencias relativas
+freq_matrix <- word_freq |>
+  select(author, word, proportion) |>
+  pivot_wider(
+    names_from = author,
+    values_from = proportion,
+    values_fill = 0
+  )
+
+# Define los perfiles de frecuencias
+p <- freq_matrix$Petro
+q <- freq_matrix$Duque
+
+# Calcula la similitud coseno
+cosine_similarity <- sum(p * q) /
+  sqrt(sum(p^2) * sum(q^2))
+
+# Calcula la distribución promedio
+m <- (p + q) / 2
+
+# Define la divergencia de Kullback--Leibler
+kl_divergence <- function(x, y) {
+  idx <- x > 0
+  sum(x[idx] * log2(x[idx] / y[idx]))
+}
+
+# Calcula la divergencia de Jensen--Shannon
+js_divergence <- 0.5 * kl_divergence(p, m) +
+  0.5 * kl_divergence(q, m)
+
+# Muestra ambas medidas
+tibble(
+  cosine_similarity = cosine_similarity,
+  jensen_shannon_divergence = js_divergence
+)
+```
+
+La **similitud coseno de 0.165** indica una **baja similitud** entre los perfiles de frecuencias de Petro y Duque. Consistentemente, la **divergencia de Jensen–Shannon de 0.811** es alta, lo que indica que las distribuciones léxicas de ambos discursos son **marcadamente diferentes**.
+
+# Términos distintivos: keyness
+
+La **frecuencia** muestra qué palabras aparecen más, mientras que la **keyness** identifica cuáles distinguen un discurso frente a otro. 
+
+Para cada término, la **keyness** compara su frecuencia observada con la esperada bajo igual distribución entre los discursos. 
+
+Para un término dado, las frecuencias observadas se organizan como
+
+\[
+\begin{array}{c|cc}
+ & \text{término} & \text{otros términos}\\
+\hline
+\text{Petro} & O_{11} & O_{12}\\
+\text{Duque} & O_{21} & O_{22}
+\end{array}
+\]
+
+La **razón de verosimilitudes** es
+
+\[
+G^2
+=
+2\sum_{i,j}
+O_{ij}\log\left(\frac{O_{ij}}{E_{ij}}\right),
+\]
+
+donde \(i\) identifica el **discurso** y \(j\) la categoría **término/otros términos**. Las frecuencias esperadas son
+
+\[
+E_{ij}
+=
+\frac{(\text{total fila }i)(\text{total columna }j)}
+{\text{total general}}.
+\]
+
+Valores altos de \(G^2\) indican términos más **distintivos** entre los discursos.
+
+La medida identifica **distintividad léxica**, no importancia política ni causalidad.
+
+```{r keyness-preparacion}
+# Construye el corpus a partir de los discursos
+corpus_es <- corpus(
+  setNames(speeches$text, speeches$author)
 )
 
-# ---------- Discurso de Gustavo Petro ----------
-text_petro %<>% 
-  mutate(word = chartr(
-    old = names(replacement_list) %>% str_c(collapse = ""), 
-    new = replacement_list %>% str_c(collapse = ""), 
-    x = word
-  ))
+# Tokeniza y limpia el texto
+tokens_es <- tokens(
+  corpus_es,
+  remove_punct = TRUE,
+  remove_numbers = TRUE,
+  remove_symbols = TRUE
+) |>
+  tokens_tolower() |>
+  tokens_remove(stopwords::stopwords("es"))
 
-dim(text_petro)
-head(text_petro, n = 10)
+# Construye la matriz documento-término
+dfm_es <- dfm(tokens_es) |>
 
-# ---------- Discurso de Iván Duque ----------
-text_duque %<>% 
-  mutate(word = chartr(
-    old = names(replacement_list) %>% str_c(collapse = ""), 
-    new = replacement_list %>% str_c(collapse = ""), 
-    x = word
-  ))
+  # Conserva términos con frecuencia mínima de 2
+  dfm_trim(min_termfreq = 2)
 
-dim(text_duque)
-head(text_duque, n = 10)
+# Calcula la keyness tomando a Petro como objetivo
+keyness_petro <- textstat_keyness(
+  dfm_es,
+  target = 1,
+  measure = "lr"
+)
+
+# Identifica automáticamente la columna del estadístico
+statistic_name <- setdiff(
+  names(keyness_petro),
+  c("feature", "p", "n_target", "n_reference")
+)[1]
+
+# Selecciona los términos más distintivos
+keyness_plot <- keyness_petro |>
+  as_tibble() |>
+  transmute(
+    feature,
+    score = .data[[statistic_name]]
+  ) |>
+
+  # Conserva los 24 valores de mayor magnitud
+  slice_max(
+    order_by = abs(score),
+    n = 24
+  ) |>
+
+  # Identifica el discurso favorecido
+  mutate(
+    favored = if_else(score > 0, "Petro", "Duque"),
+    feature = reorder(feature, score)
+  )
+
+# Muestra los resultados
+keyness_plot
 ```
 
-# Tokens más frecuentes
+```{r keyness-grafico, fig.height=7}
+# Grafica los términos más distintivos
+ggplot(
+  keyness_plot,
+  aes(feature, score)
+) +
+  geom_col() +
+  coord_flip() +
 
-Una vez limpiado y normalizado el texto, se identifican las **palabras con mayor frecuencia de aparición**. Este análisis permite detectar los términos más relevantes en cada discurso y explorar patrones léxicos dominantes.
+  # Separa los términos favorecidos por discurso
+  facet_wrap(
+    ~ favored,
+    scales = "free_y"
+  ) +
 
-```{r}
-##### Top 10 de tokens más frecuentes ----
-
-# ---------- Discurso de Gustavo Petro ----------
-text_petro %>%
-  count(word, sort = TRUE) %>%     # Contar ocurrencias y ordenar de mayor a menor
-  head(n = 10)                     # Seleccionar las 10 más frecuentes
-
-# ---------- Discurso de Iván Duque ----------
-text_duque %>%
-  count(word, sort = TRUE) %>%
-  head(n = 10)
+  # Define títulos y etiquetas
+  labs(
+    x = NULL,
+    y = "Keyness: razón de verosimilitudes con signo",
+    title = "Términos que diferencian los discursos"
+  )
 ```
 
+En `textstat_keyness()`, la magnitud de \(G^2\) mide la **fuerza de la diferencia** y el signo indica su **dirección**: valores positivos corresponden a términos proporcionalmente más frecuentes en **Petro** y valores negativos a términos más frecuentes en **Duque**.
 
+# Contexto: concordancias
 
-```{r, fig.width=10, fig.height=5, fig.align='center'}
-##### Visualización de tokens más frecuentes ----
-suppressMessages(suppressWarnings(library(gridExtra)))
+Una palabra aislada puede ser ambigua. Una **concordancia** o análisis *keyword in context* (KWIC) muestra el término dentro de su entorno inmediato y permite validar interpretaciones antes de asignarle un significado discursivo.
 
-# ---------- Discurso de Gustavo Petro ----------
-text_petro %>%
-  count(word, sort = TRUE) %>%
-  filter(n > 7) %>%
-  mutate(word = reorder(word, n)) %>%
-  ggplot(aes(x = word, y = n)) +
-    geom_col(fill = "darkolivegreen4", alpha = 0.8) +
-    theme_light() +
-    coord_flip() +
-    xlab(NULL) +
-    ylab("Frecuencia") +
-    ggtitle("Petro: Conteo de palabras") -> p1
+```{r kwic}
+# Tokeniza el corpus conservando puntuación y números
+tokens_context <- tokens(
+  corpus_es,
+  remove_punct = FALSE,
+  remove_numbers = FALSE
+)
 
-# ---------- Discurso de Iván Duque ----------
-text_duque %>%
-  count(word, sort = TRUE) %>%
-  filter(n > 7) %>%
-  mutate(word = reorder(word, n)) %>%
-  ggplot(aes(x = word, y = n)) +
-    geom_col(fill = "blue4", alpha = 0.8) +
-    theme_light() +
-    coord_flip() +
-    xlab(NULL) +
-    ylab("Frecuencia") +
-    ggtitle("Duque: Conteo de palabras") -> p2
-
-# Desplegar gráficos en paralelo
-grid.arrange(p1, p2, ncol = 2)
+# Muestra cada aparición de "paz" con 6 tokens de contexto a cada lado
+kwic(tokens_context, pattern = "paz", window = 6)
 ```
 
+La concordancia es especialmente importante para **negaciones**, citas y términos afectivos. 
 
-
-```{r, fig.width=10, fig.height=5, fig.align='center'}
-##### Visualización con nubes de palabras ----
-suppressMessages(suppressWarnings(library(wordcloud)))
-
-# Configuración del área de gráficos
-par(mfrow = c(1, 2), mar = c(1, 1, 2, 1), mgp = c(1, 1, 1))
-
-# ---------- Discurso de Gustavo Petro ----------
-set.seed(123)
-text_petro %>%
-  count(word, sort = TRUE) %>%
-  with(wordcloud(
-    words = word,
-    freq = n,
-    max.words = 20,
-    colors = "darkolivegreen4"
-  ))
-title(main = "Petro")
-
-# ---------- Discurso de Iván Duque ----------
-set.seed(123)
-text_duque %>%
-  count(word, sort = TRUE) %>%
-  with(wordcloud(
-    words = word,
-    freq = n,
-    max.words = 20,
-    colors = "blue4"
-  ))
-title(main = "Duque")
-```
-
-Los resultados muestran diferencias claras en el enfoque temático de cada discurso:
-
-- **Petro** enfatiza temas ambientales y humanitarios. Palabras como *selva*, *vida*, *humanidad*, *planta*, *salvar* y *petroleo* sugieren una narrativa centrada en la protección de la naturaleza y en críticas al modelo extractivista. Términos como *guerra*, *drogas*, *adicción* y *paz* indican una relación directa con el conflicto armado y sus causas estructurales.
-
-- **Duque**, en contraste, utiliza un lenguaje más orientado a gestión política y desarrollo institucional. Palabras como *colombia*, *acción*, *agenda*, *fiscal*, *frente*, *desarrollo* y *social* reflejan un enfoque en políticas públicas, recuperación económica y gobernanza. La presencia de *pandemia* también ubica su discurso en un contexto inmediato de crisis sanitaria.
-
-Ambos comparten el término *paz*, aunque con contextos posiblemente distintos: Petro como objetivo estructural vinculado a causas profundas, y Duque en un marco más institucional o de logros de gobierno.
-
-```{r}
-##### Frecuencias relativas de las palabras por autor ----
-
-bind_rows(
-  mutate(.data = text_petro, author = "petro"),
-  mutate(.data = text_duque, author = "duque")
-) %>%
-  count(author, word) %>%
-  group_by(author) %>%
-  mutate(proportion = n / sum(n)) %>%         # Calcular proporción relativa por autor
-  select(-n) %>%
-  spread(author, proportion, fill = 0) -> frec  # Convertir a formato ancho
-
-# Reordenar columnas
-frec %<>%
-  select(word, petro, duque)
-
-# Inspección básica
-dim(frec)
-head(frec, n = 10)
-```
-
-
-```{r}
-##### Top 10 palabras en común entre ambos discursos ----
-
-# Ordenar por frecuencia descendente en Petro, luego en Duque
-frec %>%
-  filter(petro != 0, duque != 0) %>%
-  arrange(desc(petro), desc(duque)) -> frec_comun
-
-# Inspección de dimensiones y primeras palabras
-dim(frec_comun)
-head(frec_comun, n = 10)
-```
-
-Las palabras en común más frecuentes muestran que, aunque ambos discursos comparten ciertos términos, su peso relativo es significativamente mayor en el de Petro:
-
-- Términos como *selva*, *vida*, *humanidad*, *desastre*, *américa* y *climático* tienen una presencia destacada en Petro y apenas marginal en Duque, lo que refuerza el enfoque ambiental y humanista de su intervención.
-
-- *Paz* y *país* son las únicas palabras con proporciones similares, lo que sugiere un punto temático compartido, aunque posiblemente abordado desde perspectivas distintas.
-
-- El uso de *millones* y *ustedes* indica referencias comunes a la audiencia y magnitud de los problemas, pero de nuevo con mayor intensidad en Petro.
-
-```{r}
-###### Proporción de palabras en común ----
-
-# Cálculo de la proporción de palabras compartidas entre ambos discursos
-prop_palabras_comunes <- dim(frec_comun)[1] / dim(frec)[1]
-prop_palabras_comunes
-```
-
-El resultado indica que **solo el 6.6% de las palabras utilizadas se repiten en ambos discursos**. Es decir, **más del 93% del vocabulario empleado es exclusivo de cada presidente**.
-
-Esto sugiere una **baja coincidencia léxica** entre los discursos, lo cual refuerza la idea de que tienen **enfoques temáticos y narrativas muy distintas**. 
-
-A pesar de tratarse de discursos oficiales ante el mismo foro (la ONU), cada intervención refleja **prioridades, estilos y marcos discursivos propios**. Esta diferencia puede ser atribuida a diferencias ideológicas, contextos políticos y objetivos comunicativos divergentes.
-
-```{r}
-##### Correlación de las frecuencias ----
-
-# Nota: la prueba de correlación asume linealidad y normalidad. 
-# En caso de duda, se recomienda usar métodos no paramétricos o bootstrap.
-
-# Correlación sobre todo el vocabulario (incluye palabras exclusivas)
-cor.test(x = frec$duque, y = frec$petro)
-
-# Correlación solo sobre palabras en común
-cor.test(x = frec_comun$duque, y = frec_comun$petro)
-```
-
-La correlación entre las frecuencias relativas de todas las palabras utilizadas en ambos discursos es **débilmente negativa** (\( r = -0.145 \)) y estadísticamente significativa (\( p < 0.001 \)). Esto indica una **ligera tendencia inversa**: las palabras más frecuentes en un discurso tienden a ser menos frecuentes en el otro. Este hallazgo respalda la conclusión de que **los discursos están construidos sobre vocabularios en gran medida distintos**, con énfasis temáticos divergentes.
-
-Cuando se analiza únicamente el subconjunto de palabras utilizadas por ambos oradores, la correlación es **muy baja y no significativa** (\( r = 0.093 \), \( p = 0.41 \)). Esto sugiere que, **incluso entre las palabras compartidas, no existe un patrón consistente en su nivel de uso relativo**.
-
-La **correlación de Pearson** es una medida sensible a la suposición de relación lineal entre variables, la distribución normal de los datos, y la presencia de valores extremos o ceros.
-
-En este contexto, las **frecuencias relativas de palabras no cumplen claramente estos supuestos**, por lo que esta prueba debe interpretarse con cautela. Además, la alta proporción de palabras exclusivas (∼93%) distorsiona el análisis global.
-
-Como alternativa más robusta y adecuada al contexto lingüístico se recomienda usar **Spearman** o técnicas de **re-muestreo (bootstrap)**. También puede considerarse una **distancia de similitud léxica** o análisis de componentes principales (PCA) para comparar perfiles de frecuencia.
-
-```{r}
-##### Bootstrap para la correlación entre frecuencias relativas ----
-suppressMessages(suppressWarnings(library(boot)))
-
-# ---------- Definir función de correlación ----------
-cor_func <- function(data, indices) {
-  d <- data[indices, ]
-  return(cor(d$duque, d$petro))
-}
-
-# ---------- Preparar datos ----------
-data_cor <- frec %>% 
-  select(duque, petro)
-
-# ---------- Ejecutar bootstrap ----------
-set.seed(123)
-boot_cor <- boot(data = data_cor, statistic = cor_func, R = 2000)
-
-# ---------- Intervalo de confianza bootstrap ----------
-boot.ci(boot_cor, type = "perc")
-
-# ---------- Visualización opcional ----------
-hist(boot_cor$t, 
-     main = "Distribución bootstrap de la correlación", 
-     xlab = "r", 
-     col = "steelblue", 
-     border = "white")
-
-```
-
-```{r}
-##### Bootstrap para la correlación sobre palabras en común ----
-suppressMessages(suppressWarnings(library(boot)))
-
-# ---------- Definir función de correlación ----------
-cor_func_comun <- function(data, indices) {
-  d <- data[indices, ]
-  return(cor(d$duque, d$petro))
-}
-
-# ---------- Preparar datos ----------
-data_cor_comun <- frec_comun %>% 
-  select(duque, petro)
-
-# ---------- Ejecutar bootstrap ----------
-set.seed(123)
-boot_cor_comun <- boot(data = data_cor_comun, statistic = cor_func_comun, R = 2000)
-
-# ---------- Intervalo de confianza bootstrap ----------
-boot.ci(boot_cor_comun, type = "perc")
-
-# ---------- Visualización opcional ----------
-hist(boot_cor_comun$t, 
-     main = "Distribución bootstrap (palabras en común)", 
-     xlab = "r", 
-     col = "dodgerblue4", 
-     border = "white")
-```
-
-El análisis bootstrap de la correlación entre frecuencias relativas confirma diferencias importantes entre los discursos. Al considerar **todo el vocabulario**, el intervalo de confianza del 95% para la correlación de Pearson fue **negativo y significativo** (−0.2438, −0.0738), lo que indica una **tendencia inversa**: las palabras más frecuentes en un discurso tienden a ser poco frecuentes en el otro. Esto respalda la idea de **narrativas divergentes**.
-
-En contraste, al analizar solo las **palabras en común**, el intervalo bootstrap (−0.1063, 0.4207) incluye el cero, lo que sugiere que **no hay una relación consistente** en su frecuencia relativa. Es decir, incluso entre términos compartidos, **el uso y la importancia discursiva varían** entre ambos presidentes.
-
-Frente a la prueba de Pearson tradicional, el enfoque bootstrap ofrece una estimación **más robusta** al no depender de supuestos estrictos. En conjunto, los resultados confirman que los discursos de Petro y Duque responden a **prioridades y estilos claramente diferenciados**.
+La presencia de una palabra negativa no implica que el hablante apoye su contenido; puede estar denunciándolo, negándolo o describiéndolo.
 
 # Análisis de sentimiento
 
-A cada palabra (token simple o **unigrama**) se le asigna un **puntaje de sentimiento**, que puede representar una escala cuantitativa, una polaridad (positiva/negativa) o una categoría emocional específica.
+El análisis léxico de sentimiento asigna a ciertas palabras una **polaridad** o categoría afectiva. 
 
-El **sentimiento del texto** se define como la **suma del puntaje de sus palabras individuales**, según un diccionario predefinido.
+Es una aproximación transparente, pero depende fuertemente del diccionario y no representa una medida directa de la emoción o intención del hablante.
 
-### Diccionarios de sentimiento
+Esta sección reutiliza los archivos `positive_words_es.txt` y `negative_words_es.txt`.
 
-- Están basados en palabras individuales (no consideran expresiones compuestas como *"not good"*).
-- Incluyen tanto palabras con carga afectiva como palabras neutras.
-  
-### Objetivos del análisis
+```{r sentimiento-diccionario}
+# Define las rutas de los diccionarios de sentimiento
+sentiment_files <- c(
+  positive = "positive_words_es.txt",
+  negative = "negative_words_es.txt"
+)
 
-- Comprender actitudes y opiniones implícitas en el texto.
-- Identificar flujos y transiciones narrativas.
-- Cuantificar el aporte de cada palabra a la carga emocional global.
-- Abordar algorítmicamente el contenido afectivo del discurso.
+# Verifica que ambos diccionarios estén disponibles
+sentiment_available <- all(file.exists(sentiment_files))
 
-### Consideraciones importantes
+# Función para leer y limpiar cada diccionario
+read_lexicon <- function(path, sentiment) {
 
-- El análisis de unigramas **no capta el sarcasmo ni la negación contextual** (por ejemplo, *"I'm not happy and I don't like it"* puede ser malinterpretado como positivo).
-- Para evitar falsos positivos o negativos, se recomienda complementar con **n-gramas** o técnicas más avanzadas que consideren estructura gramatical y contexto semántico.
+  tibble(
+    word = read_lines(path) |>
+      str_trim() |>
+      str_remove('^"') |>
+      str_remove('"$') |>
+      str_to_lower()
+  ) |>
 
-```{r}
-##### Diccionarios de sentimiento ----
+    # Elimina entradas vacías y duplicadas
+    filter(word != "") |>
+    distinct(word) |>
 
-# Tidytext incluye tres diccionarios en inglés:
-# - AFINN: escala de −5 a +5. [http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010]
-# - Bing: clasificación binaria (+ / −). [https://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html]
-# - NRC: clasificación binaria y categorías emocionales. [http://saifmohammad.com/WebPages/NRC-Emotion-Lexicon.htm]
+    # Asigna la categoría de sentimiento
+    mutate(sentiment = sentiment)
+}
 
-# Diccionarios en español (no incluidos por defecto en tidytext)
-# Fuente alternativa: https://www.kaggle.com/datasets/rtatman/sentiment-lexicons-for-81-languages
+# Ejecuta el análisis si los diccionarios están disponibles
+if (sentiment_available) {
 
-# ---------- Cargar diccionarios en español ----------
-positive_words <- read_csv("positive_words_es.txt", col_names = "word", show_col_types = FALSE) %>%
-  mutate(sentiment = "Positivo")
-
-negative_words <- read_csv("negative_words_es.txt", col_names = "word", show_col_types = FALSE) %>%
-  mutate(sentiment = "Negativo")
-
-# Unir ambos diccionarios
-sentiment_words <- bind_rows(positive_words, negative_words)
-
-# ---------- Comparar tamaños de los diccionarios ----------
-get_sentiments("bing") %>%
-  count(sentiment)
-
-sentiment_words %>%
-  count(sentiment)
-```
-
-```{r, fig.width=11, fig.height=4, fig.align='center'}
-###### Visualización de palabras con carga emocional ----
-suppressMessages(suppressWarnings(library(RColorBrewer)))
-
-# ---------- Discurso de Gustavo Petro ----------
-text_petro %>%
-  inner_join(sentiment_words) %>%
-  count(word, sentiment, sort = TRUE) %>%
-  filter(n > 2) %>%
-  mutate(n = ifelse(sentiment == "Negativo", -n, n)) %>%       # Valores negativos para palabras negativas
-  mutate(word = reorder(word, n)) %>%
-  ggplot(aes(x = word, y = n, fill = sentiment)) +
-    geom_col() +
-    scale_fill_manual(values = brewer.pal(8, "Dark2")[c(2, 5)]) +
-    coord_flip(ylim = c(-7, 7)) +
-    labs(
-      title = "Petro: Conteo por sentimiento",
-      y = "Frecuencia",
-      x = NULL
-    ) +
-    theme_minimal() -> p1
-
-# ---------- Discurso de Iván Duque ----------
-text_duque %>%
-  inner_join(sentiment_words) %>%
-  count(word, sentiment, sort = TRUE) %>%
-  filter(n > 2) %>%
-  mutate(n = ifelse(sentiment == "Negativo", -n, n)) %>%
-  mutate(word = reorder(word, n)) %>%
-  ggplot(aes(x = word, y = n, fill = sentiment)) +
-    geom_col() +
-    scale_fill_manual(values = brewer.pal(8, "Dark2")[c(2, 5)]) +
-    coord_flip(ylim = c(-7, 7)) +
-    labs(
-      title = "Duque: Conteo por sentimiento",
-      y = "Frecuencia",
-      x = NULL
-    ) +
-    theme_minimal() -> p2
-
-# Desplegar gráficos en paralelo
-grid.arrange(p1, p2, ncol = 2)
-```
-
-```{r, fig.width=10, fig.height=6, fig.align='center'}
-##### Visualización comparativa de sentimientos con nubes de palabras ----
-suppressMessages(suppressWarnings(library(reshape2)))  # para acast()
-
-# Configuración del área de gráficos
-par(mfrow = c(1, 2), mar = c(1, 1, 2, 1), mgp = c(1, 1, 1))
-
-# ---------- Discurso de Gustavo Petro ----------
-set.seed(123)
-text_petro %>%
-  inner_join(sentiment_words) %>%
-  count(word, sentiment, sort = TRUE) %>%
-  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
-  comparison.cloud(
-    colors     = brewer.pal(8, "Dark2")[c(2, 5)],
-    max.words  = 50,
-    title.size = 1.5
+  # Une los diccionarios positivo y negativo
+  sentiment_words <- bind_rows(
+    read_lexicon(
+      sentiment_files[["positive"]],
+      "Positivo"
+    ),
+    read_lexicon(
+      sentiment_files[["negative"]],
+      "Negativo"
+    )
   )
-title(main = "Petro")
 
-# ---------- Discurso de Iván Duque ----------
-set.seed(123)
-text_duque %>%
-  inner_join(sentiment_words) %>%
-  count(word, sentiment, sort = TRUE) %>%
-  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
-  comparison.cloud(
-    colors     = brewer.pal(8, "Dark2")[c(2, 5)],
-    max.words  = 50,
-    title.size = 1.5
+  # Cuenta las palabras por categoría
+  sentiment_words |>
+    count(sentiment)
+
+} else {
+
+  # Informa si faltan los diccionarios
+  cat(
+    "No se encontraron los diccionarios de sentimiento. ",
+    "La sección se omite sin interrumpir la compilación."
   )
-title(main = "Duque")
+}
 ```
 
-La visualización de sentimiento revela diferencias claras en el **tono emocional** de los discursos de Petro y Duque. En el caso de Petro, predominan las palabras con **carga negativa**, como "culpable", "desastre", "irracional", "destruir" y "muerte", lo que sugiere un enfoque **crítico y de denuncia**. Estas palabras reflejan un discurso orientado a problematizar la situación actual, señalar causas estructurales y enfatizar las consecuencias humanas y ambientales de políticas pasadas. Aunque también se identifican palabras positivas, como "paz" y "belleza", su frecuencia es limitada en comparación con los términos negativos, lo que refuerza un marco narrativo de **urgencia y advertencia**.
+Una comparación entre discursos debe controlar por su longitud y por la **cobertura del diccionario**. 
 
-En contraste, el discurso de Duque está dominado por palabras con **carga positiva**, como "paz", "compromiso", "reforma" y "logros". Esto indica un tono más **institucional y propositivo**, enfocado en resaltar avances, metas alcanzadas y acciones de gobierno. Las pocas palabras negativas que aparecen, como "crisis" y "puesto", tienen una frecuencia menor y no estructuran el discurso de manera central. En conjunto, el lenguaje de Duque transmite una visión orientada a **resultados**, con énfasis en la **gestión y el progreso**.
+Definimos un puntaje neto por mil tokens como la diferencia entre coincidencias positivas y negativas dividida por el número total de tokens,
 
-Ambos discursos coinciden en destacar la palabra "paz" como un elemento positivo clave, aunque el contexto semántico y narrativo en el que se inserta difiere. Mientras que Petro la articula dentro de un llamado a transformar las **causas profundas del conflicto**, Duque la presenta como parte de los **logros institucionales**. La diferencia en la carga emocional refleja no solo estilos comunicativos distintos, sino también **posicionamientos políticos y estratégicos diferenciados** frente al auditorio internacional.
+\[
+S
+=
+1000\,
+\frac{N_{+}-N_{-}}{N},
+\]
+
+donde \(N_{+}\) y \(N_{-}\) son los números de tokens positivos y negativos, respectivamente, y \(N\) es el número total de tokens.
+
+Los resultados deben describirse como **uso de palabras asociadas con polaridad**, no como medición directa del estado emocional del orador. 
+
+Además, expresiones como *no es bueno* muestran por qué un análisis de unigramas puede fallar al ignorar la **negación** y el contexto.
+
+```{r sentimiento-resumen}
+# Ejecuta el análisis si los diccionarios están disponibles
+if (sentiment_available) {
+
+  # Identifica palabras con sentimiento
+  sentiment_matches <- tokens_full |>
+    inner_join(
+      sentiment_words,
+      by = "word"
+    )
+
+  # Resume el sentimiento por autor
+  sentiment_summary <- tokens_full |>
+    count(
+      author,
+      name = "total_tokens"
+    ) |>
+
+    # Agrega conteos positivos y negativos
+    left_join(
+      sentiment_matches |>
+        count(author, sentiment) |>
+        pivot_wider(
+          names_from = sentiment,
+          values_from = n,
+          values_fill = 0
+        ),
+      by = "author"
+    ) |>
+
+    # Calcula cobertura y balance de sentimiento
+    mutate(
+      matched = Positivo + Negativo,
+      coverage = matched / total_tokens,
+      net_score_per_1000 =
+        1000 * (Positivo - Negativo) / total_tokens
+    )
+
+  # Muestra el resumen
+  sentiment_summary
+}
+```
+
+Ambos discursos presentan un **balance neto negativo**, pero este es mucho más marcado en Petro: \(-71.8\) frente a \(-19.9\) por cada 1000 tokens. 
+
+Además, la cobertura del diccionario es similar en ambos casos, alrededor del **12%**, lo que hace más comparable la diferencia observada.
+
+```{r sentimiento-palabras, fig.height=6}
+# Ejecuta el gráfico si los diccionarios están disponibles
+if (sentiment_available) {
+
+  sentiment_matches |>
+
+    # Cuenta las palabras por autor y polaridad
+    count(
+      author,
+      word,
+      sentiment,
+      sort = TRUE
+    ) |>
+
+    # Selecciona las 8 palabras más frecuentes por grupo
+    group_by(author, sentiment) |>
+    slice_max(
+      n,
+      n = 8,
+      with_ties = FALSE
+    ) |>
+    ungroup() |>
+
+    # Asigna signo según la polaridad
+    mutate(
+      signed_n = if_else(
+        sentiment == "Negativo",
+        -n,
+        n
+      ),
+      word = reorder_within(
+        word,
+        signed_n,
+        author
+      )
+    ) |>
+
+    # Construye el gráfico
+    ggplot(
+      aes(word, signed_n)
+    ) +
+    geom_col() +
+    coord_flip() +
+
+    # Separa los resultados por autor
+    facet_wrap(
+      ~ author,
+      scales = "free"
+    ) +
+
+    # Restaura las etiquetas originales
+    scale_x_reordered() +
+
+    # Define títulos y etiquetas
+    labs(
+      x = NULL,
+      y = "Frecuencia con signo",
+      title = "Palabras asociadas con polaridad"
+    )
+}
+```
 
 
-# Petro: Bigramas
+# Bigramas
 
-Hasta ahora se ha utilizado `unnest_tokens` para tokenizar por palabras individuales. A continuación, se aplica la tokenización por **secuencias de palabras** (bigramas), con el objetivo de identificar patrones de co-ocurrencia.
+Un **bigrama** es una secuencia ordenada de dos palabras consecutivas. 
 
-Este enfoque permite responder preguntas como: **¿Qué palabras tienden a aparecer juntas?** **¿Qué términos suelen seguir a otros en el discurso?**
+Por tanto, una representación natural es una **red dirigida**: una arista $i\rightarrow j$ indica que la palabra $j$ aparece inmediatamente después de $i$.
 
-```{r}
-##### Bigramas: ejemplo de juguete ----
+```{r bigramas}
+# Construye los bigramas dentro de cada oración
+bigrams <- sentences |>
+  unnest_tokens(
+    output = bigram,
+    input = sentence,
+    token = "ngrams",
+    n = 2
+  ) |>
 
-# Texto de ejemplo
-text <- c(
-  "Durante 155 años le hemos cumplido a Colombia", 
-  "a los jóvenes de nuestro país", 
-  "al futuro", 
-  "a la educación", 
-  "el conocimiento y a la construcción colectiva de conocimiento en todas las regiones."
+  # Separa cada bigrama en sus dos palabras
+  separate_wider_delim(
+    bigram,
+    delim = " ",
+    names = c("word1", "word2")
+  ) |>
+
+  # Conserva palabras válidas y elimina stopwords
+  filter(
+    str_detect(word1, "^\\p{L}+$"),
+    str_detect(word2, "^\\p{L}+$"),
+    !word1 %in% stop_words_es$word,
+    !word2 %in% stop_words_es$word
+  )
+
+# Cuenta la frecuencia de cada bigrama por autor
+bigram_counts <- bigrams |>
+  count(
+    author,
+    word1,
+    word2,
+    name = "weight",
+    sort = TRUE
+  )
+
+# Muestra los 12 bigramas más frecuentes por autor
+bigram_counts |>
+  group_by(author) |>
+  slice_max(
+    weight,
+    n = 12,
+    with_ties = FALSE
+  ) |>
+  ungroup()
+```
+
+## Frecuencia frente a asociación
+
+Una arista puede tener alta frecuencia simplemente porque sus palabras son frecuentes. Para medir la **fuerza de asociación** entre dos términos se utiliza la *pointwise mutual information* (**PMI**):
+
+\[
+\operatorname{PMI}(i,j)
+=
+\log_2\!\left(
+\frac{p(i,j)}
+{p_1(i)p_2(j)}
+\right),
+\]
+
+donde \(p(i,j)\) es la probabilidad de observar el bigrama \((i,j)\), y \(p_1(i)\) y \(p_2(j)\) son las probabilidades marginales de \(i\) y \(j\) en la primera y segunda posición, respectivamente. 
+
+Un valor positivo indica que las palabras aparecen juntas **más de lo esperado bajo independencia**; un valor negativo indica lo contrario. No implica causalidad ni equivalencia semántica.
+
+La **PPMI** (*positive PMI*) conserva únicamente las asociaciones positivas:
+
+\[
+\operatorname{PPMI}(i,j)
+=
+\max\{\operatorname{PMI}(i,j),0\}.
+\]
+
+Por ejemplo, si entre 100 bigramas *cambio* aparece 20 veces en la primera posición, *climático* 10 veces en la segunda y *cambio climático* aparece 8 veces, entonces \(p(i,j)=0.08\), \(p_1(i)=0.20\) y \(p_2(j)=0.10\). Por tanto, \(\operatorname{PMI}=\log_2(4)=2\), lo que indica una **asociación positiva fuerte** entre ambas palabras.
+
+```{r bigramas-ppmi}
+# Calcula probabilidades conjuntas y marginales por autor
+bigram_assoc <- bigram_counts |>
+  group_by(author) |>
+
+  # Total de bigramas observados
+  mutate(
+    total_bigrams = sum(weight)
+  ) |>
+  ungroup() |>
+
+  # Frecuencia marginal de la primera palabra
+  left_join(
+    bigram_counts |>
+      summarise(
+        n_word1 = sum(weight),
+        .by = c(author, word1)
+      ),
+    by = c("author", "word1")
+  ) |>
+
+  # Frecuencia marginal de la segunda palabra
+  left_join(
+    bigram_counts |>
+      summarise(
+        n_word2 = sum(weight),
+        .by = c(author, word2)
+      ),
+    by = c("author", "word2")
+  ) |>
+
+  # Calcula PMI y PPMI
+  mutate(
+    p_pair = weight / total_bigrams,
+    p_word1 = n_word1 / total_bigrams,
+    p_word2 = n_word2 / total_bigrams,
+    pmi = log2(
+      p_pair / (p_word1 * p_word2)
+    ),
+    ppmi = pmax(pmi, 0)
+  )
+
+# Selecciona las asociaciones más fuertes
+bigram_assoc |>
+
+  # Evita asociaciones basadas en una sola aparición
+  filter(weight >= 2) |>
+
+  # Conserva los 10 valores de PPMI más altos por autor
+  group_by(author) |>
+  slice_max(
+    ppmi,
+    n = 10,
+    with_ties = FALSE
+  ) |>
+  ungroup() |>
+
+  # Muestra las variables principales
+  select(
+    author,
+    word1,
+    word2,
+    weight,
+    ppmi
+  )
+```
+
+
+## Red dirigida de bigramas
+
+La **red de bigramas** usa los 45 bigramas más frecuentes. Cada **palabra** es un nodo y cada bigrama define una **arista dirigida**. El grosor de la arista representa su **frecuencia** y el tamaño del nodo, su **grado**.
+
+```{r red-bigramas-petro, fig.width=8, fig.height=7}
+# Función para construir una red de bigramas
+make_bigram_graph <- function(author_name, n_edges = 45) {
+
+  bigram_counts |>
+
+    # Selecciona el discurso y elimina nombres propios de los autores
+    filter(
+      author == author_name,
+      !word1 %in% c("petro", "duque"),
+      !word2 %in% c("petro", "duque")
+    ) |>
+
+    # Conserva los bigramas más frecuentes
+    slice_max(
+      weight,
+      n = n_edges,
+      with_ties = FALSE
+    ) |>
+
+    # Define correctamente origen, destino y peso
+    select(
+      word1,
+      word2,
+      weight
+    ) |>
+
+    # Construye la red dirigida
+    graph_from_data_frame(
+      directed = TRUE
+    )
+}
+
+# Construye las redes de ambos discursos
+graph_petro <- make_bigram_graph("Petro")
+graph_duque <- make_bigram_graph("Duque")
+
+# Función para visualizar una red de bigramas
+plot_bigram_graph <- function(graph, title, n_labels = 15) {
+
+  # Calcula el grado total
+  node_degree <- degree(graph, mode = "all")
+  V(graph)$node_degree <- node_degree
+
+  # Etiqueta los nodos de mayor grado
+  V(graph)$node_label <- ifelse(
+    rank(-node_degree, ties.method = "first") <= n_labels,
+    V(graph)$name,
+    NA
+  )
+
+  # Layout reproducible
+  set.seed(123)
+  layout_graph <- create_layout(graph, layout = "fr")
+
+  # Construye la visualización
+  ggraph(layout_graph) +
+
+    # Aristas dirigidas
+    geom_edge_link(
+      aes(width = weight),
+      alpha = 0.25,
+      colour = "gray55",
+      arrow = arrow(
+        length = grid::unit(2, "mm"),
+        type = "closed"
+      ),
+      end_cap = circle(2.5, "mm"),
+      show.legend = FALSE
+    ) +
+    scale_edge_width(range = c(0.2, 2.2)) +
+
+    # Nodos
+    geom_node_point(
+      aes(size = node_degree),
+      shape = 21,
+      fill = "white",
+      colour = "gray25",
+      stroke = 0.4
+    ) +
+    scale_size_continuous(
+      range = c(2.5, 7),
+      guide = "none"
+    ) +
+
+    # Etiquetas
+    geom_node_text(
+      aes(label = node_label),
+      repel = TRUE,
+      size = 3.2,
+      family = "sans"
+    ) +
+
+    # Conserva la proporción del layout
+    coord_fixed(
+      clip = "off"
+    ) +
+
+    # Título y estilo
+    labs(title = title) +
+    theme_void() +
+    theme(
+      plot.title = element_text(
+        hjust = 0.5,
+        face = "bold",
+        size = 14,
+        margin = margin(b = 2)
+      ),
+      plot.margin = margin(2, 2, 2, 2)
+    )
+}
+
+# Librerias
+library(ggraph) 
+library(patchwork)
+
+# Construye las visualizaciones
+plot_petro <- plot_bigram_graph(graph_petro, "Petro")
+plot_duque <- plot_bigram_graph(graph_duque, "Duque")
+
+# Muestra ambas redes lado a lado
+plot_petro + plot_duque
+```
+
+Si se ignora deliberadamente el orden y se usa una red no dirigida, debe explicitarse que se está cambiando de una relación de **sucesión** a una relación de **coocurrencia**.
+
+# Redes de coocurrencia por ventanas
+
+Los **bigramas** capturan únicamente palabras adyacentes. Una generalización consiste en conectar dos términos cuando aparecen dentro de una **ventana de contexto**. 
+
+Sea \(c_{ij}(h)\) el número de veces que los términos \(i\) y \(j\) aparecen separados por, a lo sumo, \(h\) posiciones en el texto. 
+
+La red puede definir el peso como \(w_{ij}=c_{ij}(h)\) o usar una ponderación que asigne mayor peso a coocurrencias entre palabras más próximas.
+
+Se utiliza una **ventana de cinco posiciones** y un peso decreciente \(1/d\), donde \(d\) es la distancia entre los términos. Cada **oración** se trata como una unidad independiente para evitar coocurrencias entre oraciones distintas.
+
+## Construcción reproducible
+
+Para comparar redes se mantienen constantes: **preprocesamiento**, **ventana**, **vocabulario candidato** y **número de aristas retenidas**. Esto reduce diferencias producidas únicamente por decisiones de construcción.
+
+```{r funciones-red}
+# Selecciona los 180 términos más frecuentes del corpus combinado
+common_vocab <- tokens_clean |>
+  count(word, sort = TRUE) |>
+  slice_head(n = 180) |>
+  pull(word)
+
+# Función para construir una red de coocurrencia por ventanas
+build_window_graph <- function(
+    sentence_data,
+    author_name,
+    vocabulary,
+    window = 5,
+    top_edges = 220) {
+
+  # Extrae las oraciones del autor
+  author_sentences <- sentence_data |>
+    filter(author == author_name) |>
+    pull(sentence)
+
+  # Construye un corpus con una oración por documento
+  author_corpus <- corpus(author_sentences)
+
+  # Tokeniza, limpia y restringe al vocabulario común
+  author_tokens <- tokens(
+    author_corpus,
+    remove_punct = TRUE,
+    remove_numbers = TRUE,
+    remove_symbols = TRUE
+  ) |>
+    tokens_tolower() |>
+    tokens_remove(stopwords::stopwords("es")) |>
+    tokens_keep(vocabulary)
+
+  # Construye la matriz de coocurrencias
+  fcm_author <- fcm(
+    author_tokens,
+    context = "window",
+    window = window,
+    count = "weighted",
+    weights = 1 / seq_len(window),
+    ordered = FALSE,
+    tri = TRUE
+  )
+
+  # Convierte la matriz a formato de aristas
+  mat <- as.matrix(fcm_author)
+
+  # Selecciona únicamente coocurrencias positivas
+  idx <- which(
+    upper.tri(mat) & mat > 0,
+    arr.ind = TRUE
+  )
+
+  # Construye la tabla de aristas
+  edges <- tibble(
+    word1 = rownames(mat)[idx[, 1]],
+    word2 = colnames(mat)[idx[, 2]],
+    weight = mat[idx]
+  ) |>
+
+    # Conserva las aristas de mayor peso
+    arrange(desc(weight)) |> 
+       slice_head(n = top_edges)
+
+  # Construye la red no dirigida
+  graph <- graph_from_data_frame(
+    edges,
+    directed = FALSE
+  ) |>
+
+    # Elimina aristas múltiples y lazos
+    simplify(
+      remove.multiple = TRUE,
+      remove.loops = TRUE,
+      edge.attr.comb = list(
+        weight = "sum",
+        "ignore"
+      )
+    )
+
+  # Convierte fuerza de asociación en distancia
+  E(graph)$distance <- 1 / E(graph)$weight
+
+  # Devuelve la red
+  graph
+}
+
+# Construye la red de Petro
+g_petro <- build_window_graph(
+  sentences,
+  "Petro",
+  common_vocab
 )
 
-# Convertir a data frame
-text_df <- tibble(
-  line = seq_along(text),
-  text = text
-)
-
-# Tokenizar en bigramas
-text_df %>%
-  unnest_tokens(input = text, output = bigram, token = "ngrams", n = 2) %>%
-  head(n = 10)
-```
-
-```{r}
-##### Importar datos ----
-suppressWarnings(
-  text_petro <- read_csv("discurso_onu_petro.txt", 
-                         col_names = FALSE, 
-                         show_col_types = FALSE) %>%
-    unlist(use.names = FALSE)  # Convertir a vector simple sin nombres
-)
-
-names(text_petro) <- NULL  # Eliminar nombres del vector (precaución adicional)
-text_petro <- tibble(
-  line = 1:length(text_petro),  # Crear índice de línea
-  text = text_petro             # Asignar texto original
+# Construye la red de Duque
+g_duque <- build_window_graph(
+  sentences,
+  "Duque",
+  common_vocab
 )
 ```
 
-```{r}
-##### Tokenizar en bigramas ----
-# En este caso, cada token corresponde a una secuencia de dos palabras (bigrama)
-text_petro %>%
-  unnest_tokens(input = text, output = bigram, token = "ngrams", n = 2) %>%
-  filter(!is.na(bigram)) -> text_petro_bi  # Importante: eliminar posibles NAs
+## Componente conexa gigante
 
-# Inspección básica
-dim(text_petro_bi)
-head(text_petro_bi, n = 10)
+```{r funcion-gcc}
+# Extrae la componente conexa más grande
+get_gcc <- function(graph) {
+
+  # Identifica los componentes conexos
+  comp <- components(graph)
+
+  # Localiza el componente de mayor tamaño
+  largest <- which.max(comp$csize)
+
+  # Extrae la componente gigante
+  induced_subgraph(
+    graph,
+    vids = which(comp$membership == largest)
+  )
+}
+
+# Obtiene las componentes gigantes
+gcc_petro <- get_gcc(g_petro)
+gcc_duque <- get_gcc(g_duque)
 ```
 
-```{r}
-###### Top 10 de bigramas más frecuentes ----
-# Muchos bigramas no son informativos (e.g., "de la", "en el")
-# Esto motiva aplicar nuevamente filtros con stop words
+```{r redes-coocurrencia, fig.width=12, fig.height=6}
+# Función para visualizar una red de coocurrencia
+plot_text_network <- function(graph, title, n_labels = 15) {
 
-text_petro_bi %>%
-  count(bigram, sort = TRUE) %>%
-  head(n = 10)
+  # Calcula la fuerza de cada nodo
+  node_strength <- strength(graph, weights = E(graph)$weight)
+
+  # Guarda la fuerza como atributo nodal
+  V(graph)$node_strength <- node_strength
+
+  # Etiqueta únicamente los nodos de mayor fuerza
+  V(graph)$node_label <- ifelse(
+    rank(-node_strength, ties.method = "first") <= n_labels,
+    V(graph)$name,
+    NA
+  )
+
+  # Fija la semilla para reproducibilidad
+  set.seed(123)
+
+  # Construye la visualización
+  ggraph(graph, layout = "fr") +
+
+    # Aristas: grosor proporcional a la coocurrencia
+    geom_edge_link(
+      aes(width = weight),
+      alpha = 0.25,
+      colour = "gray55",
+      show.legend = FALSE
+    ) +
+    scale_edge_width(range = c(0.2, 2.5)) +
+
+    # Nodos: tamaño proporcional a la fuerza
+    geom_node_point(
+      aes(size = node_strength),
+      shape = 21,
+      fill = "white",
+      colour = "gray25",
+      stroke = 0.5
+    ) +
+    scale_size_continuous(range = c(2.5, 8), guide = "none") +
+
+    # Etiqueta los nodos más centrales
+    geom_node_text(
+      aes(label = node_label),
+      repel = TRUE,
+      size = 3.3,
+      family = "sans"
+    ) +
+
+    # Título y estilo
+    labs(title = title) +
+    theme_void() +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+      plot.margin = margin(5, 5, 5, 5)
+    )
+}
+
+# Librerias
+library(ggraph) 
+library(patchwork)
+
+# Construye las dos figuras
+plot_petro <- plot_text_network(gcc_petro, "Petro")
+
+plot_duque <- plot_text_network(gcc_duque, "Duque")
+
+# Muestra ambas redes lado a lado
+plot_petro + plot_duque
 ```
 
-```{r}
-##### Omitir stop words y limpiar bigramas ----
-text_petro_bi %>%
-  separate(bigram, c("word1", "word2"), sep = " ") %>%
-  
-  # Eliminar bigramas con números
-  filter(!grepl(pattern = '[0-9]', x = word1)) %>%
-  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
-  
-  # Eliminar stop words en ambas posiciones
-  filter(!word1 %in% stop_words_es$word) %>%
-  filter(!word2 %in% stop_words_es$word) %>%
-  
-  # Normalizar acentos
-  mutate(word1 = chartr(
-    old = names(replacement_list) %>% str_c(collapse = ''), 
-    new = replacement_list %>% str_c(collapse = ''), 
-    x = word1)) %>%
-  mutate(word2 = chartr(
-    old = names(replacement_list) %>% str_c(collapse = ''), 
-    new = replacement_list %>% str_c(collapse = ''), 
-    x = word2)) %>%
-  
-  # Eliminar posibles NAs
-  filter(!is.na(word1)) %>%
-  filter(!is.na(word2)) %>%
-  
-  # Contar combinaciones más frecuentes
-  count(word1, word2, sort = TRUE) %>%
-  rename(weight = n) -> text_petro_bi_counts  # importante para la conformación de la red
+El tamaño de un nodo representa aquí su **fuerza**, es decir, la suma de los pesos de sus aristas. Una conexión gruesa indica coocurrencia frecuente y próxima bajo la regla de ponderación elegida.
 
-# Inspección de resultados
-dim(text_petro_bi_counts)
-head(text_petro_bi_counts, n = 10)
+# Comparación estructural de las redes
+
+Los pesos de coocurrencia representan **fuerza de asociación**, no distancia. 
+
+Por ello, para caminos ponderados definimos `distance = 1 / weight`: una asociación fuerte corresponde a una distancia corta.
+
+```{r metricas-red}
+# Función para resumir las propiedades estructurales de una red
+network_summary <- function(graph, full_graph, label) {
+
+  # Detecta comunidades mediante Louvain
+  community <- cluster_louvain(
+    graph,
+    weights = E(graph)$weight
+  )
+
+  # Calcula las principales métricas de la red
+  tibble(
+    author = label,
+
+    # Tamaño de la red
+    nodes = vcount(graph),
+    edges = ecount(graph),
+
+    # Proporción de nodos pertenecientes a la componente gigante
+    gcc_share = vcount(graph) / vcount(full_graph),
+
+    # Distribución del grado
+    mean_degree = mean(degree(graph)),
+    sd_degree = sd(degree(graph)),
+
+    # Densidad
+    density = edge_density(graph),
+
+    # Distancia media sin considerar pesos
+    mean_distance_unweighted = mean_distance(
+      graph,
+      directed = FALSE,
+      weights = NA
+    ),
+
+    # Distancia media usando el inverso de la fuerza como distancia
+    mean_distance_weighted = mean_distance(
+      graph,
+      directed = FALSE,
+      weights = E(graph)$distance
+    ),
+
+    # Transitividad global
+    transitivity = transitivity(
+      graph,
+      type = "global"
+    ),
+
+    # Asortatividad por grado
+    assortativity_degree = assortativity_degree(
+      graph,
+      directed = FALSE
+    ),
+
+    # Tamaño de la clique máxima
+    max_clique_size = clique_num(graph),
+
+    # Número de comunidades
+    communities = length(
+      unique(membership(community))
+    ),
+
+    # Modularidad de la partición
+    modularity = modularity(community)
+  )
+}
+
+# Compara las redes de Petro y Duque
+network_metrics <- bind_rows(
+  network_summary(
+    gcc_petro,
+    g_petro,
+    "Petro"
+  ),
+  network_summary(
+    gcc_duque,
+    g_duque,
+    "Duque"
+  )
+)
+
+# Organiza las métricas para facilitar la comparación
+network_metrics |>
+  pivot_longer(
+    cols = -author,
+    names_to = "Métrica",
+    values_to = "Valor"
+  ) |>
+  pivot_wider(
+    names_from = author,
+    values_from = Valor
+  ) |>
+
+  # Muestra la tabla completa
+  knitr::kable(
+    digits = 3,
+    align = c("l", "c", "c")
+  )
 ```
 
+La red de **Petro** es ligeramente más **densa y cohesionada**, con mayor grado medio, transitividad y clique máxima. 
 
-```{r, fig.width=6, fig.height=6, fig.align='center'}
-##### Definir una red a partir de la frecuencia (weight) de los bigramas ----
-# Red binaria, no dirigida, ponderada y simple
-# Recomendación: variar el umbral de filtro y explorar bigramas no consecutivos 
-# para redes más informativas
+La de **Duque** tiene más nodos, más comunidades y distancias medias algo menores. 
 
-suppressMessages(suppressWarnings(library(igraph)))
+Ambas presentan una **componente gigante dominante** y una modularidad similar (≈0.54), lo que sugiere una organización comunitaria comparable, aunque algo más fragmentada en Duque.
 
-# Crear objeto de red a partir de bigramas con peso mayor a 2
-g <- text_petro_bi_counts %>%
-  filter(weight > 2) %>%
-  graph_from_data_frame(directed = FALSE)
+Interpretación de las medidas:
 
-# Visualización de la red
+- **grado medio:** número promedio de vecinos distintos;
+- **densidad:** proporción de aristas observadas respecto a las posibles;
+- **distancia media no ponderada:** número promedio de pasos topológicos;
+- **distancia media ponderada:** distancia basada en el inverso de la fuerza de coocurrencia;
+- **transitividad:** tendencia topológica a formar triángulos;
+- **asortatividad de grado:** asociación entre los grados de nodos adyacentes;
+- **tamaño de la clique máxima:** número de nodos de la mayor clique; **no** es el número de comunidades;
+- **comunidades:** grupos encontrados por Louvain;
+- **modularidad:** separación entre comunidades respecto a la esperada bajo un modelo nulo de conexiones.
+
+Estas cantidades dependen del tamaño del vocabulario, la ventana, el filtrado y el número de aristas. 
+
+La comparación solo es interpretable porque esas decisiones se mantienen iguales entre discursos.
+
+# Centralidad
+
+No existe una única definición de **palabra importante**. Cada medida representa una propiedad estructural diferente.
+
+```{r centralidades}
+# Función para calcular medidas de centralidad
+centrality_table <- function(graph, author_name) {
+
+  tibble(
+    author = author_name,
+    word = V(graph)$name,
+
+    # Número de conexiones
+    degree = degree(graph),
+
+    # Suma de los pesos de las conexiones
+    strength = strength(graph, weights = E(graph)$weight),
+
+    # Conexión con nodos también centrales
+    eigenvector = eigen_centrality(
+      graph,
+      weights = E(graph)$weight
+    )$vector,
+
+    # Papel como puente entre otros nodos
+    betweenness = betweenness(
+      graph,
+      weights = E(graph)$distance,
+      normalized = TRUE
+    ),
+
+    # Cercanía al resto de la red
+    closeness = closeness(
+      graph,
+      weights = E(graph)$distance,
+      normalized = TRUE
+    )
+  )
+}
+
+# Calcula las centralidades para ambos discursos
+centralities <- bind_rows(
+  centrality_table(gcc_petro, "Petro"),
+  centrality_table(gcc_duque, "Duque")
+)
+
+# Muestra las 10 palabras con mayor centralidad de eigenvector
+centralities |>
+  group_by(author) |>
+  slice_max(eigenvector, n = 10, with_ties = FALSE) |>
+  ungroup() |>
+  select(author, word, degree, strength, eigenvector, betweenness)
+```
+
+En el discurso de **Duque**, *colombia* domina claramente la estructura de la red, con el mayor grado, fuerza, centralidad de eigenvector y betweenness, seguida por términos asociados con *social*, *acción*, *agenda* y *pandemia*. 
+
+En **Petro**, la centralidad se concentra en *adicción*, *petróleo*, *poder*, *drogas* y *selva*, lo que refleja un núcleo discursivo más ligado a recursos naturales, drogas y conflicto. En particular, *selva* destaca como un nodo con alta conectividad y capacidad de puente.
+
+La **fuerza** resume coocurrencias acumuladas; la **centralidad de eigenvector** favorece palabras conectadas con otras palabras centrales; la **betweenness** identifica posibles puentes entre regiones de la red. Para betweenness y closeness se utiliza el inverso del peso como distancia.
+
+# Comunidades
+
+Las comunidades son conjuntos de palabras con mayor conectividad interna de la esperada. No deben llamarse automáticamente **temas**: la interpretación temática requiere revisar sus términos y sus concordancias.
+
+```{r comunidades-tabla}
+# Función para resumir las comunidades de una red
+community_words <- function(graph, author_name, n_words = 6) {
+
+  # Detecta comunidades mediante Louvain
+  community <- cluster_louvain(
+    graph,
+    weights = E(graph)$weight
+  )
+
+  tibble(
+    word = V(graph)$name,
+    community = membership(community),
+
+    # Calcula la fuerza de cada palabra
+    strength = strength(
+      graph,
+      weights = E(graph)$weight
+    )
+  ) |>
+
+    # Organiza los nodos por comunidad
+    group_by(community) |>
+    arrange(desc(strength), .by_group = TRUE) |>
+
+    # Resume el tamaño y las palabras más representativas
+    summarise(
+      size = n(),
+      representative_words = paste(
+        head(word, n_words),
+        collapse = ", "
+      ),
+      .groups = "drop"
+    ) |>
+
+    # Añade el autor
+    mutate(
+      author = author_name,
+      .before = 1
+    ) |>
+
+    # Ordena las comunidades por tamaño
+    arrange(desc(size))
+}
+
+# Resume las comunidades de ambos discursos
+community_summary <- bind_rows(
+  community_words(gcc_petro, "Petro"),
+  community_words(gcc_duque, "Duque")
+)
+
+# Muestra los resultados
+community_summary
+```
+
+En **Petro**, las comunidades se concentran principalmente en temas de **drogas, recursos naturales, selva, cambio climático, paz y justicia social**. Destacan grupos como *adicción–poder–petróleo–dinero–carbón–cocaína* y *selva–vida–salvar–amazónica–humanidad*, que muestran núcleos discursivos claramente diferenciados.
+
+En **Duque**, las comunidades se organizan alrededor de **acción internacional, reactivación, crisis climática, paz, pandemia, salud, crecimiento y asuntos fiscales**. Su red presenta una agenda más distribuida entre política internacional, recuperación económica y temas sociales.
+
+```{r comunidades-grafico, fig.width=12, fig.height=6}
+# Función para visualizar las comunidades
+plot_communities <- function(graph, title, n_labels = 2) {
+
+  # Detecta comunidades mediante Louvain
+  community <- cluster_louvain(graph, weights = E(graph)$weight)
+
+  # Calcula comunidad y fuerza de cada nodo
+  community_id <- membership(community)
+  node_strength <- strength(graph, weights = E(graph)$weight)
+
+  # Guarda los atributos nodales
+  V(graph)$community <- factor(community_id)
+  V(graph)$node_strength <- node_strength
+
+  # Etiqueta los nodos con mayor fuerza dentro de cada comunidad
+  label_rank <- ave(
+    -node_strength,
+    community_id,
+    FUN = function(x) rank(x, ties.method = "first")
+  )
+
+  V(graph)$node_label <- ifelse(
+    label_rank <= n_labels,
+    V(graph)$name,
+    NA
+  )
+
+  # Calcula la modularidad
+  Q <- modularity(community)
+
+  # Layout reproducible
+  set.seed(123)
+  layout_graph <- create_layout(graph, layout = "fr")
+
+  # Construye la visualización
+  ggraph(layout_graph) +
+
+    # Aristas
+    geom_edge_link(
+      aes(width = weight),
+      colour = "gray60",
+      alpha = 0.20,
+      show.legend = FALSE
+    ) +
+    scale_edge_width(range = c(0.2, 2)) +
+
+    # Nodos coloreados por comunidad
+    geom_node_point(
+      aes(size = node_strength, fill = community),
+      shape = 21,
+      colour = "white",
+      stroke = 0.4
+    ) +
+    scale_size_continuous(range = c(2.5, 8), guide = "none") +
+    scale_fill_viridis_d(guide = "none") +
+
+    # Etiqueta las palabras principales de cada comunidad
+    geom_node_text(
+      aes(label = node_label),
+      repel = TRUE,
+      size = 3.2,
+      family = "sans"
+    ) +
+
+    # Conserva las proporciones del layout
+    coord_fixed(clip = "off") +
+
+    # Título y modularidad
+    labs(
+      title = title,
+      subtitle = paste0("Modularidad Q = ", round(Q, 3))
+    ) +
+    theme_void() +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+      plot.subtitle = element_text(hjust = 0.5, size = 10),
+      plot.margin = margin(4, 4, 4, 4)
+    )
+}
+
+# Construye las visualizaciones
+plot_petro <- plot_communities(gcc_petro, "Petro")
+plot_duque <- plot_communities(gcc_duque, "Duque")
+
+# Muestra ambas redes lado a lado
+plot_petro + plot_duque
+```
+
+El número asignado a cada comunidad es solo una **etiqueta algorítmica**. Su valor numérico no tiene interpretación sustantiva y puede cambiar entre algoritmos o ejecuciones.
+
+# Sensibilidad de la red
+
+Una red textual es el resultado de decisiones analíticas. Para estudiar su estabilidad conviene variar al menos el **tamaño de ventana** y el **número de aristas retenidas**.
+
+```{r sensibilidad-red}
+# Define las combinaciones de ventana y número de aristas
+sensitivity_grid <- expand_grid(
+  window = c(2, 5, 8),
+  top_edges = c(120, 220, 320)
+)
+
+# Evalúa la sensibilidad de la red a ambas decisiones
+sensitivity_results <- sensitivity_grid |>
+  mutate(
+    # Construye una red para cada combinación de parámetros
+    graph = map2(
+      window,
+      top_edges,
+      ~ build_window_graph(
+        sentences,
+        "Petro",
+        common_vocab,
+        window = .x,
+        top_edges = .y
+      )
+    ),
+
+    # Extrae la componente gigante
+    gcc = map(graph, get_gcc),
+
+    # Calcula métricas estructurales
+    nodes = map_int(gcc, vcount),
+    edges = map_int(gcc, ecount),
+    density = map_dbl(gcc, edge_density),
+    transitivity = map_dbl(
+      gcc,
+      ~ transitivity(.x, type = "global")
+    )
+  ) |>
+
+  # Elimina los objetos de red de la tabla final
+  select(-graph, -gcc)
+
+# Muestra los resultados
+sensitivity_results
+```
+
+La red es **estable frente al tamaño de la ventana**. 
+
+El número de aristas tiene mayor efecto: al aumentarlo, crece la red y disminuye ligeramente la **transitividad**, mientras la **densidad** permanece relativamente estable.
+
+Si las conclusiones cambian drásticamente con pequeñas modificaciones del parámetro, deben reportarse como **sensibles a la especificación**. 
+
+La sensibilidad no es un defecto: es información sobre qué tan determinada está la estructura por los datos frente a las decisiones del analista.
+
+
+# Representaciones vectoriales y similitud textual
+
+Las redes permiten estudiar **relaciones entre términos**, pero no son la única forma de representar un texto. 
+
+Una alternativa fundamental consiste en transformar cada documento en un **vector numérico**. 
+
+Una vez realizada esta transformación, podemos comparar documentos, reducir la dimensión del espacio y **estudiar semejanzas léxicas o semánticas**.
+
+En esta sección estudiaremos cuatro herramientas complementarias:
+
+1. **Matriz documento--término y TF--IDF**.
+2. **SVD y análisis semántico latente (LSA)**.
+3. **Similitud coseno**.
+4. **Embeddings contextuales**.
+
+Como ejemplo utilizaremos **reseñas de películas** clasificadas como positivas o negativas. 
+
+Este caso permite observar una diferencia importante, ya que dos reseñas pueden expresar opiniones similares utilizando palabras diferentes y, por tanto, ser poco similares léxicamente pero muy similares semánticamente.
+
+## Preparación
+
+Utilizamos una muestra balanceada de reseñas de IMDB incluida en `text2vec`. Para mantener los cálculos rápidos seleccionamos 100 reseñas positivas y 100 negativas de longitud moderada.
+
+```{r representaciones-setup, message=FALSE, warning=FALSE}
+library(tidyverse)  # Manipulación y visualización de datos
+library(quanteda)   # Procesamiento y análisis de texto
+library(text2vec)   # Representación vectorial de texto
+library(Matrix)     # Manejo de matrices dispersas
+library(irlba)      # Descomposición SVD eficiente
+library(reticulate) # Integración de R con Python
+
+# Fija la semilla para reproducibilidad
 set.seed(123)
-plot(
-  g,
-  layout = layout_with_fr,
-  vertex.color = 1,
-  vertex.frame.color = 1,
-  vertex.size = 3,
-  vertex.label.color = "black",
-  vertex.label.cex = 1,
-  vertex.label.dist = 1,
-  main = "Umbral = 3"
+
+# Carga las reseñas de IMDB
+data("movie_review", package = "text2vec")
+
+# Limpia y prepara los textos
+reviews <- movie_review |>
+  mutate(
+    sentiment = if_else(sentiment == 1, "Positiva", "Negativa"),
+    review_clean = review |>
+      str_replace_all("<[^>]+>", " ") |>
+      str_squish(),
+    n_words = str_count(review_clean, "\\S+")
+  ) |>
+  # Conserva reseñas de longitud moderada
+  filter(between(n_words, 40, 100)) |>
+  group_by(sentiment) |>
+  slice_sample(n = 100) |>
+  ungroup() |>
+  mutate(
+    doc_id = paste0("review_", row_number())
+  )
+
+# Verifica el número de documentos
+reviews |>
+  count(sentiment)
+```
+
+El objeto contiene **200 documentos** y una variable externa, `sentiment`, que utilizaremos únicamente para interpretar las representaciones obtenidas.
+
+# Matriz documento--término
+
+La representación más directa de un corpus es la **matriz documento--término**. 
+
+Si tenemos \(D\) documentos y \(V\) términos diferentes, construimos una matriz $\boldsymbol X=(x_{ij})$ de dimensión $D\times V$, donde \(x_{ij}\) representa la **frecuencia del término** \(j\) en el documento \(i\).
+
+Cada documento queda entonces representado por una fila de \(\boldsymbol X\). Dos documentos que utilizan vocabulario similar tendrán vectores parecidos.
+
+Esta representación es normalmente **dispersa**, pues cada documento utiliza solo una pequeña fracción del vocabulario total.
+
+```{r representaciones-dfm}
+# Construye el corpus a partir de las reseñas
+review_corpus <- corpus(
+  reviews,
+  text_field = "review_clean",
+  docid_field = "doc_id"
+)
+
+# Tokeniza los textos y elimina puntuación, números y símbolos
+review_tokens <- tokens(
+  review_corpus,
+  remove_punct = TRUE,
+  remove_numbers = TRUE,
+  remove_symbols = TRUE
+) |>
+  # Convierte todas las palabras a minúsculas
+  tokens_tolower() |>
+  # Elimina palabras vacías en inglés
+  tokens_remove(stopwords::stopwords("en"))
+
+# Construye la matriz documento--término
+review_dfm <- dfm(review_tokens) |>
+  # Conserva términos presentes en al menos 5 documentos
+  dfm_trim(
+    min_docfreq = 5,
+    docfreq_type = "count"
+  ) |>
+  # Conserva términos presentes en máximo el 80% de los documentos
+  dfm_trim(
+    max_docfreq = 0.80,
+    docfreq_type = "prop"
+  )
+
+# Muestra el número de documentos y términos
+dim(review_dfm)
+
+# Muestra la matriz documento--término
+review_dfm
+```
+
+## TF--IDF
+
+Las **frecuencias brutas** tienen una limitación, pues términos que aparecen en muchos documentos pueden dominar la representación aunque aporten poca información para distinguirlos.
+
+**TF--IDF** combina dos componentes. El primero es la **frecuencia relativa del término dentro del documento** (*Term Frequency*, TF),
+
+$$
+\operatorname{TF}_{ij}
+=
+\frac{n_{ij}}{\sum_k n_{ik}},
+$$
+
+donde \(n_{ij}\) es el número de apariciones del término \(j\) en el documento \(i\). El segundo es la **frecuencia inversa de documentos** (*Inverse Document Frequency*, IDF),
+
+$$
+\operatorname{IDF}_j
+=
+\log\left(\frac{D}{df_j}\right),
+$$
+
+donde \(D\) es el número total de documentos y \(df_j\) el número de documentos que contienen el término \(j\). 
+
+Así, **IDF asigna menor peso a los términos muy comunes en el corpus** y mayor peso a los más específicos.
+
+Su producto es
+
+$$
+\operatorname{TFIDF}_{ij}
+=
+\operatorname{TF}_{ij} \times \operatorname{IDF}_j.
+$$
+
+Un término recibe un **peso alto** cuando es **frecuente en un documento pero relativamente raro en el corpus**.
+
+```{r representaciones-tfidf}
+# Calcula la matriz TF--IDF
+review_tfidf <- dfm_tfidf(review_dfm, scheme_tf = "prop")
+
+review_tfidf
+```
+
+Podemos examinar qué términos reciben, en promedio, mayor peso dentro de cada tipo de reseña.
+
+```{r representaciones-tfidf-terminos, fig.height=6}
+# Convierte la matriz TF--IDF a una matriz convencional
+tfidf_matrix <- as.matrix(review_tfidf)
+
+# Calcula el peso TF--IDF promedio de cada término por sentimiento
+mean_tfidf <- map_dfr(
+  c("Negativa", "Positiva"),
+  function(group) {
+
+    # Selecciona las reseñas del grupo y promedia cada término
+    tibble(
+      term = colnames(tfidf_matrix),
+      mean_tfidf = colMeans(
+        tfidf_matrix[reviews$sentiment == group, , drop = FALSE]
+      ),
+      sentiment = group
+    )
+  }
+)
+
+# Selecciona los 12 términos con mayor TF--IDF promedio por sentimiento
+top_tfidf <- mean_tfidf |>
+  group_by(sentiment) |>
+  slice_max(
+    mean_tfidf,
+    n = 12,
+    with_ties = FALSE
+  ) |>
+  ungroup()
+
+# Ordena los términos dentro de cada grupo para la visualización
+top_tfidf |>
+  mutate(
+    term = tidytext::reorder_within(
+      term,
+      mean_tfidf,
+      sentiment
+    )
+  ) |>
+
+  # Construye el gráfico de barras
+  ggplot(aes(term, mean_tfidf)) +
+  geom_col() +
+  coord_flip() +
+
+  # Separa las reseñas positivas y negativas
+  facet_wrap(
+    ~ sentiment,
+    scales = "free"
+  ) +
+
+  # Restaura las etiquetas originales de los términos
+  tidytext::scale_x_reordered() +
+
+  # Define títulos y etiquetas
+  labs(
+    x = NULL,
+    y = "TF--IDF promedio",
+    title = "Términos característicos de las reseñas"
+  )
+```
+
+La representación TF--IDF describe principalmente **qué palabras caracterizan cada documento**. 
+
+Sin embargo, **TF--IDF se basa en las palabras observadas** y trata términos diferentes como dimensiones independientes, incluso cuando tienen significados similares.
+
+# SVD y análisis semántico latente
+
+En una matriz TF--IDF, cada **término del vocabulario representa una dimensión**. Por ejemplo, si después del preprocesamiento quedan 2,000 términos, cada documento queda representado por un vector de 2,000 componentes. 
+
+Muchas de estas dimensiones presentan patrones similares o redundantes. 
+
+La **descomposición en valores singulares (SVD)** permite resumir esa información en un número menor de **dimensiones latentes**.
+
+La SVD de una matriz \(\boldsymbol X\) se expresa como
+
+\[
+\boldsymbol X=\boldsymbol U\boldsymbol D\boldsymbol V^\top,
+\]
+
+donde las **columnas** de \(\boldsymbol U\) describen las **dimensiones latentes de los documentos**, las **columnas** de \(\boldsymbol V\) describen las correspondientes **dimensiones latentes de los términos**, y \(\boldsymbol D\) contiene los **valores singulares**, que indican la **importancia de cada dimensión**.
+
+Conservando únicamente las primeras \(k\) dimensiones obtenemos la aproximación
+
+$$
+\boldsymbol X
+\approx
+\boldsymbol U_k
+\boldsymbol D_k
+\boldsymbol V_k^\top.
+$$
+
+Esta es la base del **análisis semántico latente** (*Latent Semantic Analysis*, LSA). Cada documento pasa de estar representado por miles de términos a un vector de solo \(k\) **dimensiones latentes**.
+
+## Interpretación
+
+Las **dimensiones latentes** no representan necesariamente palabras o temas específicos, sino **patrones de coocurrencia entre términos a través de los documentos**. 
+
+Por ello, dos documentos pueden quedar próximos en el espacio LSA incluso si no comparten exactamente las mismas palabras, siempre que utilicen vocabulario asociado con patrones similares.
+
+```{r representaciones-lsa}
+# Convierte la matriz TF--IDF a formato disperso
+tfidf_sparse <- methods::as(
+  review_tfidf,
+  "dgCMatrix"
+)
+
+# Calcula una SVD truncada conservando 20 dimensiones latentes
+lsa_fit <- irlba(
+  tfidf_sparse,
+  nv = 20,
+  nu = 20
+)
+
+# Multiplica cada componente de U por su valor singular correspondiente
+lsa_documents <- sweep(
+  lsa_fit$u,
+  MARGIN = 2,
+  STATS = lsa_fit$d,
+  FUN = "*"
+)
+
+# Muestra el número de documentos y dimensiones latentes
+dim(lsa_documents)
+```
+
+**Cada reseña está ahora representada** mediante **20 dimensiones latentes** en lugar de una dimensión por término.
+
+## Visualización en dos dimensiones
+
+Podemos utilizar las dos primeras dimensiones para visualizar los documentos.
+
+```{r representaciones-lsa-grafico, fig.height=6}
+# Construye el mapa con las dos primeras dimensiones latentes
+lsa_map <- reviews |>
+  transmute(
+    sentiment,
+    dim1 = lsa_documents[, 1],
+    dim2 = lsa_documents[, 2]
+  )
+
+# Visualiza las reseñas en el espacio LSA
+ggplot(
+  lsa_map,
+  aes(
+    dim1,
+    dim2,
+    color = sentiment,
+    shape = sentiment
+  )
+) +
+  # Representa cada reseña como un punto
+  geom_point(
+    alpha = 0.7,
+    size = 2.5
+  ) +
+  # Asigna colores según el sentimiento
+  scale_color_manual(
+    values = c(
+      "Negativa" = "#D55E00",
+      "Positiva" = "#0072B2"
+    )
+  ) +
+  # Define títulos y etiquetas
+  labs(
+    x = "Dimensión latente 1",
+    y = "Dimensión latente 2",
+    color = "Sentimiento",
+    shape = "Sentimiento",
+    title = "Representación LSA de las reseñas"
+  ) +
+  theme_minimal()
+```
+
+Una separación entre reseñas positivas y negativas sugiere que las **dimensiones latentes identificadas por LSA capturan patrones léxicos asociados con la valoración de la película**. 
+
+El signo de cada dimensión es **arbitrario**; por ello, la interpretación debe centrarse en la posición relativa y agrupamiento de los documentos en el espacio latente.
+
+# Similitud coseno
+
+Una representación vectorial permite **cuantificar la semejanza entre textos** mediante medidas basadas en la proximidad entre sus vectores.
+
+Sean \(\boldsymbol x_i\) y \(\boldsymbol x_j\) los vectores asociados con dos documentos. Su **similitud coseno** es
+
+$$
+\operatorname{cos}
+(\boldsymbol x_i,\boldsymbol x_j)
+=
+\frac{
+\boldsymbol x_i^\top\boldsymbol x_j
+}{
+\|\boldsymbol x_i\|
+\|\boldsymbol x_j\|
+}.
+$$
+
+La similitud coseno compara la **orientación** de los vectores, no su magnitud. 
+
+Por ello, documentos de diferente longitud pueden considerarse similares si presentan **patrones relativos de términos semejantes**.
+
+Para vectores TF--IDF no negativos, la similitud coseno toma valores entre **0 y 1**. Valores cercanos a **1** indican **perfiles textuales muy similares**, mientras que valores cercanos a **0** indican **poca semejanza**.
+
+## Similitud entre reseñas
+
+Primero se **normaliza los vectores TF--IDF** y se calcula la **similitud coseno entre todas las parejas de reseñas**. 
+
+Luego se compara si las reseñas con el **mismo sentimiento** presentan, en promedio, mayor similitud que aquellas con sentimientos distintos.
+
+```{r representaciones-coseno}
+# Calcula la norma euclidiana de cada vector TF--IDF
+tfidf_norm <- sqrt(Matrix::rowSums(tfidf_sparse^2))
+
+# Normaliza cada documento para que su vector tenga norma igual a 1
+tfidf_unit <- Matrix::Diagonal(
+  x = 1 / pmax(tfidf_norm, 1e-12)
+) %*% tfidf_sparse
+
+# Calcula la similitud coseno entre todos los pares de documentos
+tfidf_similarity <- as.matrix(tcrossprod(tfidf_unit))
+
+# Selecciona únicamente una vez cada pareja de documentos
+pair_index <- which(
+  upper.tri(tfidf_similarity),
+  arr.ind = TRUE
+)
+
+# Construye una tabla con las similitudes entre pares
+tfidf_pairs <- tibble(
+  # Índices de los documentos comparados
+  i = pair_index[, 1],
+  j = pair_index[, 2],
+
+  # Similitud coseno entre ambos documentos
+  similarity = tfidf_similarity[pair_index],
+
+  # Identifica si las reseñas tienen el mismo sentimiento
+  comparison = if_else(
+    reviews$sentiment[i] == reviews$sentiment[j],
+    "Mismo sentimiento",
+    "Sentimientos distintos"
+  )
+)
+
+# Resume la similitud por tipo de comparación
+tfidf_pairs |>
+  summarise(
+    # Similitud promedio
+    mean_similarity = mean(similarity),
+
+    # Similitud mediana
+    median_similarity = median(similarity),
+
+    .by = comparison
+  )
+```
+
+Las reseñas con el **mismo sentimiento presentan mayor similitud léxica** que aquellas con sentimientos distintos, tanto en promedio (0.060 vs. 0.051) como en la mediana (0.043 vs. 0.035). 
+
+Sin embargo, la diferencia es pequeña, lo que indica que el **sentimiento explica solo una parte de la similitud entre los textos**.
+
+Si el vocabulario está relacionado con la evaluación de las películas, esperamos que dos reseñas con el **mismo sentimiento** sean, en promedio, más similares que dos reseñas con sentimientos diferentes.
+
+```{r representaciones-coseno-grafico, fig.height=5}
+# Compara las distribuciones de similitud
+ggplot(
+  tfidf_pairs,
+  aes(comparison, similarity)
+) +
+  geom_boxplot(
+    outlier.alpha = 0.15
+  ) +
+  labs(
+    x = NULL,
+    y = "Similitud coseno",
+    title = "Similitud léxica entre reseñas"
+  )
+```
+
+La similitud coseno no está asociada exclusivamente con TF--IDF. Puede calcularse sobre **cualquier representación vectorial**, incluyendo LSA y *embeddings*.
+
+# Embeddings contextuales
+
+TF--IDF y LSA representan los textos a partir de **patrones léxicos observados en el corpus**. 
+
+En cambio, los **embeddings contextuales** utilizan **modelos de lenguaje entrenados sobre grandes colecciones de texto** para representar palabras, oraciones o documentos mediante **vectores densos con información semántica**.
+
+Su característica principal es que la representación depende del **contexto**, pues una misma palabra puede tener vectores diferentes según las palabras y expresiones que la acompañan.
+
+## Transformers
+
+Los **transformers** son arquitecturas de **redes neuronales** diseñadas para **representar secuencias** considerando simultáneamente las **relaciones entre sus elementos**. 
+
+Su componente central es el mecanismo de **atención**, que permite que cada palabra determine **qué otras palabras del texto son más relevantes para construir su representación contextual**.
+
+En el mecanismo de *self-attention*, cada token se transforma en tres vectores: 
+
+- **query** (\(\boldsymbol Q\)), que representa la información que el token busca; 
+- **key** (\(\boldsymbol K\)), que describe la información disponible en cada token;
+- **value** (\(\boldsymbol V\)), que contiene la información que finalmente se combina. 
+
+La atención se calcula como
+
+$$
+\operatorname{Attention}
+(\boldsymbol Q,\boldsymbol K,\boldsymbol V)
+=
+\operatorname{softmax}
+\left(
+\frac{\boldsymbol Q\boldsymbol K^\top}{\sqrt{d_k}}
+\right)
+\boldsymbol V,
+$$
+
+donde \(d_k\) es la dimensión de los vectores *key*. El producto \(\boldsymbol Q\boldsymbol K^\top\) mide la **compatibilidad entre los tokens**, `softmax` convierte estos valores en **pesos de atención**, y la multiplicación por \(\boldsymbol V\) genera una combinación ponderada de la información contextual.
+
+Este mecanismo permite que la **representación de cada token incorpore información procedente de otros tokens del texto**.
+
+Para obtener un único vector para una oración o documento, las representaciones de los tokens se combinan mediante una operación de **pooling**. El resultado es un vector denso
+
+\[
+\boldsymbol e_i\in\mathbb R^p
+\]
+
+que intenta conservar información relevante sobre el **significado global del texto**.
+
+## Construcción de embeddings
+
+Utilizamos `sentence-transformers` mediante `reticulate`. La declaración de la dependencia Python se realiza directamente desde R.
+
+```{r representaciones-embeddings-setup, message=FALSE, warning=FALSE}
+# Usa un entorno Python administrado por reticulate
+Sys.setenv(RETICULATE_PYTHON = "managed")
+
+# Declara la dependencia Python
+py_require(packages = "sentence-transformers")
+
+# Importa sentence-transformers
+sentence_transformers <- import("sentence_transformers")
+
+# Carga el modelo
+embedding_model <- sentence_transformers$SentenceTransformer(
+  "sentence-transformers/all-MiniLM-L6-v2"
 )
 ```
 
-```{r, fig.width=6, fig.height=6, fig.align='center'}
-##### Red con un umbral diferente ----
-# Red binaria, no dirigida, ponderada, con un umbral ajustado
-# Este umbral es menor para incluir más relaciones
+Generamos un embedding para cada reseña. 
 
-# Crear la red con un umbral de peso mayor a 0
-g <- text_petro_bi_counts %>%
-  filter(weight > 0) %>%
-  graph_from_data_frame(directed = FALSE)
+Solicitamos directamente vectores normalizados, por lo que su producto interno coincide con la **similitud coseno**.
 
-# Visualización de la red con layout Kamada-Kawai
-set.seed(123)
-plot(
-  g,
-  layout = layout_with_kk,      # Layout Kamada-Kawai para una disposición más atractiva
-  vertex.color = 1,
-  vertex.frame.color = 1,
-  vertex.size = 3,
-  vertex.label = NA,            # No mostrar etiquetas de los vértices
-  main = "Umbral = 1"           # Título con el umbral aplicado
-)
-```
-
-```{r, fig.width=12, fig.height=6, fig.align='center'}
-##### Componente conexa más grande de la red ----
-# Crear la red con un umbral de peso mayor a 0
-g <- text_petro_bi_counts %>%
-  filter(weight > 0) %>%
-  graph_from_data_frame(directed = FALSE)
-
-# Asignar componentes conexas a los vértices usando components()
-V(g)$cluster <- components(graph = g)$membership
-
-# Extraer la componente conexa más grande
-gcc <- induced_subgraph(
-  graph = g, 
-  vids = which(V(g)$cluster == which.max(components(graph = g)$csize))
+```{r representaciones-embeddings}
+# Calcula los embeddings contextuales
+review_embeddings <- embedding_model$encode(
+  reviews$review_clean,
+  batch_size = 16L,
+  show_progress_bar = FALSE,
+  normalize_embeddings = TRUE
 )
 
-# Configuración de gráficos para mostrar dos visualizaciones
-par(mfrow = c(1, 2), mar = c(1, 1, 2, 1), mgp = c(1, 1, 1))
+# Convierte el resultado en una matriz de R
+review_embeddings <- as.matrix(review_embeddings)
 
-# Visualización 1: Componente conexa sin peso ajustado
-set.seed(123)
-plot(
-  gcc, 
-  layout = layout_with_kk, 
-  vertex.color = 1, 
-  vertex.frame.color = 1, 
-  vertex.size = 3, 
-  vertex.label.color = 'black', 
-  vertex.label.cex = 0.9, 
-  vertex.label.dist = 1
+# Muestra sus dimensiones
+dim(review_embeddings)
+```
+
+A diferencia de TF--IDF, la dimensión del embedding no depende del número de palabras presentes en nuestro corpus.
+
+## Visualización del espacio semántico
+
+Los embeddings siguen siendo multidimensionales. Podemos utilizar **PCA** para obtener una visualización bidimensional.
+
+```{r representaciones-embeddings-pca, fig.height=6}
+# Reduce los embeddings a dos dimensiones
+embedding_pca <- prcomp(
+  review_embeddings,
+  center = TRUE,
+  scale. = FALSE
 )
 
-# Visualización 2: Componente conexa con tamaño de vértice por fuerza y ancho de borde por peso
-set.seed(123)
-plot(
-  gcc, 
-  layout = layout_with_kk, 
-  vertex.color = adjustcolor('darkolivegreen4', 0.1), 
-  vertex.frame.color = 'darkolivegreen4', 
-  vertex.size = 2 * strength(gcc), 
-  vertex.label.color = 'black', 
-  vertex.label.cex = 0.9, 
-  vertex.label.dist = 1, 
-  edge.width = 3 * E(g)$weight / max(E(g)$weight)
+# Construye el mapa semántico
+embedding_map <- reviews |>
+  transmute(
+    sentiment,
+    dim1 = embedding_pca$x[, 1],
+    dim2 = embedding_pca$x[, 2]
+  )
+
+# Visualiza las reseñas
+ggplot(
+  embedding_map,
+  aes(
+    dim1,
+    dim2,
+    color = sentiment,
+    shape = sentiment
+  )
+) +
+  # Representa cada reseña como un punto
+  geom_point(
+    alpha = 0.7,
+    size = 2.5
+  ) +
+  # Asigna colores según el sentimiento
+  scale_color_manual(
+    values = c(
+      "Negativa" = "#D55E00",
+      "Positiva" = "#0072B2"
+    )
+  ) +
+  # Define títulos y etiquetas
+  labs(
+    x = "Componente 1",
+    y = "Componente 2",
+    color = "Sentimiento",
+    shape = "Sentimiento",
+    title = "Representación contextual de las reseñas"
+  ) +
+  theme_minimal()
+```
+
+La interpretación cambia respecto de LSA. La proximidad en este espacio busca reflejar principalmente **semejanza semántica**, no simplemente patrones de palabras compartidas.
+
+# Similitud semántica
+
+Como los embeddings fueron normalizados, podemos calcular todas las similitudes coseno mediante un producto matricial.
+
+```{r representaciones-embeddings-similitud}
+# Calcula la similitud coseno entre todas las reseñas
+# Como los embeddings están normalizados, el producto interno equivale al coseno
+embedding_similarity <- tcrossprod(
+  review_embeddings
 )
 
-# Título para la visualización completa
-title(main = "Componente conexa", outer = TRUE, line = -1)
-```
+# Construye una tabla con las mismas parejas usadas en TF--IDF
+embedding_pairs <- tibble(
+  # Índices de las reseñas comparadas
+  i = pair_index[, 1],
+  j = pair_index[, 2],
 
-La red de la componente conexa extraída del discurso de Petro destaca temas clave, como la **crisis ecológica** y la **Amazonía**. Conexiones como **"selva" y "amazonica"** reflejan la centralidad de la **Amazonía** en su discurso sobre el cambio climático, tratándola como un elemento vital para la **salvación** del planeta.
+  # Similitud semántica entre ambas reseñas
+  similarity = embedding_similarity[pair_index],
 
-La red también subraya la relación entre la **"coca" y "planta"**, señalando la problemática de la producción de **cocaína** y sus impactos en la región. Además, **"arrojan" y "venenos"**, junto con **"glifosato"**, reflejan la crítica a las políticas que usan sustancias nocivas en la erradicación de cultivos ilícitos.
-
-Petro critica las políticas actuales, evidenciado en conexiones como **"prefieren" y "sirve"** o **"arrojarle" y "venenos"**, donde destaca la ineficacia y los efectos dañinos de estas decisiones. Además, la red resalta la visión de **"planta" y "selvatica"**, vinculando la naturaleza a un concepto **sagrado** que debe ser protegido de políticas extractivas.
-
-La red muestra que el discurso de Petro se enfoca en la **crisis ambiental**, la **lucha contra las drogas** y la **crítica a las políticas destructivas**, llamando a la acción para preservar los ecosistemas y promover una política más justa y transformadora.
-
-# Petro: Skipgramas
-
-En esta sección, se analiza el uso de **skipgramas** (técnica que identifica relaciones semánticas entre palabras no contiguas), una metodología que captura conexiones entre palabras separadas por términos intermedios. A diferencia de los bigramas, los **skipgramas revelan patrones más complejos** en el discurso. Este enfoque permite entender mejor las **relaciones lingüísticas** y cómo se articulan conceptos clave a lo largo del texto.
-
-```{r}
-##### skipgrama: ejemplo de juguete ----
-# Texto de ejemplo
-text <- c(
-  "Durante 155 años le hemos cumplido a Colombia", 
-  "a los jóvenes de nuestro país", 
-  "al futuro", 
-  "a la educación", 
-  "el conocimiento y a la construcción colectiva de conocimiento en todas las regiones."
+  # Identifica si tienen el mismo sentimiento
+  comparison = if_else(
+    reviews$sentiment[i] == reviews$sentiment[j],
+    "Mismo sentimiento",
+    "Sentimientos distintos"
+  )
 )
 
-# Convertir el texto a un data frame
-text_df <- tibble(line = 1:length(text), text = text)
+# Resume la similitud semántica por tipo de comparación
+embedding_pairs |>
+  summarise(
+    # Similitud promedio
+    mean_similarity = mean(similarity),
 
-# Tokenizar en skipgramaas (relaciones entre palabras no contiguas)
-text_df %>% 
-  unnest_tokens(input = text, output = skipgram, token = "skip_ngrams", n = 2) %>%
-  head(n = 10)  # Mostrar los primeros 10 resultados
+    # Similitud mediana
+    median_similarity = median(similarity),
+
+    .by = comparison
+  )
 ```
 
-```{r}
-##### Importar datos ----
-# Leer el archivo CSV y convertirlo a un vector sin nombres
-suppressWarnings({
-  text_petro <- read_csv("discurso_onu_petro.txt", col_names = FALSE, show_col_types = FALSE) %>%
-    unlist(use.names = FALSE)
-})
+Las reseñas con el **mismo sentimiento presentan mayor similitud semántica** que aquellas con sentimientos distintos, tanto en promedio (**0.336 vs. 0.318**) como en la mediana (**0.337 vs. 0.322**). 
 
-# Eliminar nombres de las columnas en el vector
-names(text_petro) <- NULL  
+La diferencia es moderada, lo que sugiere que el **sentimiento explica parte, pero no toda, de la estructura semántica** de las reseñas.
 
-# Convertir el vector a un tibble con índices de línea
-text_petro <- tibble(line = 1:length(text_petro), text = text_petro)
+Esta comparación pregunta ahora si reseñas con la misma valoración presentan mayor **proximidad semántica**, aunque no necesariamente utilicen las mismas palabras.
+
+# Similitud léxica frente a similitud semántica
+
+Una de las diferencias más importantes entre TF--IDF y los embeddings puede verse comparando ambas medidas para exactamente las mismas parejas de documentos.
+
+```{r representaciones-comparacion, fig.height=6}
+# Une similitud léxica y semántica
+similarity_comparison <- tfidf_pairs |>
+  transmute(
+    i,
+    j,
+    comparison,
+    lexical_similarity = similarity,
+    semantic_similarity = embedding_similarity[
+      cbind(i, j)
+    ]
+  )
+
+# Calcula la asociación entre ambas medidas
+similarity_comparison |>
+  summarise(
+    correlation = cor(
+      lexical_similarity,
+      semantic_similarity
+    )
+  )
 ```
 
-```{r}
-##### Tokenizar en skipgrama ----
-# En este caso, cada token es un unigrama, bigrama regular o bigrama con espaciamiento
-text_petro %>%
-  unnest_tokens(input = text, output = skipgram, token = "skip_ngrams", n = 2) %>%
-  filter(!is.na(skipgram)) -> text_petro_skip  # Filtrar NA y almacenar en text_petro_skip
-
-# Ver dimensiones del resultado
-dim(text_petro_skip)
-
-# Mostrar los primeros 10 resultados
-head(text_petro_skip, n = 10)
+```{r representaciones-comparacion-grafico, fig.height=6}
+# Compara ambas nociones de similitud
+ggplot(
+  similarity_comparison,
+  aes(
+    lexical_similarity,
+    semantic_similarity
+  )
+) +
+  geom_point(
+    alpha = 0.25,
+    size = 1.5
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE
+  ) +
+  labs(
+    x = "Similitud TF--IDF",
+    y = "Similitud mediante embeddings",
+    title = "Similitud léxica y semántica"
+  )
 ```
 
-```{r}
-##### Remover unigramas ----
-suppressMessages(suppressWarnings(library(ngram)))
+Una correlación positiva indica que ambas representaciones capturan parte de la misma estructura. 
 
-# Contar palabras en cada skipgrama
-text_petro_skip$num_words <- text_petro_skip$skipgram %>% 
-  map_int(.f = ~ wordcount(.x))
+Sin embargo, la relación no debería ser perfecta porque responden a preguntas diferentes.
 
-# Ver los primeros 10 resultados
-head(text_petro_skip, n = 10)
+## Textos semánticamente similares con vocabulario diferente
 
-# Filtrar y remover unigramas (solo mantener bigramas)
-text_petro_skip %<>% 
-  filter(num_words == 2) %>%  # Mantener solo bigramas
-  select(-num_words)          # Eliminar la columna de conteo de palabras
+El caso más interesante aparece cuando dos reseñas tienen **baja similitud TF--IDF pero alta similitud mediante embeddings**.
 
-# Ver las dimensiones y los primeros 10 resultados después del filtrado
-dim(text_petro_skip)
-head(text_petro_skip, n = 10)
-```
-
-```{r}
-##### Omitir stop words ----
-text_petro_skip %>%
-  # Separar los bigramas en dos columnas (word1 y word2)
-  separate(skipgram, c("word1", "word2"), sep = " ") %>%
-  
-  # Filtrar palabras con números
-  filter(!grepl(pattern = '[0-9]', x = word1)) %>%
-  filter(!grepl(pattern = '[0-9]', x = word2)) %>%
-  
-  # Filtrar stop words (eliminando palabras comunes en español)
-  filter(!word1 %in% stop_words_es$word) %>%
-  filter(!word2 %in% stop_words_es$word) %>%
-  
-  # Remover acentos de las palabras
-  mutate(word1 = chartr(
-    old = names(replacement_list) %>% str_c(collapse = ''), 
-    new = replacement_list %>% str_c(collapse = ''),
-    x = word1
-  )) %>%
-  
-  mutate(word2 = chartr(
-    old = names(replacement_list) %>% str_c(collapse = ''), 
-    new = replacement_list %>% str_c(collapse = ''),
-    x = word2
-  )) %>%
-  
-  # Eliminar valores NA en word1 y word2
-  filter(!is.na(word1)) %>% 
-  filter(!is.na(word2)) %>%
-  
-  # Contar frecuencia de cada par de palabras (bigrama)
-  count(word1, word2, sort = TRUE) %>%
-  
-  # Renombrar la columna de conteo a "weight"
-  rename(weight = n) -> text_petro_skip_counts
-
-# Ver dimensiones y primeros 10 resultados
-dim(text_petro_skip_counts)
-head(text_petro_skip_counts, n = 10)
-```
-
-```{r, fig.width=12, fig.height=6, fig.align='center'}
-##### Definir una red a partir de la frecuencia (weight) de los bigramas ----
-# Filtrar bigramas con peso mayor a 0 y crear un grafo no dirigido
-g <- text_petro_skip_counts %>%
-  filter(weight > 0) %>%
-  graph_from_data_frame(directed = FALSE)
-
-# Simplificar el grafo (eliminar bucles y aristas redundantes)
-g <- igraph::simplify(g)  # Importante para limpiar el grafo
-
-# Crear una componente conexa (subgrafo más grande)
-V(g)$cluster <- clusters(graph = g)$membership
-gcc <- induced_subgraph(graph = g, vids = which(V(g)$cluster == which.max(clusters(graph = g)$csize)))
-
-# Configurar la visualización en dos paneles
-par(mfrow = c(1, 2), mar = c(1, 1, 2, 1), mgp = c(1, 1, 1))
-
-# Viz 1: Grafo básico
-set.seed(123)
-plot(gcc, layout = layout_with_fr, 
-     vertex.color = 1, 
-     vertex.frame.color = 1, 
-     vertex.size = 3, 
-     vertex.label = NA)
-
-# Viz 2: Grafo con tamaño de vértices ajustado por fuerza
-set.seed(123)
-plot(gcc, layout = layout_with_fr, 
-     vertex.color = adjustcolor('darkolivegreen4', 0.1), 
-     vertex.frame.color = 'darkolivegreen4', 
-     vertex.size = 2 * strength(gcc), 
-     vertex.label = NA)
-
-# Añadir título
-title(main = "Componente conexa", outer = TRUE, line = -1)
-```
-
-Los resultados de los **skipgramas** muestran pares de palabras (bigrama) que aparecen frecuentemente juntas en el discurso de Petro, con un énfasis particular en temas como el **desastre climático**, la **selva amazónica**, y las **crisis ambientales**. Las palabras con alta frecuencia de co-ocurrencia, como **"desastre climático"**, **"selva amazónica"** y **"justicia social"**, reflejan los temas centrales del discurso, enfocados en la **urgencia ambiental**, la **justicia social**, y las **acciones necesarias para salvar el planeta**.
-
-Además, hay una notable presencia de **palabras relacionadas con el conflicto** (e.g., **"guerra"**, **"venenos"**, **"coca"**), lo que subraya la crítica a las políticas previas, especialmente aquellas vinculadas al narcotráfico y sus impactos negativos. Otros pares de palabras, como **"salvar selva"** o **"planta amazonica"**, refuerzan la importancia de proteger el medio ambiente.
-
-Los resultados revelan un discurso que articula de manera continua los **problemas ambientales**, **conflictos sociales** y la **crisis global**, con un fuerte llamado a la acción para abordar estos desafíos.
-
-# Comparación
-
-En este análisis, se comparan los discursos pronunciados por los **presidentes Gustavo Petro** e **Iván Duque** en la Asamblea General de la ONU. Utilizando la técnica de **skipgramas**, se exploran las relaciones semánticas entre las palabras en los discursos, lo que permite identificar patrones de co-ocurrencia más complejos. Para representar estos patrones, se construyó una **red** basada en los skipgramas, utilizando un umbral de frecuencia de 1 para obtener la **componente conexa** del grafo, lo que nos proporciona una visión detallada de las conexiones lingüísticas y temáticas en ambos discursos.
-
-### Redes
-
-```{r, echo = F}
-##### Importar datos ----
-# Leer el archivo CSV, convertir a un vector sin nombres y convertir a tibble
-text_petro <- suppressWarnings(unlist(c(read_csv("discurso_onu_petro.txt", col_names = FALSE, show_col_types = FALSE))))
-names(text_petro) <- NULL  # Eliminar nombres en el vector
-text_petro <- tibble(line = 1:length(text_petro), text = text_petro)
-
-##### Tokenizar en skipgrama ----
-# Tokenizar en skipgrama (relaciones semánticas no contiguas)
-text_petro %>%
-  unnest_tokens(tbl = ., input = text, output = skipgram, token = "skip_ngrams", n = 2) %>%
-  filter(!is.na(skipgram)) -> text_petro_skip
-
-##### Remover unigramas ----
-# Contar palabras en cada skipgrama
-text_petro_skip$num_words <- text_petro_skip$skipgram %>% 
-  map_int(.f = ~ wordcount(.x))
-
-# Filtrar solo bigramas (remover unigramas)
-text_petro_skip %<>% 
-  filter(num_words == 2) %>%  # Mantener solo bigramas
-  select(-num_words)          # Eliminar la columna de conteo de palabras
-
-##### Omitir stop words ----
-# Filtrar stop words, remover números y normalizar palabras
-text_petro_skip %>%
-  separate(skipgram, c("word1", "word2"), sep = " ") %>%
-  filter(!grepl(pattern = '[0-9]', x = word1)) %>%  # Remover números
-  filter(!grepl(pattern = '[0-9]', x = word2)) %>%  # Remover números
-  filter(!word1 %in% stop_words_es$word) %>%        # Eliminar stop words en word1
-  filter(!word2 %in% stop_words_es$word) %>%        # Eliminar stop words en word2
-  mutate(word1 = chartr(old = names(replacement_list) %>% str_c(collapse = ''), 
-                       new = replacement_list %>% str_c(collapse = ''),
-                       x = word1)) %>%   # Normalizar acentos en word1
-  mutate(word2 = chartr(old = names(replacement_list) %>% str_c(collapse = ''), 
-                       new = replacement_list %>% str_c(collapse = ''),
-                       x = word2)) %>%   # Normalizar acentos en word2
-  filter(!is.na(word1)) %>%  # Eliminar NA en word1
-  filter(!is.na(word2)) %>%  # Eliminar NA en word2
-  count(word1, word2, sort = TRUE) %>%
-  rename(weight = n) -> text_petro_skip_counts
-
-##### Definir una red a partir de la frecuencia (weight) de los bigramas ----
-# Crear la red a partir de los bigramas con peso mayor a 0
-g <- text_petro_skip_counts %>%
-  filter(weight > 0) %>%
-  graph_from_data_frame(directed = FALSE)
-
-# Simplificar el grafo (eliminar bucles y aristas redundantes)
-g <- igraph::simplify(g)
-
-# Grafo inducido por la componente conexa (subgrafo más grande)
-V(g)$cluster <- clusters(graph = g)$membership
-gcc_petro <- induced_subgraph(graph = g, vids = which(V(g)$cluster == which.max(clusters(graph = g)$csize)))
-```
-
-```{r, echo = F}
-##### Importar datos ----
-# Leer el archivo CSV, convertir a un vector sin nombres y convertir a tibble
-text_duque <- suppressWarnings(unlist(c(read_csv("discurso_onu_duque.txt", col_names = FALSE, show_col_types = FALSE))))
-names(text_duque) <- NULL  # Eliminar nombres en el vector
-text_duque <- tibble(line = 1:length(text_duque), text = text_duque)
-
-##### Tokenizar en skipgrama ----
-# Tokenizar en skipgrama (relaciones semánticas no contiguas)
-text_duque %>%
-  unnest_tokens(tbl = ., input = text, output = skipgram, token = "skip_ngrams", n = 2) %>%
-  filter(!is.na(skipgram)) -> text_duque_skip
-
-##### Remover unigramas ----
-# Contar palabras en cada skipgrama
-text_duque_skip$num_words <- text_duque_skip$skipgram %>% 
-  map_int(.f = ~ wordcount(.x))
-
-# Filtrar solo bigramas (remover unigramas)
-text_duque_skip %<>% 
-  filter(num_words == 2) %>%  # Mantener solo bigramas
-  select(-num_words)          # Eliminar la columna de conteo de palabras
-
-##### Omitir stop words ----
-# Filtrar stop words, remover números y normalizar palabras
-text_duque_skip %>%
-  separate(skipgram, c("word1", "word2"), sep = " ") %>%
-  filter(!grepl(pattern = '[0-9]', x = word1)) %>%  # Remover números
-  filter(!grepl(pattern = '[0-9]', x = word2)) %>%  # Remover números
-  filter(!word1 %in% stop_words_es$word) %>%        # Eliminar stop words en word1
-  filter(!word2 %in% stop_words_es$word) %>%        # Eliminar stop words en word2
-  mutate(word1 = chartr(old = names(replacement_list) %>% str_c(collapse = ''), 
-                       new = replacement_list %>% str_c(collapse = ''),
-                       x = word1)) %>%   # Normalizar acentos en word1
-  mutate(word2 = chartr(old = names(replacement_list) %>% str_c(collapse = ''), 
-                       new = replacement_list %>% str_c(collapse = ''),
-                       x = word2)) %>%   # Normalizar acentos en word2
-  filter(!is.na(word1)) %>%  # Eliminar NA en word1
-  filter(!is.na(word2)) %>%  # Eliminar NA en word2
-  count(word1, word2, sort = TRUE) %>%
-  rename(weight = n) -> text_duque_skip_counts
-
-##### Definir una red a partir de la frecuencia (weight) de los bigramas ----
-# Crear la red a partir de los bigramas con peso mayor a 0
-g <- text_duque_skip_counts %>%
-  filter(weight > 0) %>%
-  graph_from_data_frame(directed = FALSE)
-
-# Simplificar el grafo (eliminar bucles y aristas redundantes)
-g <- igraph::simplify(g)
-
-# Grafo inducido por la componente conexa (subgrafo más grande)
-V(g)$cluster <- clusters(graph = g)$membership
-gcc_duque <- induced_subgraph(graph = g, vids = which(V(g)$cluster == which.max(clusters(graph = g)$csize)))
-```
-
-```{r, fig.width=12, fig.height=6, fig.align='center', echo = F}
-# Configuración de la visualización: 2 gráficos en fila
-par(mfrow = c(1, 2), mar = c(1, 1, 2, 1), mgp = c(1, 1, 1))
-
-# Visualización 1: Petro
-set.seed(123)
-plot(
-  gcc_petro, 
-  layout = layout_with_kk, 
-  vertex.color = adjustcolor('darkolivegreen4', 0.1), 
-  vertex.frame.color = 'darkolivegreen4', 
-  vertex.size = 1.6 * strength(gcc_petro), 
-  vertex.label = NA, 
-  main = "Petro"
+```{r representaciones-pares-semanticos}
+# Define el umbral de baja similitud léxica
+# Se toma el 25% inferior de las similitudes TF--IDF
+lexical_cutoff <- quantile(
+  similarity_comparison$lexical_similarity,
+  0.25
 )
 
-# Visualización 2: Duque
-set.seed(123)
-plot(
-  gcc_duque, 
-  layout = layout_with_kk, 
-  vertex.color = adjustcolor('blue4', 0.1), 
-  vertex.frame.color = 'blue4', 
-  vertex.size = 1.6 * strength(gcc_duque), 
-  vertex.label = NA, 
-  main = "Duque"
+# Define el umbral de alta similitud semántica
+# Se toma el 10% superior de las similitudes entre embeddings
+semantic_cutoff <- quantile(
+  similarity_comparison$semantic_similarity,
+  0.90
 )
+
+# Busca pares léxicamente distintos pero semánticamente próximos
+semantic_pairs <- similarity_comparison |>
+
+  # Conserva pares con baja similitud léxica y alta similitud semántica
+  filter(
+    lexical_similarity <= lexical_cutoff,
+    semantic_similarity >= semantic_cutoff
+  ) |>
+
+  # Ordena los pares desde la mayor similitud semántica
+  arrange(
+    desc(semantic_similarity)
+  ) |>
+
+  # Selecciona los seis pares más representativos
+  slice_head(n = 6) |>
+
+  # Construye una tabla con los textos y sus similitudes
+  transmute(
+    # Sentimiento de cada reseña
+    sentiment_1 = reviews$sentiment[i],
+    sentiment_2 = reviews$sentiment[j],
+
+    # Muestra una versión abreviada de cada reseña
+    review_1 = str_trunc(
+      reviews$review_clean[i],
+      180
+    ),
+    review_2 = str_trunc(
+      reviews$review_clean[j],
+      180
+    ),
+
+    # Similitud basada en TF--IDF
+    lexical_similarity,
+
+    # Similitud basada en embeddings
+    semantic_similarity
+  )
+
+# Muestra los pares seleccionados
+semantic_pairs
 ```
 
-Los resultados de los **skipgramas** para los discursos de Petro y Duque muestran diferentes enfoques en sus discursos. En el caso de Petro, las palabras más frecuentes tienden a resaltar temas como **crisis climática**, **desastres ambientales**, y la necesidad de **salvación** de la naturaleza y la humanidad. Por ejemplo, las combinaciones "desastre climático", "selva amazónica", y "salvar selva" reflejan una fuerte preocupación por los efectos negativos del cambio climático y la deforestación. También se destacan términos relacionados con la lucha contra la **adición** y los problemas sociales, como "adicción dinero" y "crisis climática", lo que sugiere una crítica hacia las causas estructurales de los problemas ambientales y sociales.
+Estos ejemplos permiten observar directamente la diferencia conceptual: **TF--IDF necesita palabras compartidas**, mientras que los embeddings pueden reconocer expresiones semánticamente relacionadas construidas con vocabulario distinto.
 
-En contraste, el discurso de **Duque** está más enfocado en **acciones políticas**, **reformas sociales** y **fuerzas de seguridad**. Los **skipgramas** más comunes incluyen combinaciones como "acción climática", "fuerza pública", "paz legalidad", lo que refleja un enfoque más institucional y orientado a la gobernanza, con un énfasis en la seguridad y el desarrollo económico. También se observa un énfasis en la **agenda social** y en el **desarrollo sostenible**, con términos como "derechos humanos" y "desarrollo sostenible", lo que indica un discurso centrado en la cooperación internacional y las políticas de bienestar.
+# Centro semántico de cada grupo
 
-Los resultados muestran una diferencia clave en la orientación de ambos discursos. Petro utiliza un lenguaje que se centra en los problemas globales y ambientales, con una crítica directa a las consecuencias de las políticas actuales, mientras que Duque presenta un enfoque más institucional, centrado en reformas y desarrollo dentro de un marco de gobernanza. Ambas visiones, aunque diferentes, resaltan la importancia de temas como la **paz** y la **sostenibilidad**, pero desde perspectivas y enfoques estratégicos muy distintos.
+Los embeddings también permiten resumir un conjunto de documentos mediante su **centroide semántico**. 
 
-```{r, echo = F}
-# Calcular las métricas para Petro y Duque
-metrics_petro <- c(
-  mean_distance(gcc_petro), 
-  mean(degree(gcc_petro)), 
-  sd(degree(gcc_petro)), 
-  clique.number(gcc_petro), 
-  edge_density(gcc_petro), 
-  transitivity(gcc_petro), 
-  assortativity_degree(gcc_petro)
+Para un grupo con \(n\) textos,
+
+\[
+\boldsymbol c
+=
+\frac{1}{n}
+\sum_{i=1}^{n}
+\boldsymbol e_i.
+\]
+
+Normalizando posteriormente \(\boldsymbol c\), podemos medir la similitud de cada documento con el centro de su grupo.
+
+```{r representaciones-centroides}
+# Identifica los grupos
+positive_id <- reviews$sentiment == "Positiva"
+negative_id <- reviews$sentiment == "Negativa"
+
+# Función para normalizar un vector
+normalize_vector <- function(x) {
+  x / sqrt(sum(x^2))
+}
+
+# Calcula los centroides semánticos
+centroid_positive <- normalize_vector(
+  colMeans(
+    review_embeddings[positive_id, , drop = FALSE]
+  )
 )
 
-metrics_duque <- c(
-  mean_distance(gcc_duque), 
-  mean(degree(gcc_duque)), 
-  sd(degree(gcc_duque)), 
-  clique.number(gcc_duque), 
-  edge_density(gcc_duque), 
-  transitivity(gcc_duque), 
-  assortativity_degree(gcc_duque)
+centroid_negative <- normalize_vector(
+  colMeans(
+    review_embeddings[negative_id, , drop = FALSE]
+  )
 )
 
-# Crear el dataframe con las métricas calculadas
-tab <- data.frame(
-  "Petro" = round(metrics_petro, 4),
-  "Duque" = round(metrics_duque, 4)
-)
+# Compara ambos centroides
+centroid_similarity <- sum(centroid_positive * centroid_negative)
 
-# Asignar nombres a las filas y columnas
-rownames(tab) <- c("Dist. media", "Grado media", "Grado desviación", "Número clan", "Densidad", "Transitividad", "Asortatividad")
-colnames(tab) <- c("Petro", "Duque")
-
-# Mostrar la tabla
-tab
+tibble(centroid_similarity = centroid_similarity)
 ```
 
-Los resultados de las métricas para las redes de skipgramas de los discursos de Petro y Duque muestran varias diferencias clave:
+La similitud entre los **centroides semánticos** de las reseñas positivas y negativas es muy alta (\(0.929\)). Esto indica que, en términos de contenido general, ambos grupos comparten una **estructura semántica muy similar**.
 
-1. **Distancia media**: La distancia media de las redes de ambos presidentes es similar, con Petro (7.77) y Duque (7.60). Esto indica que, en promedio, los nodos (palabras) en ambas redes están igualmente distantes entre sí.
+En otras palabras, las reseñas positivas y negativas suelen hablar de aspectos parecidos de las películas; la principal diferencia está más en **cómo los valoran** que en **qué temas mencionan**.
 
-2. **Grado medio**: El grado medio es ligeramente más alto en la red de Duque (2.45) en comparación con la de Petro (2.41), lo que sugiere que, en promedio, las palabras en el discurso de Duque están más conectadas (es decir, tienen más co-ocurrencias) que las de Petro.
+Una similitud alta entre centroides indica que ambos conjuntos comparten buena parte de su contenido semántico general. Una similitud menor indica que las reseñas positivas y negativas ocupan regiones más diferenciadas del espacio.
 
-3. **Desviación estándar del grado**: La desviación estándar del grado en la red de Duque (2.07) es mayor que en la de Petro (1.88), lo que indica que la red de Duque tiene una mayor variabilidad en la cantidad de conexiones entre las palabras, mientras que en la red de Petro las conexiones son más homogéneas.
+## Reseñas más representativas
 
-4. **Número de clanes**: Ambos discursos presentan 3 clanes, lo que significa que las redes de Petro y Duque se dividen de manera similar en 3 grupos de palabras más conectadas entre sí.
+Podemos identificar los textos más próximos al centro semántico de cada grupo.
 
-5. **Densidad**: La densidad de la red de Petro (0.0071) es ligeramente mayor que la de Duque (0.0059), lo que sugiere que la red de Petro tiene más conexiones en relación con el número total de posibles conexiones, aunque ambas redes tienen una densidad baja, lo que indica redes con pocas conexiones entre todas las palabras posibles.
-
-6. **Transitividad**: La transitividad en la red de Duque (0.1107) es mayor que en la de Petro (0.0863), lo que implica que en la red de Duque es más probable que las palabras conectadas a una misma palabra también estén conectadas entre sí, indicando una estructura algo más cohesiva.
-
-7. **Asortatividad**: Ambas redes muestran valores negativos en la asortatividad (-0.0474 para Petro y -0.0693 para Duque), lo que indica que las palabras con un alto número de conexiones tienden a conectarse con palabras con un bajo número de conexiones, aunque la red de Duque muestra una asortatividad más negativa, lo que sugiere una desconexión más marcada entre palabras altamente conectadas y menos conectadas.
-
-Las redes de ambos presidentes muestran estructuras de co-ocurrencias similares en cuanto a la división en clanes y la distancia media entre palabras, pero la red de Duque tiene una mayor variabilidad en las conexiones, una mayor transitividad y una asortatividad más negativa.
-
-### Top 10 de las palabras más importantes
-
-Las **palabras más importantes** en una red de texto se pueden identificar mediante la **centralidad de eigenvector**, un indicador clave en la teoría de grafos que mide la influencia de un nodo dentro de una red. En el contexto de un análisis de texto, cada **palabra** se trata como un **nodo** en una red, y las conexiones entre ellas (en este caso, los **skipgramas**) son representadas como **enlaces**. La **centralidad de eigenvector** evalúa no solo la cantidad de **conexiones directas** que tiene una palabra, sino también la importancia de las **palabras** a las que está conectada. De este modo, las **palabras más importantes** son aquellas que están conectadas a otras **palabras** igualmente influyentes dentro de la red, lo que les otorga una **centralidad alta**. Este enfoque permite identificar **términos clave** que tienen un impacto significativo en el **discurso** o **contexto analizado**.
-
-**Petro**
-
-```{r, echo = F}
-# Calcular la centralidad de eigen para la red de Petro (sin el argumento 'scale')
-centralidad_petro <- tibble(
-  word = V(gcc_petro)$name,
-  eigen = eigen_centrality(gcc_petro)$vector
+```{r representaciones-representativas}
+# Calcula proximidad a cada centroide
+similarity_positive <- as.vector(
+  review_embeddings %*%
+    centroid_positive
 )
 
-# Obtener las 10 palabras con mayor centralidad de eigen
-centralidad_petro %>%
-  arrange(desc(eigen)) %>%
-  slice_head(n = 10)
+similarity_negative <- as.vector(
+  review_embeddings %*%
+    centroid_negative
+)
+
+# Asigna la similitud con el centroide propio
+representative_reviews <- reviews |>
+  mutate(
+    centroid_similarity = if_else(
+      sentiment == "Positiva",
+      similarity_positive,
+      similarity_negative
+    )
+  ) |>
+  group_by(sentiment) |>
+  slice_max(
+    centroid_similarity,
+    n = 5,
+    with_ties = FALSE
+  ) |>
+  ungroup() |>
+  transmute(
+    sentiment,
+    centroid_similarity,
+    review = str_trunc(
+      review_clean,
+      200
+    )
+  )
+
+representative_reviews
 ```
 
-**Duque**
+Estas reseñas pueden interpretarse como **prototipos observados**: textos particularmente próximos al contenido semántico promedio de cada grupo.
 
-```{r, echo = F}
-# Calcular la centralidad de eigen para la red de Duque (sin el argumento 'scale')
-centralidad_duque <- tibble(
-  word = V(gcc_duque)$name,
-  eigen = eigen_centrality(gcc_duque)$vector
+# Comparación de las tres representaciones
+
+Finalmente, podemos aplicar la misma medida de similitud a **TF--IDF**, **LSA** y **embeddings**. Esto permite distinguir el efecto de cambiar la medida del efecto de cambiar la representación.
+
+```{r representaciones-comparacion-final}
+# Función para normalizar las filas de una matriz
+normalize_rows <- function(x) {
+  x / sqrt(rowSums(x^2))
+}
+
+# Normaliza la representación LSA
+lsa_unit <- normalize_rows(lsa_documents)
+
+# Calcula similitudes LSA
+lsa_similarity <- tcrossprod(lsa_unit)
+
+# Construye una tabla conjunta
+all_similarities <- bind_rows(
+  tibble(
+    representation = "TF-IDF",
+    similarity = tfidf_similarity[pair_index],
+    comparison = tfidf_pairs$comparison
+  ),
+  tibble(
+    representation = "LSA",
+    similarity = lsa_similarity[pair_index],
+    comparison = tfidf_pairs$comparison
+  ),
+  tibble(
+    representation = "Embeddings",
+    similarity = embedding_similarity[pair_index],
+    comparison = tfidf_pairs$comparison
+  )
 )
 
-# Obtener las 10 palabras con mayor centralidad de eigen
-centralidad_duque %>%
-  arrange(desc(eigen)) %>%
-  slice_head(n = 10)
+# Resume las tres representaciones
+all_similarities |>
+  summarise(
+    mean_similarity = mean(similarity),
+    median_similarity = median(similarity),
+    .by = c(
+      representation,
+      comparison
+    )
+  )
 ```
 
-Los resultados de la **centralidad de eigenvector** para los discursos de Petro y Duque muestran las palabras más influyentes dentro de sus respectivas redes de skipgramas.
-
-Para **Petro**, las palabras con mayor centralidad son **"selva"**, **"amazonica"** y **"salvar"**, lo que indica que estos términos tienen un alto impacto dentro del discurso, siendo centrales en la red. Estas palabras están fuertemente conectadas con otras palabras influyentes como **"planta"** y **"humanidad"**, reflejando la importancia de la **naturaleza** y la **salvación** en el contexto del mensaje.
-
-En el caso de **Duque**, las palabras clave con mayor centralidad son **"accion"**, **"colombia"** y **"climatica"**, lo que señala que el discurso gira alrededor de **la acción** política, el **país** y el **cambio climático**. Estas palabras clave están relacionadas con temas de **compromiso** y **crisis**, lo que resalta los enfoques de **reforma** y **desafíos globales** dentro del mensaje.
-
-Petro se enfoca más en temas **ambientales** y de **salvación**, mientras que Duque enfatiza la **acción política** y los **desafíos sociales y climáticos**.
-
-### Agrupamiento
-
-A continuación se presenta el análisis de **agrupamiento** aplicado a los discursos de los presidentes **Petro** y **Duque**, con el objetivo de identificar los principales **temas** que emergen de sus intervenciones. Utilizando técnicas de análisis de **redes** y la asignación de **palabras** a **clusters**, se agrupan los términos más relevantes de cada discurso según su co-ocurrencia en los **skipgramas**. Este enfoque permite observar de manera clara cómo se estructuran los **discursos** de ambos presidentes y cuáles son los **conceptos clave** en los que centran su atención. A través del **clustering**, se puede explorar la distribución de las **palabras** en torno a diferentes **temas**, proporcionando una visión más profunda de las **prioridades discursivas** de cada mandatario y su estrategia comunicativa en contextos nacionales e internacionales.
-
-```{r, fig.width=12, fig.height=6, fig.align='center', echo = F}
-# Cargar librerías
-suppressMessages(suppressWarnings(library(RColorBrewer)))
-
-# Definir paleta de colores
-cols <- c(
-  brewer.pal(9, "Set1")[1:9],
-  brewer.pal(8, "Set2")[1:7],
-  brewer.pal(8, "Set2")[1:7],
-  brewer.pal(12, "Set3")[1:3]
-)
-
-# Configuración de la disposición gráfica
-par(mfrow = c(1, 2), mar = c(1, 1, 2, 1), mgp = c(1, 1, 1))
-
-# Visualización 1: Petro
-kc_petro <- cluster_fast_greedy(gcc_petro)
-
-set.seed(123)
-plot(
-  gcc_petro, 
-  layout = layout_with_kk, 
-  vertex.color = adjustcolor(cols[kc_petro$membership], 0.1), 
-  vertex.frame.color = cols[kc_petro$membership], 
-  vertex.size = 1.6 * strength(gcc_petro), 
-  vertex.label = NA, 
-  main = "Petro"
-)
-
-# Visualización 2: Duque
-kc_duque <- cluster_fast_greedy(gcc_duque)
-
-set.seed(123)
-plot(
-  gcc_duque, 
-  layout = layout_with_kk, 
-  vertex.color = adjustcolor(cols[kc_duque$membership], 0.1), 
-  vertex.frame.color = cols[kc_duque$membership], 
-  vertex.size = 1.6 * strength(gcc_duque), 
-  vertex.label = NA, 
-  main = "Duque"
-)
+```{r representaciones-comparacion-final-grafico, fig.height=6}
+# Compara las distribuciones de similitud
+ggplot(
+  all_similarities,
+  aes(comparison, similarity)
+) +
+  geom_boxplot(
+    outlier.alpha = 0.1
+  ) +
+  facet_wrap(
+    ~ representation,
+    scales = "free_y"
+  ) +
+  labs(
+    x = NULL,
+    y = "Similitud coseno",
+    title = "Comparación de representaciones textuales"
+  )
 ```
 
-En el análisis de los resultados del clustering de palabras en los discursos de los presidentes Petro y Duque, se observa una clara distinción en los temas centrales que abordan en sus intervenciones. Para **Petro**, los términos más relevantes se agrupan principalmente en torno a temas de **protección ambiental** y **justicia social**. Las palabras como **selva**, **amazonica**, **salvar**, **vida** y **humanidad** están agrupadas en el **cluster 1**, lo que indica que Petro focaliza su discurso en la defensa del medio ambiente y la protección de la humanidad frente a las crisis ecológicas. Este grupo temático refleja su enfoque en la **sostenibilidad** y en la **urgencia de salvar la naturaleza**. Por otro lado, palabras como **acumulacion**, **planta** y **actuar** pertenecen al **cluster 18**, sugiriendo que Petro también aborda la **economía** y los **procesos sociales**, aunque estos temas no son tan prominentes como los ecológicos. Además, términos como **destruir** y **mundo** están distribuidos en **clusters** más dispersos, lo que podría reflejar la amplitud de los temas sobre los cuales trata de generar conciencia, abarcando tanto cuestiones globales como locales.
+Esta comparación resume las diferencias entre los métodos:
 
-En el caso de **Duque**, el clustering de palabras muestra una organización centrada en **temas de acción política**, **paz** y **desarrollo económico**. Palabras como **accion**, **cambio**, **crisis** y **colombia** están agrupadas en el **cluster 7**, destacando su énfasis en la **gestión de crisis** y la **acción política** para transformar la realidad del país. Este cluster refleja el foco de Duque en la **gestión de la pandemia** y otros desafíos sociales. Un segundo conjunto de palabras como **desarrollo**, **paz**, **objetivos** y **construccion** se encuentra en el **cluster 15**, lo que indica que el presidente también pone un fuerte énfasis en temas de **desarrollo social** y **paz**. Por otro lado, palabras como **derechos**, **economico**, **fondo** y **comunidad** pertenecen al **cluster 12**, reflejando su enfoque en la **economía** y las **políticas públicas** orientadas a mejorar la situación social y económica del país. Finalmente, algunas palabras como **migrantes**, **pandemia** y **emociones** están agrupadas en **clusters** que evidencian su interés en los **desafíos sociales** y **humanitarios** que atraviesa la nación.
+- **TF--IDF** representa directamente el vocabulario observado; 
+- **LSA** comprime esos patrones léxicos en dimensiones latentes; 
+- **embeddings contextuales** incorporan información semántica aprendida previamente. 
 
-En resumen, los discursos de Petro y Duque reflejan diferentes prioridades y enfoques temáticos. **Petro** se centra en la **protección del medio ambiente** y **temas humanitarios**, mientras que **Duque** pone énfasis en la **acción política**, **desarrollo económico** y la **gestión de crisis**. Los **clusters** identificados permiten una comprensión más clara de cómo ambos presidentes estructuran sus mensajes y abordan los principales problemas nacionales.
+La **similitud coseno** es la herramienta común que permite comparar documentos dentro de cualquiera de estos espacios.
+
+El punto fundamental es que la noción de **similitud textual depende de la representación elegida**. Dos documentos pueden ser distintos en vocabulario y, al mismo tiempo, muy próximos en significado. 
+
+Por ello, TF--IDF, LSA y embeddings no deben entenderse como métodos competidores, sino como representaciones que describen **niveles diferentes de la estructura del texto**.
+
+
+# Temas para profundizar
+
+Además de las herramientas estudiadas, existen otras áreas importantes del **análisis computacional de texto**:
+
+1. **Modelos de tópicos:** métodos como **LDA**, **STM** y **BERTopic** permiten identificar estructuras temáticas latentes y estudiar cómo se distribuyen entre documentos.
+
+2. **Clustering de documentos:** agrupa textos con contenido léxico o semántico similar sin utilizar categorías definidas previamente.
+
+3. **Clasificación y regresión de textos:** utilizan el texto como información explicativa para **predecir categorías o variables**, mediante modelos estadísticos o de aprendizaje automático.
+
+4. **Reconocimiento de entidades (NER):** identifica automáticamente **personas, organizaciones, lugares, fechas** y otras entidades mencionadas en los textos.
+
+5. **Análisis sintáctico y dependencias:** estudia las **relaciones gramaticales** entre palabras, permitiendo identificar sujetos, objetos, modificadores y estructuras de negación.
+
+6. **Análisis temporal de texto:** estudia cómo cambian el **vocabulario, los tópicos, el sentimiento y las representaciones semánticas** a lo largo del tiempo.
+
+7. **Estilometría y autoría:** analiza patrones lingüísticos para caracterizar **estilos de escritura**, comparar autores o estudiar cambios estilísticos.
+
+8. **Modelos generativos y LLM:** permiten realizar tareas como **clasificación, extracción de información, resumen y respuesta a preguntas**, aunque requieren especial atención a validación, reproducibilidad y sesgos.
+
+
+
+
 
 # Referencias
 
-https://juanitorduz.github.io/text-mining-networks-and-visualization-plebiscito-tweets/
+- Benoit, K., Watanabe, K., Wang, H., Nulty, P., Obeng, A., Müller, S. y Matsuo, A. (2018). **quanteda: An R package for the quantitative analysis of textual data**. *Journal of Open Source Software*.
+- Silge, J. y Robinson, D. (2017). **Text Mining with R: A Tidy Approach**. O'Reilly Media.
+- Deerwester, S., Dumais, S. T., Furnas, G. W., Landauer, T. K. y Harshman, R. (1990). **Indexing by latent semantic analysis**. *Journal of the American Society for Information Science*.
+- Vaswani, A. et al. (2017). **Attention Is All You Need**. *Advances in Neural Information Processing Systems*.
+- Reimers, N. y Gurevych, I. (2019). **Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks**. *Proceedings of EMNLP-IJCNLP*.
+- Blondel, V. D., Guillaume, J.-L., Lambiotte, R. y Lefebvre, E. (2008). **Fast unfolding of communities in large networks**. *Journal of Statistical Mechanics: Theory and Experiment*.
 
-https://www.jorgelopezperez.com/posts/analisis-de-texto-con-r-jugando-un-poco-con-tidytext/
