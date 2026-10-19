@@ -819,7 +819,7 @@ threshold_table <- function(net, tau = seq(0, 0.95, by = 0.05)) {
 ```
 
 
-# Ejemplo 1. Paisaje
+# Paisaje
 
 ## Construir y explorar el RAG
 

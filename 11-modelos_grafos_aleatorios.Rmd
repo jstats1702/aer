@@ -1,0 +1,1345 @@
+---
+title: "Modelo de Erdős–Rényi"
+author:
+  - "Juan Sosa PhD"
+  - "Email: jcsosam@unal.edu.co"
+  - "GitHub: https://github.com/jstats1702"
+date: ""
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cerulean
+    highlight: kate
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introducción
+
+Un **modelo estadístico para redes** es una **familia de distribuciones de probabilidad** sobre un conjunto de redes posibles:
+
+$$
+\mathcal P=\{p(\mathbf Y\mid\boldsymbol\theta):\boldsymbol\theta\in\Theta\},
+$$
+
+donde \(\mathbf Y\) es la matriz de adyacencia, \(\boldsymbol\theta\) representa los parámetros del modelo y \(\Theta\) es su espacio de valores posibles. 
+
+La utilidad de los **modelos de redes** consiste en:
+
+- **Describir y explicar** la formación de enlaces.
+- **Estudiar** las propiedades estructurales de las redes.
+- **Evaluar** la asociación entre covariables endógenas y exógenas y la formación de enlaces.
+- **Identificar** patrones de interacción, dependencia y organización estructural.
+- **Cuantificar** la incertidumbre asociada a los procesos de formación de redes.
+- **Predecir** enlaces no observados y posibles relaciones futuras.
+- **Simular** redes bajo diferentes condiciones y escenarios.
+
+Consideramos **grafos simples, binarios y no dirigidos**, con \(n\) vértices fijos y distinguibles, donde \(y_{ij}=y_{ji}\in\{0,1\}\) y \(y_{ii}=0\).
+
+## Algunos modelos
+
+Existen distintas familias de **modelos de grafos aleatorios**, entre las que se destacan:
+
+- **Modelo Bernoulli homogéneo:** enlaces independientes con probabilidad constante.
+- **Modelos de grafos aleatorios exponenciales (ERGM):** dependencia de enlaces asociada con características nodales y configuraciones estructurales.
+- **Modelos de bloques estocásticos (SBM):** agrupación de vértices según patrones de conectividad.
+- **Modelos de espacio latente:** probabilidades de enlace determinadas por posiciones en un espacio no observado.
+
+# Modelo de Erdős–Rényi
+
+Estudiaremos el **modelo Bernoulli homogéneo**, también conocido como **modelo de Erdős–Rényi**, ampliamente utilizado como **modelo de referencia** en el análisis de redes.
+
+Este modelo supone que cada **díada** presenta una arista de manera **independiente**, con una **probabilidad común** \(\theta\):
+
+$$
+y_{i,j}\mid\theta\overset{\mathrm{iid}}{\sim}
+\operatorname{Bernoulli}(\theta),\qquad 1\leq i<j\leq n,
+\qquad 0<\theta<1.
+$$
+
+Escribamos \(q=\binom n2\) para el número de díadas posibles y \(s=\sum_{i<j}y_{ij}\) para el número de aristas observadas. La **distribución conjunta** es
+
+$$
+p(\mathbf Y\mid\theta)
+=\prod_{i<j}\theta^{y_{i,j}}(1-\theta)^{1-y_{i,j}}
+=\theta^s(1-\theta)^{q-s}.
+$$
+
+El modelo es **homogéneo** porque no considera diferencias entre vértices o díadas, y es **independiente** porque la presencia de una arista no modifica la probabilidad de las demás.
+
+## Propiedades del modelo
+
+1. **Número de aristas:** \(S\sim\textsf{Bin}(q,\theta)\), con \(\textsf{E}(S)=q\theta\) y \(\textsf{Var}(S)=q\theta(1-\theta)\), de donde la **densidad esperada** es \(\theta\).
+
+2. **Distribución de grados:** \(D_i\sim\textsf{Bin}(n-1,\theta)\), con \(\textsf{E}(D_i)=(n-1)\theta\). Los grados **no son independientes**, pues \(\textsf{Cov}(D_i,D_j)=\theta(1-\theta)\) para \(i\neq j\).
+
+3. **Régimen disperso:** si \(\theta=k/(n-1)\), con \(k\) fijo, el **grado esperado** permanece constante, la **densidad** tiende a cero y \(D_i\) converge en distribución a una \(\textsf{Poisson}(k)\) cuando \(n\to\infty\).
+
+4. **Transitividad:** debido a la **independencia de las aristas**, la probabilidad de cerrar una tripla conectada es \(\theta\). Por tanto, la **transitividad global** converge en probabilidad a \(\theta\) cuando \(n\to\infty\) y \(\theta\) permanece fijo. En el **régimen disperso** con \(\theta=k/(n-1)\), tiende a cero.
+
+5. **Conectividad y distancias:** la red tiende a estar **conectada** cuando \(\theta\) supera suficientemente el umbral \(\log(n)/n\), y **desconectada** cuando está suficientemente por debajo, para \(n\) grande. En redes desconectadas, la **distancia promedio** entre vértices conectados por algún camino puede ser pequeña, aunque la red esté **fragmentada**.
+
+6. **Uniformidad condicional:** dado \(S=s\), todos los grafos con \(n\) vértices y \(s\) aristas son **equiprobables**:
+
+   \[
+   \textsf{Pr}(\mathbf{Y}=\mathbf{y}\mid S=s)=\binom{q}{s}^{-1}.
+   \]
+
+## Ejemplo: simulación
+
+Simulamos una red **dispersa** con **grado esperado** aproximadamente igual a \(k=2\). 
+
+     La probabilidad de enlace es \(\theta=k/(n-1)\).
+
+```{r, fig.width=7, fig.height=5, fig.align='center'}
+# Paquetes necesarios: install.packages(c("igraph", "igraphdata"))
+suppressMessages(suppressWarnings(library(igraph)))
+
+# Parámetros del modelo
+n_sim <- 120
+k <- 2
+theta_sim <- k / (n_sim - 1)
+
+# Simular un grafo simple no dirigido
+set.seed(42)
+g_sim <- sample_gnp(
+  n = n_sim,
+  p = theta_sim,
+  directed = FALSE,
+  loops = FALSE
+)
+
+# Visualizar la red
+set.seed(42)
+plot(
+  g_sim,
+  layout = layout_with_fr(g_sim),
+  vertex.size = 5,
+  vertex.label = NA,
+  vertex.color = "steelblue",
+  vertex.frame.color = NA,
+  edge.color = "gray65",
+  main = "Modelo Bernoulli homogéneo"
+)
+```
+
+Las **componentes** y la **proporción de pares alcanzables** ayudan a interpretar las distancias en una red posiblemente desconectada.
+
+```{r}
+# Identificar componentes conexas
+comp_sim <- components(g_sim)
+tamanos <- comp_sim$csize
+
+# Proporción de pares que pueden comunicarse
+pares_alcanzables <- sum(choose(tamanos, 2))
+prop_alcanzables <- pares_alcanzables / choose(n_sim, 2)
+
+# Resumen de propiedades observadas y teóricas
+resumen_sim <- data.frame(
+  Estadistico = c(
+    "Vértices", "Aristas", "Densidad", "Grado medio",
+    "Grado medio esperado", "Componentes", "Componente mayor (%)",
+    "Pares alcanzables (%)", "Distancia entre alcanzables", "Transitividad"
+  ),
+  Valor = c(
+    vcount(g_sim), ecount(g_sim), edge_density(g_sim),
+    mean(degree(g_sim)), (n_sim - 1) * theta_sim,
+    comp_sim$no, 100 * max(tamanos) / n_sim,
+    100 * prop_alcanzables,
+    mean_distance(g_sim, directed = FALSE, unconnected = TRUE),
+    transitivity(g_sim, type = "global", isolates = "zero")
+  )
+)
+
+# Mostrar resultados
+knitr::kable(resumen_sim, digits = 3)
+
+# Comparar distribución de grados y aproximación Poisson
+soporte_grados <- 0:max(degree(g_sim))
+comparacion_grados <- data.frame(
+  Grado = soporte_grados,
+  Observado = tabulate(degree(g_sim) + 1, nbins = n_sim)[soporte_grados + 1] / n_sim,
+  Binomial = dbinom(soporte_grados, size = n_sim - 1, prob = theta_sim),
+  Poisson = dpois(soporte_grados, lambda = k)
+)
+
+# Mostrar las primeras categorías
+knitr::kable(head(comparacion_grados, 12), digits = 5)
+```
+
+## Ejemplo: simulación (cont.)
+
+Repetimos el experimento **\(B\)** veces para construir **distribuciones de referencia** de los estadísticos. 
+
+Los cuantiles 2.5 % y 97.5 % forman un **intervalo de simulación**, no un intervalo de confianza para \(\theta\).
+
+```{r}
+# Número de redes simuladas
+B_sim <- 1000
+
+# Reservar memoria para las estadísticas
+frecuencias_grado <- matrix(0, nrow = B_sim, ncol = n_sim)
+distancias_sim    <- numeric(B_sim)
+transitividad_sim <- numeric(B_sim)
+alcanzables_sim   <- numeric(B_sim)
+
+# Repetir la simulación
+set.seed(123)
+for (b in seq_len(B_sim)) {
+
+  # Generar una nueva red
+  g_b <- sample_gnp(
+    n = n_sim,
+    p = theta_sim,
+    directed = FALSE,
+    loops = FALSE
+  )
+
+  # Registrar frecuencias de todos los grados posibles
+  grados_b <- degree(g_b)
+  frecuencias_grado[b, ] <- tabulate(grados_b + 1, nbins = n_sim) / n_sim
+
+  # Registrar distancia entre pares alcanzables
+  distancias_sim[b] <- mean_distance(
+    g_b, directed = FALSE, unconnected = TRUE
+  )
+
+  # Registrar transitividad global
+  transitividad_sim[b] <- transitivity(
+    g_b, type = "global", isolates = "zero"
+  )
+
+  # Registrar la fracción de pares alcanzables
+  tamanos_b <- components(g_b)$csize
+  alcanzables_sim[b] <- sum(choose(tamanos_b, 2)) / choose(n_sim, 2)
+}
+```
+
+```{r, fig.width=9, fig.height=5, fig.align='center'}
+# Calcular cuantiles de las frecuencias por grado
+cuantiles_grado <- apply(
+  frecuencias_grado, 2, quantile, probs = c(0.025, 0.5, 0.975)
+)
+
+# Mostrar todos los grados observados en las simulaciones
+ultimo_grado <- max(which(colSums(frecuencias_grado) > 0)) - 1
+x_grados <- 0:ultimo_grado
+
+# Preparar gráfico
+plot(
+  x_grados, cuantiles_grado[2, x_grados + 1],
+  type = "n", xlab = "Grado", ylab = "Proporción de vértices",
+  ylim = c(0, max(cuantiles_grado[3, x_grados + 1])),
+  main = "Distribución de grado"
+)
+
+# Intervalo central de simulación del 95 %
+segments(
+  x_grados, cuantiles_grado[1, x_grados + 1],
+  x_grados, cuantiles_grado[3, x_grados + 1],
+  col = "gray55"
+)
+
+# Mediana simulada
+points(x_grados, cuantiles_grado[2, x_grados + 1], pch = 16)
+
+# Distribución binomial exacta
+points(
+  x_grados,
+  dbinom(x_grados, size = n_sim - 1, prob = theta_sim),
+  col = "blue", pch = 17
+)
+
+# Aproximación Poisson
+points(x_grados, dpois(x_grados, lambda = k), col = "red3", pch = 1)
+
+# Identificar curvas
+legend(
+  "topright",
+  legend = c("Mediana simulada", "Binomial", "Poisson", "Intervalo 95 %"),
+  col = c("black", "blue", "red3", "gray55"),
+  pch = c(16, 17, 1, NA),
+  lty = c(NA, NA, NA, 1), bty = "n"
+)
+```
+
+```{r, fig.width=9, fig.height=3, fig.align='center'}
+# Organizar los tres histogramas
+par(mfrow = c(1, 3), mar = c(4, 4, 2, 1))
+
+# Distribución de la distancia media entre alcanzables
+hist(
+  distancias_sim, col = "gray85", border = "white",
+  main = "Distancia media", xlab = "Solo pares alcanzables"
+)
+abline(v = median(distancias_sim), col = "blue", lwd = 2)
+
+# Distribución de la transitividad
+hist(
+  transitividad_sim, col = "gray85", border = "white",
+  main = "Transitividad", xlab = "Transitividad global"
+)
+abline(v = median(transitividad_sim), col = "blue", lwd = 2)
+
+# Distribución de pares alcanzables
+hist(
+  alcanzables_sim, col = "gray85", border = "white",
+  main = "Alcanzabilidad", xlab = "Fracción de pares alcanzables"
+)
+abline(v = median(alcanzables_sim), col = "blue", lwd = 2)
+```
+
+## Estimación
+
+El **estimador de máxima verosimilitud (MLE)** es el valor de \(\theta\) que maximiza **la probabilidad de la red observada**.
+
+La **log-verosimilitud** es
+
+\[
+\ell(\theta)=s\log\theta+(q-s)\log(1-\theta).
+\]
+
+Para \(0<s<q\), al resolver \(\partial\ell(\theta)/\partial\theta=0\) se obtiene
+
+\[
+\widehat\theta=\frac{s}{q}=\frac{2s}{n(n-1)}
+=\text{densidad observada}.
+\]
+
+Cuando \(s=0\) o \(s=q\), el máximo está en **0** o **1**, respectivamente; por tanto, si \(\Theta=(0,1)\), el MLE no se alcanza dentro del espacio abierto.
+
+### Ejemplo: red de aeropuertos
+
+Utilizaremos la red de **aeropuertos de Estados Unidos** correspondiente a diciembre de 2010. 
+
+Dos aeropuertos estarán conectados si existe **al menos una ruta aérea entre ellos**, independientemente de su dirección.
+
+```{r}
+# Cargar la red
+data("USairports", package = "igraphdata")
+
+# Actualizar el formato del grafo
+USairports <- igraph::upgrade_graph(USairports)
+
+# Convertir a una red no dirigida
+g <- as_undirected(
+  USairports,
+  mode = "collapse",
+  edge.attr.comb = "ignore"
+)
+
+# Eliminar bucles y aristas múltiples
+g <- simplify(g, remove.multiple = TRUE, remove.loops = TRUE)
+
+# Tamaño de la red
+(n <- vcount(g))
+(s <- ecount(g))
+(q <- choose(n, 2))
+```
+
+```{r, fig.width=8, fig.height=7, fig.align='center', echo=FALSE}
+# Calcular el grado de cada aeropuerto
+grados <- degree(g)
+
+# Identificar aeropuertos con grado alto
+umbral_hub <- quantile(grados, 0.95)
+
+# Definir color de los vértices
+color_vertices <- ifelse(grados >= umbral_hub, "tomato", "steelblue")
+
+# Definir tamaño de los vértices según el grado
+tam_vertices <- 1.5 + 5 * grados / max(grados)
+
+# Fijar semilla para obtener la misma disposición
+set.seed(42)
+
+# Construir una disposición de la red
+pos <- layout_with_fr(g, niter = 500)
+
+# Dibujar la red
+plot(
+  g,
+  layout = pos,
+  vertex.size = tam_vertices,
+  vertex.color = color_vertices,
+  vertex.frame.color = NA,
+  vertex.label = NA,
+  edge.color = adjustcolor("gray40", alpha.f = 0.12),
+  edge.width = 0.4,
+  main = "Aeropuertos de Estados Unidos"
+)
+
+# Agregar una leyenda simple
+legend(
+  "topleft",
+  legend = c("Aeropuertos", "Aeropuertos con alto grado"),
+  col = c("steelblue", "tomato"),
+  pch = 19,
+  pt.cex = c(1.2, 1.5),
+  bty = "n"
+)
+```
+
+Bajo el **modelo Bernoulli homogéneo**, el estimador de máxima verosimilitud de \(\theta\) corresponde a la **densidad observada**.
+
+```{r}
+# Estimar la probabilidad de enlace
+(theta_hat <- s / q)
+```
+
+```{r, fig.width=7, fig.height=4, fig.align='center'}
+# Definir la log-verosimilitud
+log_verosimilitud <- function(theta) {
+  s * log(theta) + (q - s) * log1p(-theta)
+}
+
+# Construir valores cercanos al estimador
+theta_min <- max(1e-6, 0.5 * theta_hat)
+theta_max <- min(1 - 1e-6, 1.5 * theta_hat)
+
+valores_theta <- seq(theta_min, theta_max, length.out = 300)
+
+# Evaluar la log-verosimilitud
+valores_loglik <- log_verosimilitud(valores_theta)
+
+# Graficar la función
+plot(
+  valores_theta, valores_loglik,
+  type = "l",
+  lwd = 2,
+  xlab = expression(theta),
+  ylab = "Log-verosimilitud",
+  main = "Estimación por máxima verosimilitud"
+)
+
+# Identificar el estimador
+abline(v = theta_hat, col = "red3", lty = 2, lwd = 2)
+```
+
+## Bondad de ajuste
+
+La **bondad de ajuste** evalúa si un modelo reproduce adecuadamente las **propiedades estructurales** de una red observada, comparando estadísticos \(t(\mathbf y)\) con sus distribuciones bajo el modelo estimado.
+
+Una coincidencia en la **densidad** no garantiza un buen ajuste en otras propiedades.
+
+### Elementos
+
+- **Estadístico de prueba:** función \(t(\mathbf y)\) que resume una propiedad de la red.
+- **Distribución de referencia:** distribución del estadístico bajo el modelo estimado.
+- **Intervalo de simulación:** rango de valores habituales del estadístico bajo el modelo.
+- **Valor \(p\):** medida de qué tan extrema resulta la estadística observada respecto de su distribución de referencia.
+
+### Procedimiento de evaluación
+
+Para evaluar el modelo Bernoulli homogéneo, simulamos \(B\) redes independientes utilizando el **estimador de máxima verosimilitud** \(\widehat{\theta}\):
+
+$$
+\mathbf Y^{(b)}\sim G(n,\widehat{\theta}),
+\qquad b=1,\ldots,B.
+$$
+
+El procedimiento consiste en:
+
+1. **Calcular** los estadísticos de la red observada.
+2. **Simular** \(B\) redes bajo el modelo estimado.
+3. **Calcular** los estadísticos en cada red simulada.
+4. **Comparar** los valores observados con las distribuciones simuladas.
+5. **Evaluar** las discrepancias mediante intervalos de simulación y valores \(p\) aproximados.
+
+### Estadísticos de prubea 
+
+1. **Densidad:** proporción de aristas existentes respecto de las posibles.
+2. **Grado promedio:** número promedio de conexiones por vértice.
+3. **Dispersión de grados:** variabilidad en el número de conexiones de los vértices.
+4. **Grado máximo:** mayor número de conexiones de un vértice.
+5. **Transitividad global:** proporción de triples conectados que forman triángulos.
+6. **Número de triángulos:** cantidad de conjuntos de tres vértices mutuamente conectados.
+7. **Distancia geodésica promedio:** distancia promedio entre pares de vértices alcanzables.
+8. **Diámetro:** máxima distancia geodésica finita entre vértices.
+9. **Número de componentes:** cantidad de subredes conectadas.
+10. **Tamaño de la componente gigante:** proporción de vértices en la componente más grande.
+11. **Proporción de vértices aislados:** fracción de vértices sin conexiones.
+12. **Asortatividad por grado:** tendencia de los vértices a conectarse con otros de grado similar.
+13. **Modularidad:** intensidad de la organización de la red en comunidades, dada una partición.
+
+### Ejemplo: red de aeropuertos (cont.)
+
+Consideraremos tres **estadísticos de bondad de ajuste**:
+
+- **Densidad:** proporción de aristas existentes respecto de las posibles.
+- **Transitividad global:** proporción de triples conectados que forman triángulos.
+- **Distancia geodésica promedio:** número promedio de aristas en los caminos más cortos entre pares de vértices alcanzables.
+
+La **densidad esperada** coincide con la observada, pues \(\widehat{\theta}\) se estima a partir de ella. Por tanto, no permite evaluar independientemente la **bondad de ajuste**.
+
+La **transitividad** y la **distancia geodésica promedio** permiten evaluar si el modelo reproduce adecuadamente la **formación de triángulos** y las **distancias entre vértices**, respectivamente.
+
+En redes desconectadas, la distancia promedio se calcula únicamente entre **pares alcanzables**, por lo que no refleja completamente la fragmentación.
+
+```{r}
+# Estadísticos observados
+(densidad_obs <- edge_density(g))
+(trans_obs <- transitivity(g, type = "global"))
+(distancia_obs <- mean_distance(g, directed = FALSE, unconnected = TRUE))
+
+# Número de simulaciones
+B <- 1000
+
+# Almacenar resultados
+densidad_rep <- numeric(B)
+trans_rep <- numeric(B)
+distancia_rep <- numeric(B)
+
+# Simular redes bajo el modelo estimado
+set.seed(42)
+
+for (b in seq_len(B)) {
+
+  # Generar una red Bernoulli homogénea
+  g_b <- sample_gnp(
+    n = n,
+    p = theta_hat,
+    directed = FALSE,
+    loops = FALSE
+  )
+
+  # Calcular la densidad
+  densidad_rep[b] <- edge_density(g_b)
+
+  # Calcular la transitividad
+  trans_rep[b] <- transitivity(g_b, type = "global")
+
+  # Calcular la distancia geodésica promedio
+  distancia_rep[b] <- mean_distance(
+    g_b,
+    directed = FALSE,
+    unconnected = TRUE
+  )
+}
+
+# Resumir los estadísticos
+comparacion <- data.frame(
+  Estadistico = c(
+    "Densidad",
+    "Transitividad",
+    "Distancia geodésica promedio"
+  ),
+  Observado = c(
+    densidad_obs,
+    trans_obs,
+    distancia_obs
+  ),
+  Media_simulada = c(
+    mean(densidad_rep),
+    mean(trans_rep),
+    mean(distancia_rep)
+  ),
+  Q025 = c(
+    quantile(densidad_rep, 0.025),
+    quantile(trans_rep, 0.025),
+    quantile(distancia_rep, 0.025)
+  ),
+  Q975 = c(
+    quantile(densidad_rep, 0.975),
+    quantile(trans_rep, 0.975),
+    quantile(distancia_rep, 0.975)
+  )
+)
+
+# Mostrar resultados
+knitr::kable(comparacion, digits = 5)
+```
+
+Los cuantiles 2.5 % y 97.5 % delimitan un **intervalo de simulación del 95 %** para cada estadístico.
+
+```{r, fig.width=9, fig.height=3, fig.align='center'}
+# Organizar los gráficos
+par(mfrow = c(1, 3), mar = c(4, 4, 2, 1))
+
+# Distribución simulada de la densidad
+hist(
+  densidad_rep,
+  breaks = 25,
+  col = "gray85",
+  border = "gray85",
+  xlim = range(c(densidad_rep, densidad_obs)),
+  main = "Densidad",
+  xlab = "Densidad",
+  ylab = "Frecuencia"
+)
+
+# Identificar la densidad observada
+abline(v = densidad_obs, col = "red3", lwd = 2, lty = 2)
+
+# Distribución simulada de la transitividad
+hist(
+  trans_rep,
+  breaks = 25,
+  col = "gray85",
+  border = "gray85",
+  xlim = range(c(trans_rep, trans_obs)),
+  main = "Transitividad global",
+  xlab = "Transitividad",
+  ylab = "Frecuencia"
+)
+
+# Identificar la transitividad observada
+abline(v = trans_obs, col = "red3", lwd = 2, lty = 2)
+
+# Distribución simulada de la distancia geodésica promedio
+hist(
+  distancia_rep,
+  breaks = 25,
+  col = "gray85",
+  border = "gray85",
+  xlim = range(c(distancia_rep, distancia_obs)),
+  main = "Distancia geodésica promedio",
+  xlab = "Distancia geodésica",
+  ylab = "Frecuencia"
+)
+
+# Identificar la distancia observada
+abline(v = distancia_obs, col = "red3", lwd = 2, lty = 2)
+```
+
+Las **líneas rojas** representan los valores observados.
+
+Una separación importante respecto de las distribuciones simuladas indica que el modelo no reproduce adecuadamente la propiedad evaluada.
+
+### Evaluación de las discrepancias
+
+Estimamos las probabilidades de cola a partir de las \(B\) redes simuladas:
+
+$$
+\widehat p_{\mathrm{sup}}=
+\frac{1+\sum_{b=1}^{B} I(t_b\geq t_{\mathrm{obs}})}{B+1},
+\qquad
+\widehat p_{\mathrm{inf}}=
+\frac{1+\sum_{b=1}^{B} I(t_b\leq t_{\mathrm{obs}})}{B+1}.
+$$
+
+Una medida **bilateral aproximada** es
+
+$$
+\widehat p_{\mathrm{bil}}=
+\min\left\{
+1,\,
+2\min(\widehat p_{\mathrm{sup}},\widehat p_{\mathrm{inf}})
+\right\}.
+$$
+
+```{r}
+# Transitividad: probabilidades de cola
+p_sup_trans <- (1 + sum(trans_rep >= trans_obs)) / (B + 1)
+p_inf_trans <- (1 + sum(trans_rep <= trans_obs)) / (B + 1)
+
+# Transitividad: valor bilateral
+p_bil_trans <- min(1, 2 * min(p_sup_trans, p_inf_trans))
+
+# Distancia geodésica: probabilidades de cola
+p_sup_dist <- (1 + sum(distancia_rep >= distancia_obs)) / (B + 1)
+p_inf_dist <- (1 + sum(distancia_rep <= distancia_obs)) / (B + 1)
+
+# Distancia geodésica: valor bilateral
+p_bil_dist <- min(1, 2 * min(p_sup_dist, p_inf_dist))
+
+# Resumir resultados
+resultados <- data.frame(
+  Estadistico = c("Transitividad", "Distancia geodésica promedio"),
+  p_superior = c(p_sup_trans, p_sup_dist),
+  p_inferior = c(p_inf_trans, p_inf_dist),
+  p_bilateral = c(p_bil_trans, p_bil_dist)
+)
+
+# Mostrar resultados
+knitr::kable(resultados, digits = 5)
+```
+
+Estos valores son **medidas aproximadas de discrepancia**, obtenidas mediante simulaciones del modelo con \(\widehat{\theta}\). 
+
+Un **valor \(p\) pequeño** sugiere que el modelo no reproduce adecuadamente el estadístico evaluado, mientras que un valor grande no demuestra que el modelo sea correcto.
+
+# Validación cruzada
+
+La **validación cruzada por díadas** evalúa la capacidad predictiva del modelo sobre **díadas reservadas para prueba**, cuyos estados de conexión no se utilizan durante la estimación.
+
+El procedimiento consiste en:
+
+1. **Dividir** las \(q\) díadas en \(L\) grupos (*folds*).
+2. **Estimar** \(\theta\) utilizando las díadas de entrenamiento.
+3. **Predecir** las díadas de prueba mediante \(\widehat \theta_{i,j}\).
+4. **Evaluar** las predicciones y repetir el procedimiento para todos los folds.
+
+Consideramos dos dimensiones:
+
+- **Calidad probabilística:** precisión de las probabilidades estimadas mediante **Brier score** y **log-loss**.
+- **Capacidad discriminativa:** habilidad para distinguir enlaces de no enlaces mediante **ROC** y **AUC**.
+
+En el **modelo Bernoulli homogéneo**, todas las díadas de un mismo fold reciben idéntica probabilidad. Por tanto, el modelo **no tiene capacidad discriminativa** y su AUC es **0.5**.
+
+## Ejemplo: red de aeropuertos (cont.)
+
+### Conformación de folds {-}
+
+```{r}
+# Extraer las díadas no ordenadas
+Y <- as.matrix(as_adjacency_matrix(g, sparse = FALSE))
+observado <- as.integer(Y[lower.tri(Y)])
+q <- length(observado)
+
+# Construir diez folds de tamaños similares
+L <- 5
+set.seed(789)
+fold <- sample(rep(seq_len(L), length.out = q))
+
+# Resumir las díadas de cada fold
+resumen_folds <- data.frame(
+  Fold = seq_len(L),
+  Diadas = as.integer(tabulate(fold, nbins = L)),
+  Enlaces = as.integer(tabulate(fold[observado == 1], nbins = L))
+)
+
+# Calcular proporciones de enlaces
+resumen_folds$Proporcion <- resumen_folds$Enlaces / resumen_folds$Diadas
+
+# Mostrar resultados
+knitr::kable(resumen_folds, digits = 5)
+```
+
+### Predicción y evaluación probabilística {-}
+
+El **Brier score** y la **pérdida logarítmica (log-loss)** evalúan la calidad de las probabilidades predichas:
+
+\[
+\text{Brier}=\frac{1}{m}\sum_{k=1}^{m}(y_k-\widehat p_k)^2,
+\]
+
+\[
+\text{Log-loss}=-\frac{1}{m}\sum_{k=1}^{m}
+\left[y_k\log(\widehat p_k)+(1-y_k)\log(1-\widehat p_k)\right],
+\]
+
+donde \(m\) es el número de díadas evaluadas, \(y_k\in\{0,1\}\) indica la existencia de un enlace y \(\widehat p_k\) su probabilidad estimada. 
+
+En ambos casos, **valores menores indican mejor desempeño predictivo**.
+
+```{r}
+# Almacenar las probabilidades predichas
+prob_cv <- numeric(q)
+theta_fold <- numeric(L)
+
+# Validación cruzada
+for (l in seq_len(L)) {
+
+  # Identificar entrenamiento y prueba
+  entrenamiento <- fold != l
+  prueba <- fold == l
+
+  # Estimar theta con los datos de entrenamiento
+  theta_fold[l] <- mean(observado[entrenamiento])
+
+  # Predecir las díadas de prueba
+  prob_cv[prueba] <- theta_fold[l]
+}
+
+# Calcular Brier score
+brier <- mean((observado - prob_cv)^2)
+
+# Evitar logaritmos de cero
+epsilon <- 1e-12
+prob_segura <- pmin(pmax(prob_cv, epsilon), 1 - epsilon)
+
+# Calcular pérdida logarítmica
+logloss <- -mean(
+  observado * log(prob_segura) + (1 - observado) * log(1 - prob_segura)
+)
+
+# Resumir resultados
+metricas <- data.frame(
+  Metrica = c("Brier score", "Log-loss"),
+  Valor = c(brier, logloss)
+)
+
+knitr::kable(metricas, digits = 5)
+```
+
+### Matriz de confusión {-}
+
+Para clasificar las díadas, definimos un **umbral** \(c\), de forma que se predice un enlace cuando \(\widehat \theta_{i,j}\geq c\).
+
+La **matriz de confusión** permite calcular:
+
+- **Sensibilidad:** proporción de enlaces correctamente identificados.
+- **Especificidad:** proporción de no enlaces correctamente identificados.
+- **Precisión:** proporción de enlaces predichos que realmente existen.
+- **Exactitud:** proporción total de clasificaciones correctas.
+
+```{r}
+# Definir el umbral
+umbral <- 0.5
+
+# Clasificar las díadas
+predicho <- as.integer(prob_cv >= umbral)
+
+# Construir la matriz de confusión
+matriz_confusion <- table(
+  Predicho  = factor(predicho,  levels = c(0, 1)),
+  Observado = factor(observado, levels = c(0, 1))
+)
+
+matriz_confusion
+
+# Identificar las cuatro categorías
+VN <- matriz_confusion["0", "0"]
+FN <- matriz_confusion["0", "1"]
+FP <- matriz_confusion["1", "0"]
+VP <- matriz_confusion["1", "1"]
+
+# Calcular métricas de clasificación
+sensibilidad  <- if (VP + FN > 0) VP / (VP + FN) else NA_real_
+especificidad <- if (VN + FP > 0) VN / (VN + FP) else NA_real_
+precision     <- if (VP + FP > 0) VP / (VP + FP) else NA_real_
+exactitud     <- (VP + VN) / q
+
+# Resumir resultados
+clasificacion <- data.frame(
+  Metrica = c("Sensibilidad", "Especificidad", "Precisión", "Exactitud"),
+  Valor   = c(sensibilidad, especificidad, precision, exactitud)
+)
+
+knitr::kable(clasificacion, digits = 5)
+```
+
+El modelo presenta **sensibilidad nula** y **especificidad perfecta**, pues clasifica todas las díadas como ausencias de enlace. 
+
+Aunque alcanza una **exactitud del 98.38 %**, no identifica ningún enlace existente. Esto evidencia que una **alta exactitud no implica buena capacidad predictiva** en redes dispersas.
+
+Estos resultados corresponden a la clasificación con umbral \(0.5\).
+
+### Curva ROC y AUC {-}
+
+La **curva ROC** representa la **sensibilidad** frente a la **tasa de falsos positivos** para **distintos umbrales**. 
+
+El **AUC** resume la capacidad discriminativa: **0.5** indica ausencia de discriminación y **1** discriminación perfecta.
+
+En el **Bernoulli homogéneo**, las probabilidades son constantes dentro de cada fold. Por tanto, la ROC tiene únicamente los puntos operativos \((0,0)\) y \((1,1)\), cuya interpolación corresponde a la **diagonal**.
+
+```{r}
+# Cargar la librería
+suppressMessages(suppressWarnings(library(pROC)))
+
+# Almacenar AUC por fold
+auc_folds <- numeric(L)
+
+# Calcular AUC en cada fold
+for (l in seq_len(L)) {
+
+  # Seleccionar las díadas de prueba
+  prueba <- fold == l
+  y <- observado[prueba]
+  p <- prob_cv[prueba]
+
+  # Verificar que existen ambas clases
+  if (length(unique(y)) == 2) {
+
+    # Calcular la curva ROC
+    roc_l <- roc(
+      response  = y,
+      predictor = p,
+      levels    = c(0, 1),
+      direction = "<",
+      quiet     = TRUE
+    )
+
+    # Extraer el AUC
+    auc_folds[l] <- as.numeric(auc(roc_l))
+
+  } else {
+
+    # AUC indefinido si falta alguna clase
+    auc_folds[l] <- NA_real_
+  }
+}
+
+# Mostrar resultados
+resultados_auc <- data.frame(
+  Fold = seq_len(L),
+  AUC = auc_folds
+)
+
+knitr::kable(resultados_auc, digits = 4)
+```
+
+El **AUC es 0.5 en cada fold** cuando están presentes ambas clases.
+
+# Modelo basado en vecinos comunes
+
+El **modelo de vecinos comunes** incorpora información sobre la **estructura local de la red** para estimar **probabilidades de enlace heterogéneas**, lo que puede mejorar la **capacidad predictiva y discriminativa**.
+
+Dos vértices \(i\) y \(j\) tienen un **vecino común** cuando ambos están conectados con un tercer vértice. 
+
+Su número se define como
+
+$$
+c_{i,j}=\sum_{k\neq i,j}y_{i,k}\,y_{j,k}.
+$$
+
+Modelamos la probabilidad de enlace mediante una **regresión logística**:
+
+$$
+y_{i,j}\mid c_{i,j}\sim\textsf{Bernoulli}(\theta_{i,j}),
+\qquad
+\textsf{logit}(\theta_{i,j})=
+\beta_0+\beta_1\log(1+c_{i,j}).
+$$
+
+La transformación \(\log(1+c_{i,j})\) reduce la influencia de valores elevados y permite incluir díadas sin vecinos comunes.
+
+A diferencia del **Bernoulli homogéneo**, este modelo permite asignar **probabilidades diferentes** a cada díada.
+
+
+### Bondad de ajuste
+
+Evaluamos si el **modelo de vecinos comunes** reproduce la **densidad**, la **transitividad global** y la **distancia geodésica promedio** de la red observada.
+
+Ajustamos el modelo utilizando todas las díadas y simulamos \(B\) redes con las **probabilidades de enlace estimadas**.
+
+```{r}
+# Construir la matriz de adyacencia
+Y <- as.matrix(as_adjacency_matrix(g, sparse = FALSE))
+
+# Extraer los enlaces observados
+y <- as.integer(Y[lower.tri(Y)])
+
+# Calcular los vecinos comunes
+matriz_vecinos <- Y %*% Y
+vecinos <- log1p(matriz_vecinos[lower.tri(Y)])
+
+# Construir los datos
+datos <- data.frame(enlace = y, vecinos = vecinos)
+
+# Ajustar el modelo logístico
+modelo_vecinos <- glm(
+  enlace ~ vecinos,
+  data = datos,
+  family = binomial()
+)
+
+# Obtener las probabilidades estimadas
+p_hat <- predict(modelo_vecinos, type = "response")
+
+# Resumir el modelo
+summary(modelo_vecinos)
+```
+
+```{r}
+# Calcular los estadísticos observados
+estadisticos_obs <- c(
+  Densidad = edge_density(g),
+  Transitividad = transitivity(g, type = "global"),
+  Distancia = mean_distance(g, directed = FALSE, unconnected = TRUE)
+)
+
+# Número de simulaciones
+B <- 1000
+
+# Almacenar los estadísticos simulados
+estadisticos_rep <- matrix(NA_real_, nrow = B, ncol = 3)
+colnames(estadisticos_rep) <- names(estadisticos_obs)
+
+# Simular redes bajo el modelo ajustado
+set.seed(42)
+
+for (b in seq_len(B)) {
+
+  # Simular los enlaces
+  enlaces_b <- rbinom(q, size = 1, prob = p_hat)
+
+  # Construir una matriz de adyacencia vacía
+  Y_b <- matrix(0, nrow = n, ncol = n)
+
+  # Incorporar los enlaces simulados
+  Y_b[lower.tri(Y_b)] <- enlaces_b
+
+  # Garantizar simetría
+  Y_b <- Y_b + t(Y_b)
+
+  # Construir la red simulada
+  g_b <- graph_from_adjacency_matrix(
+    Y_b,
+    mode = "undirected",
+    diag = FALSE
+  )
+
+  # Calcular los estadísticos
+  estadisticos_rep[b, 1] <- edge_density(g_b)
+  estadisticos_rep[b, 2] <- transitivity(g_b, type = "global")
+  estadisticos_rep[b, 3] <- mean_distance(
+    g_b,
+    directed = FALSE,
+    unconnected = TRUE
+  )
+}
+
+# Resumir los resultados
+comparacion_vecinos <- data.frame(
+  Estadistico = names(estadisticos_obs),
+  Observado = as.numeric(estadisticos_obs),
+  Media_simulada = colMeans(estadisticos_rep),
+  Q025 = apply(estadisticos_rep, 2, quantile, probs = 0.025),
+  Q975 = apply(estadisticos_rep, 2, quantile, probs = 0.975)
+)
+
+# Mostrar resultados
+knitr::kable(comparacion_vecinos, digits = 5)
+```
+
+
+```{r, fig.width=9, fig.height=3, fig.align='center'}
+# Organizar los gráficos
+par(mfrow = c(1, 3), mar = c(4, 4, 2, 1))
+
+# Graficar las distribuciones simuladas
+for (k in seq_len(3)) {
+
+  # Seleccionar el estadístico
+  valores <- estadisticos_rep[, k]
+  observado_k <- estadisticos_obs[k]
+
+  # Graficar la distribución
+  hist(
+    valores,
+    breaks = 25,
+    col = "gray85",
+    border = "white",
+    xlim = range(c(valores, observado_k)),
+    main = names(estadisticos_obs)[k],
+    xlab = "Valor del estadístico",
+    ylab = "Frecuencia"
+  )
+
+  # Identificar el valor observado
+  abline(v = observado_k, col = "red3", lwd = 2, lty = 2)
+}
+
+# Restaurar los gráficos
+par(mfrow = c(1, 1))
+```
+
+```{r}
+# Almacenar las probabilidades bilaterales aproximadas
+p_bilateral <- numeric(3)
+
+# Evaluar cada estadístico
+for (k in seq_len(3)) {
+
+  # Extraer los valores
+  valores <- estadisticos_rep[, k]
+  observado_k <- estadisticos_obs[k]
+
+  # Calcular las probabilidades de cola
+  p_sup <- (1 + sum(valores >= observado_k)) / (B + 1)
+  p_inf <- (1 + sum(valores <= observado_k)) / (B + 1)
+
+  # Calcular la medida bilateral
+  p_bilateral[k] <- min(1, 2 * min(p_sup, p_inf))
+}
+
+# Mostrar resultados descriptivos
+resultados_ajuste <- data.frame(
+  Estadistico = names(estadisticos_obs),
+  p_bilateral = p_bilateral
+)
+
+knitr::kable(resultados_ajuste, digits = 4)
+```
+
+## Validación cruzada {-}
+
+Utilizamos los **mismos folds** de la validación anterior. 
+
+Para evitar **filtraciones de información**, los vecinos comunes se calculan exclusivamente con las aristas de entrenamiento.
+
+```{r}
+# Identificar las díadas no ordenadas
+indices <- which(lower.tri(Y), arr.ind = TRUE)
+
+# Almacenar probabilidades y coeficientes
+prob_vecinos <- numeric(q)
+coeficientes <- matrix(NA_real_, nrow = L, ncol = 2)
+
+# Validación cruzada
+for (l in seq_len(L)) {
+
+  # Identificar entrenamiento y prueba
+  entrenamiento <- fold != l
+  prueba <- fold == l
+
+  # Construir la red de entrenamiento
+  Y_train <- Y
+
+  # Identificar las díadas de prueba
+  i <- indices[prueba, 1]
+  j <- indices[prueba, 2]
+
+  # Ocultar los enlaces de prueba en ambas direcciones
+  Y_train[cbind(i, j)] <- 0
+  Y_train[cbind(j, i)] <- 0
+
+  # Calcular el número de vecinos comunes
+  matriz_vecinos <- Y_train %*% Y_train
+
+  # Extraer los vecinos comunes de cada díada
+  vecinos <- matriz_vecinos[lower.tri(matriz_vecinos)]
+
+  # Construir los datos de entrenamiento
+  datos_train <- data.frame(
+    enlace = observado[entrenamiento],
+    vecinos = log1p(vecinos[entrenamiento])
+  )
+
+  # Ajustar la regresión logística
+  modelo <- glm(
+    enlace ~ vecinos,
+    data = datos_train,
+    family = binomial()
+  )
+
+  # Guardar los coeficientes estimados
+  coeficientes[l, ] <- coef(modelo)
+
+  # Construir los datos de prueba
+  datos_test <- data.frame(
+    vecinos = log1p(vecinos[prueba])
+  )
+
+  # Predecir las probabilidades de enlace
+  prob_vecinos[prueba] <- predict(
+    modelo,
+    newdata = datos_test,
+    type = "response"
+  )
+}
+
+# Resumir los coeficientes estimados
+resultados_coef <- data.frame(
+  Fold = seq_len(L),
+  Intercepto = coeficientes[, 1],
+  Beta_vecinos = coeficientes[, 2]
+)
+
+knitr::kable(resultados_coef, digits = 5)
+```
+
+### Evaluación predictiva {-}
+
+Comparamos ambos modelos mediante **Brier score**, **log-loss** y **AUC**, utilizando las mismas díadas de prueba.
+
+```{r}
+# Función para calcular métricas probabilísticas
+calcular_metricas <- function(y, p) {
+
+  # Evitar logaritmos de cero
+  p <- pmin(pmax(p, 1e-12), 1 - 1e-12)
+
+  # Calcular Brier score
+  brier <- mean((y - p)^2)
+
+  # Calcular pérdida logarítmica
+  logloss <- -mean(
+    y * log(p) + (1 - y) * log(1 - p)
+  )
+
+  # Devolver resultados
+  return(c(Brier = brier, LogLoss = logloss))
+}
+
+# Evaluar el modelo Bernoulli homogéneo
+metricas_bern <- calcular_metricas(observado, prob_cv)
+
+# Evaluar el modelo de vecinos comunes
+metricas_vecinos <- calcular_metricas(observado, prob_vecinos)
+
+# Comparar resultados
+comparacion <- data.frame(
+  Modelo = c("Bernoulli homogéneo", "Vecinos comunes"),
+  Brier = c(metricas_bern[1], metricas_vecinos[1]),
+  LogLoss = c(metricas_bern[2], metricas_vecinos[2])
+)
+
+# Mostrar resultados
+knitr::kable(comparacion, digits = 5)
+```
+
+### Curvas ROC y AUC {-}
+
+```{r}
+# Almacenar resultados por fold
+auc_bern <- rep(NA_real_, L)
+auc_vecinos <- rep(NA_real_, L)
+
+# Evaluar ambos modelos
+for (l in seq_len(L)) {
+
+  # Seleccionar las díadas de prueba
+  prueba <- fold == l
+  y <- observado[prueba]
+
+  # Verificar la presencia de ambas clases
+  if (length(unique(y)) == 2) {
+
+    # Curva ROC del Bernoulli homogéneo
+    roc_bern <- pROC::roc(
+      response  = y,
+      predictor = prob_cv[prueba],
+      levels    = c(0, 1),
+      direction = "<",
+      quiet     = TRUE
+    )
+
+    # Curva ROC del modelo de vecinos comunes
+    roc_vecinos <- pROC::roc(
+      response = y,
+      predictor = prob_vecinos[prueba],
+      levels = c(0, 1),
+      direction = "<",
+      quiet = TRUE
+    )
+
+    # Guardar el AUC de cada modelo
+    auc_bern[l] <- as.numeric(pROC::auc(roc_bern))
+    auc_vecinos[l] <- as.numeric(pROC::auc(roc_vecinos))
+  }
+}
+
+# Comparar resultados por fold
+resultados_auc <- data.frame(
+  Fold = seq_len(L),
+  Bernoulli = auc_bern,
+  Vecinos_comunes = auc_vecinos
+)
+
+# Mostrar resultados
+knitr::kable(resultados_auc, digits = 4)
+
+# Resumir el AUC promedio
+resumen_auc <- data.frame(
+  Modelo = c("Bernoulli homogéneo", "Vecinos comunes"),
+  AUC_promedio = c(
+    mean(auc_bern, na.rm = TRUE),
+    mean(auc_vecinos, na.rm = TRUE)
+  )
+)
+
+knitr::kable(resumen_auc, digits = 4)
+```
+
+
+```{r, fig.width=7, fig.height=6, fig.align='center'}
+# Definir colores por modelo
+color_vecinos <- adjustcolor("steelblue", alpha.f = 0.4)
+color_bern <- adjustcolor("red3", alpha.f = 0.4)
+
+# Inicializar el gráfico
+primer_grafico <- TRUE
+
+# Graficar las curvas ROC de todos los folds
+for (l in seq_len(L)) {
+
+  # Seleccionar las díadas de prueba
+  prueba <- fold == l
+  y <- observado[prueba]
+
+  # Verificar que existen ambas clases
+  if (length(unique(y)) < 2) next
+
+  # Calcular ROC del modelo Bernoulli
+  roc_bern <- pROC::roc(
+    response = y,
+    predictor = prob_cv[prueba],
+    levels = c(0, 1),
+    direction = "<",
+    quiet = TRUE
+  )
+
+  # Calcular ROC del modelo de vecinos comunes
+  roc_vecinos <- pROC::roc(
+    response = y,
+    predictor = prob_vecinos[prueba],
+    levels = c(0, 1),
+    direction = "<",
+    quiet = TRUE
+  )
+
+  # Crear el gráfico con la primera curva
+  if (primer_grafico) {
+
+    plot(
+      roc_vecinos,
+      legacy.axes = TRUE,
+      col = color_vecinos,
+      lwd = 2,
+      xlab = "Tasa de falsos positivos",
+      ylab = "Sensibilidad",
+      main = "Curvas ROC por fold"
+    )
+
+    primer_grafico <- FALSE
+
+  } else {
+
+    # Agregar la curva de vecinos comunes
+    plot(
+      roc_vecinos,
+      add = TRUE,
+      col = color_vecinos,
+      lwd = 2
+    )
+  }
+
+  # Agregar la curva del modelo Bernoulli
+  plot(
+    roc_bern,
+    add = TRUE,
+    col = color_bern,
+    lwd = 2,
+    lty = 2
+  )
+}
+
+# Calcular el AUC promedio por modelo
+auc_medio_vecinos <- mean(auc_vecinos, na.rm = TRUE)
+auc_medio_bern <- mean(auc_bern, na.rm = TRUE)
+
+# Agregar la leyenda
+legend(
+  "bottomright",
+  legend = c(
+    paste0("Vecinos comunes: AUC = ", round(auc_medio_vecinos, 3)),
+    paste0("Bernoulli: AUC = ", round(auc_medio_bern, 3))
+  ),
+  col = c("steelblue", "red3"),
+  lwd = 2,
+  lty = c(1, 2),
+  bty = "n"
+)
+```
+
+## Otros modelos de predicción de enlaces
+
+Además de los **vecinos comunes**, podemos considerar otros predictores para la red de aeropuertos:
+
+- **Enlace preferencial:**  producto de los grados de dos vértices, \(d_i d_j\).
+- **Similitud de grados:**  diferencia absoluta entre los grados, \(|d_i-d_j|\).
+- **Distancia geográfica:** distancia física entre dos aeropuertos, \(h_{i,j}\).
+- **Modelo combinado:**     incorpora simultáneamente varios de estos predictores.
+
+Estos predictores pueden utilizarse en **modelos de regresión logística** para estimar probabilidades de enlace.
+
+Los predictores estructurales deben calcularse exclusivamente con las aristas de entrenamiento.
+
+
