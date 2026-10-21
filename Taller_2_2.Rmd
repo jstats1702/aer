@@ -1,0 +1,174 @@
+---
+title: "Taller #2"
+subtitle: "Maduración del café colombiano"
+author: "Análisis Estadístico de Redes"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    code_folding: hide
+    df_print: paged
+    self_contained: true
+---
+
+<style>
+body {
+  font-size: 16px;
+  line-height: 1.62;
+}
+.main-container {
+  max-width: 1120px !important;
+}
+h1, h2, h3 {
+  font-weight: 650;
+  margin-top: 1.35em;
+}
+h1 {
+  border-bottom: 2px solid #e7e7e7;
+  padding-bottom: 0.22em;
+}
+h2 {
+  border-bottom: 1px solid #eeeeee;
+  padding-bottom: 0.16em;
+}
+blockquote {
+  border-left: 4px solid #4a6fa5;
+  background: #f7f9fc;
+  padding: 0.8em 1.1em;
+  color: #30343b;
+}
+.callout {
+  border: 1px solid #d9e2ef;
+  border-left: 5px solid #4a6fa5;
+  border-radius: 5px;
+  background: #f8fafc;
+  padding: 0.9em 1.1em;
+  margin: 1.1em 0;
+}
+.callout-warning {
+  border-left-color: #b36b00;
+  background: #fffaf2;
+}
+.callout-extra {
+  border-left-color: #5c6f68;
+  background: #f7faf8;
+}
+table {
+  width: 100%;
+}
+code {
+  font-size: 0.92em;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 9,
+  fig.height = 6,
+  out.width = "100%"
+)
+options(width = 100)
+```
+
+# Objetivo
+
+Estudiar **cómo cambian las características visuales de los frutos de café según su estado de maduración**. Aplique técnicas de **análisis de imágenes y redes de superpíxeles** para caracterizar las diferencias entre etapas y determinar si las propiedades estructurales de las redes mejoran la clasificación basada únicamente en el color.
+
+La pregunta central es:
+
+> **¿Qué patrones cromáticos y estructurales distinguen los estados de maduración del café y cuánto mejora su clasificación al incorporar características de las redes de superpíxeles?**
+
+# Datos
+
+Utilice el [**Cherry Coffe Bean Dataset**](https://zenodo.org/records/14271151), publicado por **Pinto, Paz y Campo (Unicomfacauca)** en Zenodo. La colección contiene fotografías de frutos de café etiquetadas según su estado de maduración. Para este taller trabaje con un único archivo del repositorio, de modo que la fuente y las etiquetas sean reproducibles.
+
+- **Fuente:** <https://zenodo.org/records/14271151>
+- **Archivo de trabajo:** [`dataset4_1_cropped.zip`](https://zenodo.org/records/14271151/files/dataset4_1_cropped.zip?download=1) (aproximadamente 66,6 MB).
+- **Vista previa de su contenido:** <https://zenodo.org/records/14271151/preview/dataset4_1_cropped.zip>
+- **Referencia:** Pinto, V. H., Paz, C. F. y Campo, D. A. (2024). *Cherry Coffe Bean Dataset* (v2). Zenodo. <https://doi.org/10.5281/zenodo.14271151>.
+
+El archivo contiene imágenes JPEG organizadas en las siguientes carpetas, que se utilizarán como etiquetas:
+
+| Carpeta | Estado de maduración |
+|:--|:--|
+| `Verdes` | Frutos verdes |
+| `Pintones` | Frutos en transición de color |
+| `Maduros` | Frutos maduros |
+| `Sobremaduros` | Frutos sobremaduros |
+| `Secos` | Frutos secos |
+
+<div class="callout callout-warning">
+<strong>Importante.</strong> Las etiquetas provienen de las carpetas del conjunto de datos, no de una medición independiente de madurez fisiológica. La unidad de análisis es la <strong>imagen</strong>; varias fotografías pueden corresponder a una misma sesión o a frutos visualmente muy parecidos. No asuma que todas las imágenes son observaciones independientes.
+</div>
+
+## Descarga y conformación de la muestra
+
+Descargue y descomprima `dataset4_1_cropped.zip`. Seleccione una muestra **equilibrada de aproximadamente 30 imágenes por etapa** (150 en total), fijando una semilla. Antes de seleccionar, compruebe cuántas imágenes están disponibles por categoría, su resolución, el formato de color y la presencia de fotografías repetidas o casi idénticas. Conserve los archivos originales y registre la etiqueta y la ruta de cada imagen.
+
+<div class="callout">
+<strong>Nota.</strong> Para el análisis comparativo, estandarice la resolución y conserve una regla común de recorte y tratamiento del fondo. No mezcle fotografías adicionales de otros archivos sin identificar su origen. El documento debe compilarse a partir de los datos almacenados localmente; la descarga solo debe ejecutarse cuando sea necesaria.
+</div>
+
+# Actividades
+
+## Preparación y exploración de imágenes
+
+Examine la distribución de imágenes por estado de maduración, sus dimensiones, condiciones de iluminación, fondos y posibles duplicados. Visualice ejemplos representativos y justifique las exclusiones realizadas. Estandarice la resolución de las imágenes y represéntelas en los espacios de color RGB y CIELAB para explorar las diferencias cromáticas entre estados.
+
+Calcule, para cada imagen, medidas de tendencia central y dispersión de los canales RGB y las componentes $L^*$, $a^*$ y $b^*$. Compare sus distribuciones entre estados de maduración e identifique los atributos cromáticos con mayor capacidad para diferenciarlos.
+
+## Superpíxeles y construcción de redes
+
+Segmente cada imagen mediante SLIC y construya una red de adyacencia de regiones (RAG), cuyos vértices representan superpíxeles y cuyas aristas conectan regiones con fronteras comunes. Asigne pesos a las aristas según la similitud de color en CIELAB, siguiendo la metodología de la clase.
+
+Utilice inicialmente los mismos parámetros de segmentación y ponderación para todas las imágenes. Compare el número y tamaño de los superpíxeles, las fronteras, los pesos y la estructura de las redes entre los distintos estados de maduración. Tenga en cuenta que los pesos representan similitud cromática y no distancias geodésicas.
+
+## Caracterización y comparación de redes
+
+Caracterice las redes mediante grado, fuerza, transitividad, similitud media, componentes y comunidades. Identifique comunidades mediante Louvain y represéntelas sobre las imágenes originales. Si utiliza umbrales de similitud, aplique criterios comparables entre imágenes y examine su efecto sobre la fragmentación y el tamaño de la componente mayor.
+
+Construya una matriz de características con una fila por imagen y columnas correspondientes a los atributos cromáticos y las medidas de red. Compare sus distribuciones entre estados de maduración e identifique las diferencias más relevantes. Tenga en cuenta que las comunidades representan regiones cromáticamente similares y no necesariamente objetos individuales.
+
+## Clasificación del estado de maduración
+
+Evalúe la siguiente pregunta: ¿las características estructurales de las redes mejoran la clasificación de los estados de maduración frente al uso exclusivo de atributos cromáticos?
+
+Divida los datos en entrenamiento (80 %) y prueba (20 %), conservando aproximadamente las proporciones de las cinco clases. Evite que imágenes duplicadas o muy similares aparezcan en ambos conjuntos y, cuando sea posible, agrupe las fotografías de una misma sesión de captura.
+
+Compare al menos dos modelos de clasificación, utilizando, por ejemplo, regresión logística multinomial:
+
+1. Modelo de referencia: medidas de tendencia central y dispersión de RGB y CIELAB.
+2. Modelo ampliado: los mismos atributos cromáticos más un conjunto reducido de medidas estructurales de las redes.
+
+Realice la selección de variables, estandarización y ajuste de los modelos exclusivamente con los datos de entrenamiento, utilizando validación cruzada. Evalúe ambos modelos en prueba mediante matriz de confusión, exactitud y F1 macro. Incluya como referencia un clasificador que prediga siempre la clase más frecuente en entrenamiento.
+
+Identifique los estados de maduración con mayores errores de clasificación y determine si las características de las redes aportan una mejora predictiva relevante. Discuta las limitaciones de los resultados, considerando que se clasifican categorías fotográficas y no se mide directamente la maduración fisiológica de los frutos.
+
+## Sensibilidad y robustez
+
+Repita los análisis principales utilizando al menos dos configuraciones de SLIC y, cuando corresponda, distintos umbrales de similitud. Evalúe la sensibilidad de las comunidades identificadas, las diferencias entre estados de maduración y la capacidad predictiva de los modelos. Discuta cómo la resolución de las imágenes, la iluminación, el fondo y la presencia de fotografías consecutivas pueden afectar los resultados.
+
+# Discusión
+
+A partir de los resultados obtenidos, responda las siguientes preguntas:
+
+- ¿Qué características cromáticas y espaciales distinguen los estados de maduración del café?
+- ¿Qué diferencias presentan las redes en términos de conectividad, similitud y estructura de comunidades?
+- ¿Qué información adicional aportan las características estructurales de las redes frente a los atributos RGB y CIELAB?
+- ¿En qué medida las características de red mejoran la clasificación fuera de muestra? ¿Qué estados presentan mayores dificultades de clasificación?
+- ¿Cómo afectan la iluminación, el fondo, la selección de imágenes y la dependencia entre fotografías a la interpretación y generalización de los resultados?
+
+# Producto final
+
+Entregue un informe reproducible en R Markdown, su versión HTML y un inventario de las imágenes utilizadas, incluyendo sus etiquetas y rutas. Presente únicamente figuras y tablas relevantes, acompañadas de interpretaciones concisas. Organice y comente brevemente el código, garantizando su ejecución a partir de las imágenes guardadas. Documente las decisiones de selección, segmentación, construcción de redes y validación.
+
+No se requieren modelos de aprendizaje profundo ni detección automática de frutos. El objetivo es integrar las técnicas de análisis cromático y redes de superpíxeles con una evaluación estadística de la capacidad de clasificación fuera de muestra.

@@ -1,0 +1,180 @@
+---
+title: "Taller #2"
+subtitle: "Contratación pública en Colombia"
+author: "Análisis Estadístico de Redes"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    code_folding: hide
+    df_print: paged
+    self_contained: true
+---
+
+<style>
+body {
+  font-size: 16px;
+  line-height: 1.62;
+}
+.main-container {
+  max-width: 1120px !important;
+}
+h1, h2, h3 {
+  font-weight: 650;
+  margin-top: 1.35em;
+}
+h1 {
+  border-bottom: 2px solid #e7e7e7;
+  padding-bottom: 0.22em;
+}
+h2 {
+  border-bottom: 1px solid #eeeeee;
+  padding-bottom: 0.16em;
+}
+blockquote {
+  border-left: 4px solid #4a6fa5;
+  background: #f7f9fc;
+  padding: 0.8em 1.1em;
+  color: #30343b;
+}
+.callout {
+  border: 1px solid #d9e2ef;
+  border-left: 5px solid #4a6fa5;
+  border-radius: 5px;
+  background: #f8fafc;
+  padding: 0.9em 1.1em;
+  margin: 1.1em 0;
+}
+.callout-warning {
+  border-left-color: #b36b00;
+  background: #fffaf2;
+}
+.callout-extra {
+  border-left-color: #5c6f68;
+  background: #f7faf8;
+}
+table {
+  width: 100%;
+}
+code {
+  font-size: 0.92em;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 9,
+  fig.height = 6,
+  out.width = "100%"
+)
+options(width = 100)
+```
+
+# Objetivo
+
+Estudiar **qué se propone contratar el Estado colombiano** a partir de las descripciones de los procesos publicados en **SECOP II durante 2025**. Utilice técnicas de **minería de texto y análisis de redes** para reconocer patrones temáticos y evaluar si la información lingüística mejora la predicción del presupuesto estimado de los procesos de contratación.
+
+La pregunta central es:
+
+> **¿Qué temas caracterizan la contratación pública colombiana y cuánto aporta el contenido de las descripciones a la predicción del precio base de un proceso, más allá de su modalidad y localización?**
+
+# Datos
+
+Utilice el conjunto oficial [**SECOP II – Procesos de Contratación**](https://www.datos.gov.co/Estad-sticas-Nacionales/SECOP-II-Procesos-de-Contrataci-n/p6dx-8zbt), publicado por la **Agencia Nacional de Contratación Pública – Colombia Compra Eficiente**. El conjunto incluye procesos adjudicados y no adjudicados, se actualiza periódicamente y contiene registros correspondientes a 2025.
+
+- **Fuente:** <https://www.datos.gov.co/Estad-sticas-Nacionales/SECOP-II-Procesos-de-Contrataci-n/p6dx-8zbt>
+- **Acceso programático (JSON):** <https://www.datos.gov.co/resource/p6dx-8zbt.json>
+- **Documentación de las consultas:** <https://dev.socrata.com/docs/queries/>
+
+Considere las siguientes variables, cuyos nombres en la API se indican entre paréntesis:
+
+| Variable | Uso |
+|:--|:--|
+| `id_del_proceso` | Identificador del documento |
+| `descripci_n_del_procedimiento` | Texto principal del corpus |
+| `nombre_del_procedimiento` | Referencia complementaria, no sustituye la descripción |
+| `fecha_de_publicacion_del` | Fecha de publicación en 2025 |
+| `departamento_entidad` | Localización de la entidad, no necesariamente del proyecto |
+| `modalidad_de_contratacion` | Modalidad del procedimiento |
+| `precio_base` | Presupuesto proyectado del proceso, en pesos colombianos |
+| `ordenentidad` | Orden de la entidad contratante |
+
+<div class="callout callout-warning">
+<strong>Importante.</strong> El <em>precio base</em> no corresponde necesariamente al valor contratado, pagado o ejecutado. Asimismo, este conjunto registra <strong>procesos</strong>, no una lista exhaustiva de contratos firmados. No interprete las predicciones como estimaciones del gasto público efectivamente realizado.
+</div>
+
+## Descarga y conformación del corpus
+
+Seleccione exclusivamente procesos publicados entre el **1 de enero y el 31 de diciembre de 2025**, con precio base positivo y descripción no vacía. Para que el ejercicio sea manejable, construya un corpus de aproximadamente **2 000 a 3 000 procesos**, conservando distintos trimestres, departamentos y modalidades. Establezca una regla reproducible de selección y examine la distribución de la muestra antes de analizarla.
+
+<div class="callout">
+<strong>Nota.</strong> Cada <strong>proceso de contratación</strong> constituye un documento. Construya una tabla con una fila por `id_del_proceso`, el texto y sus metadatos. Si alguna descripción contiene información personal o identificadores innecesarios, elimínelos de las salidas compartidas. Documente la fecha de consulta y conserve el archivo de datos utilizado.
+</div>
+
+# Actividades
+
+## Preparación y exploración
+
+Revise valores faltantes, duplicados, textos demasiado cortos, fechas, departamentos, modalidades y valores extremos del precio base. Describa el número de documentos, la longitud de las descripciones y la distribución de los presupuestos, justificando las exclusiones realizadas. Aplique tokenización, normalización y eliminación de palabras vacías en español, conservando los términos relevantes para la contratación pública.
+
+Identifique palabras y bigramas frecuentes, así como términos distintivos entre modalidades o grupos de precios. Utilice keyness para identificar expresiones relevantes y distinguir contenidos sustantivos de fórmulas administrativas recurrentes.
+
+## Matriz documento–término y similitud
+
+Construya la matriz documento–término $\mathbf{X}$, cuyas filas representan procesos y columnas, términos. Examine su dimensión y dispersión. Compare frecuencias y TF–IDF, calcule similitudes de Jaccard y coseno entre documentos e interprete los resultados según las características de los procesos.
+
+Aplique una descomposición en valores singulares truncada (LSA) y represente los procesos en dos dimensiones. Interprete las agrupaciones mediante ejemplos concretos y examine su relación con las modalidades de contratación y los departamentos, sin asumir que corresponden a categorías oficiales de gasto.
+
+## Redes de texto
+
+Construya redes no dirigidas de coocurrencia mediante ventanas de palabras. Para controlar su tamaño, defina un vocabulario y criterios de selección de aristas comparables entre grupos. Contraste la frecuencia de los bigramas con una medida de asociación, como PMI, excluyendo asociaciones basadas en ocurrencias muy escasas.
+
+Caracterice las redes mediante grado, fuerza, componentes, transitividad, centralidad y comunidades. Compare al menos dos redes correspondientes a grupos relevantes (por ejemplo, dos modalidades de contratación), identifique sus términos centrales e interprete las principales diferencias temáticas. Tenga en cuenta que los pesos de coocurrencia representan intensidad de asociación, no distancia geodésica.
+
+## Red de semejanza entre procesos
+
+A partir de TF–IDF, construya una red de documentos en la que dos procesos estén conectados cuando sus descripciones presenten suficiente similitud. Justifique el criterio de conexión y evalúe la sensibilidad de los resultados. Identifique comunidades y examine si agrupan procesos con características similares, incluso entre diferentes entidades o departamentos.
+
+Compare las distribuciones del precio base entre comunidades, considerando las modalidades de contratación. Identifique diferencias relevantes e interprete los resultados sin establecer relaciones causales.
+
+## Predicción del presupuesto
+
+Defina $y_i=\log(\text{precio base}_i)$ para los procesos con precio base positivo y evalúe la siguiente pregunta: ¿el contenido de las descripciones mejora la predicción del presupuesto proyectado? Divida los datos en entrenamiento (80 %) y prueba (20 %), fijando una semilla y evitando que procesos duplicados o descripciones idénticas aparezcan en ambos conjuntos.
+
+Compare al menos dos modelos de regresión:
+
+1. Modelo de referencia: incluya modalidad de contratación, orden de la entidad y departamento, agrupando categorías poco frecuentes cuando sea necesario.
+2. Modelo ampliado: incorpore las mismas covariables y un número reducido de componentes LSA obtenidos a partir de TF–IDF.
+
+Realice el preprocesamiento, la construcción de TF–IDF y la estimación de LSA utilizando únicamente los datos de entrenamiento. Seleccione el número de componentes mediante validación cruzada y evalúe ambos modelos en el conjunto de prueba mediante MAE y RMSE, calculados sobre el logaritmo del precio base. Incluya como referencia la predicción constante de la mediana del entrenamiento.
+
+Determine si la información textual mejora la capacidad predictiva frente a las variables administrativas. Examine los procesos con mayores errores e identifique posibles características asociadas. Evite utilizar variables que revelen directamente el presupuesto o información posterior a la publicación del proceso.
+
+## Robustez
+
+Repita los análisis principales utilizando al menos dos criterios de preprocesamiento y construcción de redes. Examine la sensibilidad de los términos más relevantes, las comunidades identificadas y la capacidad predictiva de los modelos. Discuta cómo las diferencias en la cobertura de la muestra limitan la generalización de los resultados a la contratación pública colombiana.
+
+# Discusión
+
+A partir de los resultados obtenidos, responda las siguientes preguntas:
+
+- ¿Qué bienes, servicios y actividades predominan en los procesos de contratación pública?
+- ¿Qué similitudes y diferencias presentan las redes de términos entre modalidades de contratación y las comunidades de documentos?
+- ¿Los procesos con contenidos similares presentan precios base comparables? ¿Qué papel desempeña la modalidad de contratación?
+- ¿En qué medida la incorporación de información textual mejora la capacidad predictiva fuera de muestra?
+- ¿Cómo afectan la calidad de las descripciones, la selección de procesos y la diferencia entre precio base y gasto ejecutado a la interpretación de los resultados?
+
+# Producto final
+
+Entregue un informe reproducible en R Markdown, su versión HTML y el conjunto de datos utilizado. Incluya únicamente figuras y tablas relevantes, acompañadas de interpretaciones concisas. Organice y comente brevemente el código, garantizando su ejecución a partir de los datos guardados. Documente las decisiones de preprocesamiento, modelado y validación.
+
+No se requiere análisis de sentimiento ni modelos avanzados de lenguaje. El objetivo es integrar las técnicas de análisis de texto y redes con una evaluación estadística de la capacidad predictiva fuera de muestra.
