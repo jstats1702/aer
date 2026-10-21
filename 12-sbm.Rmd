@@ -1,0 +1,813 @@
+---
+title: "Modelos de bloques estocásticos"
+author:
+- Juan Sosa PhD
+- Email   jcsosam@unal.edu.co
+- GitHub  https://github.com/jstats1702
+date: ""
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cerulean
+    highlight: kate
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introducción
+
+Los **modelos de bloques estocásticos** (**SBM**, *stochastic block models*) representan una red mediante **clases de vértices estocásticamente equivalentes**. 
+
+La **probabilidad de vínculo** entre dos vértices depende únicamente de las **clases a las que pertenecen**, y no de sus identidades individuales.
+
+El SBM puede representar **patrones assortativos**, **disassortativos** o **núcleo-periferia**. 
+
+El término **comunidad** se reserva aquí para grupos con conectividad interna relativamente alta.
+
+```{r patrones-sbm, fig.width=9, fig.height=3, fig.align='center'}
+# Matrices de interacción representativas
+Pi_comunidad <- matrix(c(0.75, 0.08, 0.08, 0.70), 2, 2)
+Pi_disassort <- matrix(c(0.08, 0.75, 0.75, 0.08), 2, 2)
+Pi_nucleo    <- matrix(c(0.75, 0.45, 0.45, 0.05), 2, 2)
+
+# Mostrar las tres estructuras
+matrices <- list(Pi_comunidad, Pi_disassort, Pi_nucleo)
+titulos <- c("Comunidades", "Disassortativa", "Núcleo-periferia")
+par(mfrow = c(1, 3), mar = c(2, 2, 3, 1))
+for (k in seq_along(matrices)) {
+  image(
+    x = 1:2, y = 1:2, z = matrices[[k]],
+    col = hcl.colors(100, "Blues 3"), zlim = c(0, 1),
+    axes = FALSE, xlab = "", ylab = "", main = titulos[k]
+  )
+  axis(1, at = 1:2, labels = 1:2, tick = FALSE)
+  axis(2, at = 1:2, labels = 1:2, tick = FALSE)
+  box()
+}
+```
+
+El caso particular de **un solo bloque** ($Q=1$) corresponde al **modelo Bernoulli homogéneo**: 
+
+$$
+y_{i,j}\overset{\text{iid}}{\sim}\textsf{Bernoulli}(\theta), \qquad i<j.
+$$
+
+# Modelo de bloques estocásticos
+
+Consideramos un **grafo simple no dirigido** $G=(V,E)$, con $V=\{1,\ldots,n\}$ y matriz de adyacencia $\mathbf{Y}=[y_{i,j}]$.
+
+## Clases latentes
+
+Cada vértice pertenece a una de $Q$ **clases latentes**. 
+
+Sea $\xi_i\in\{1,\ldots,Q\}$ su etiqueta y $z_{i,q}=\mathbb{1}(\xi_i=q)$ su indicador de pertenencia. 
+
+Se supone que
+$$
+\boldsymbol{z}_i\mid\boldsymbol{\alpha}
+\overset{\text{iid}}{\sim}\textsf{Multinomial}(1,\boldsymbol{\alpha}),
+\qquad i=1,\ldots,n,
+$$
+donde $\boldsymbol{\alpha}=(\alpha_1,\ldots,\alpha_Q)$, $\alpha_q\geq 0$ y $\sum_{q=1}^Q\alpha_q=1$. 
+
+Por tanto, $\textsf{Pr}(\xi_i=q\mid\boldsymbol\alpha)=\alpha_q$.
+
+## Probabilidades de interacción
+
+Sea $\mathbf{\Pi}=[\pi_{q,r}]$ una **matriz simétrica** de probabilidades, con $0\leq\pi_{q,r}\leq 1$. 
+
+Condicionalmente a las etiquetas, las **díadas distintas** son independientes:
+$$
+y_{i,j}\mid\boldsymbol\xi,\mathbf\Pi
+\overset{\text{ind}}{\sim}
+\textsf{Bernoulli}(\pi_{\xi_i,\xi_j}),\qquad i<j.
+$$
+
+los **vínculos son condicionalmente independientes** dadas las asignaciones de clase, y sus probabilidades **dependen únicamente de las clases** de los vértices involucrados.
+
+La **distribución condicional de la red** se expresa como
+$$
+p(\mathbf y\mid\boldsymbol\xi,\mathbf\Pi)
+=
+\prod_{i<j}
+p(y_{i,j}\mid\xi_i,\xi_j,\mathbf\Pi)
+=
+\prod_{i<j}
+\pi_{\xi_i,\xi_j}^{y_{i,j}}
+(1-\pi_{\xi_i,\xi_j})^{1-y_{i,j}}.
+$$
+
+Aunque los **vínculos son condicionalmente independientes** dadas las asignaciones de clase, esta propiedad no necesariamente se conserva al **marginalizar las clases latentes**. En efecto, la distribución marginal de la red se obtiene sumando sobre todas las posibles configuraciones de las clases:
+$$
+p(\mathbf y\mid\boldsymbol\alpha,\mathbf\Pi)
+=
+\sum_{\boldsymbol\xi}
+p(\mathbf y\mid\boldsymbol\xi,\mathbf\Pi)\,
+p(\boldsymbol\xi\mid\boldsymbol\alpha),
+$$
+donde la suma considera las $Q^n$ posibles configuraciones de $\boldsymbol\xi$.
+
+Por lo tanto, las aristas pueden presentar **dependencia marginal cuando comparten un vértice**. Por ejemplo, $y_{i,j}$ y $y_{i,k}$ dependen de la misma asignación latente $\xi_i$, lo que puede inducir una asociación entre ambas.
+
+## Verosimilitud con clases conocidas
+
+Sean $n_q$ el número de vértices de la clase $q$, $m_{q,r}$ el número de aristas entre las clases $q$ y $r$, y $N_{q,r}$ el número de díadas posibles:
+$$
+N_{q,r}=\begin{cases}
+\binom{n_q}{2},&q=r,\\
+n_q\,n_r,&q<r.
+\end{cases}
+$$
+
+Condicionalmente a una **partición conocida**, el **estimador de máxima verosimilitud** es
+$$
+\hat\pi_{q,r}=\frac{m_{q,r}}{N_{q,r}},\qquad N_{q,r}>0,
+$$
+y el estimador de las proporciones de clases es $\hat\alpha_q=n_q/n$.
+
+## Grado esperado e identificabilidad
+
+Para un vértice $i$ de la clase $q$, el **grado esperado condicional** es
+$$
+\textsf{E}(D_i\mid\boldsymbol\xi,\mathbf\Pi)
+=(n_q-1)\pi_{q,q}+\sum_{r\neq q}n_r\pi_{q,r}.
+$$
+
+Los **nombres de las clases son arbitrarios**, pues permutar simultáneamente las etiquetas, las entradas de $\boldsymbol\alpha$ y las filas y columnas de $\mathbf\Pi$ no modifica el modelo. 
+
+Este fenómeno se conoce como **permutación de etiquetas** (*label switching*).
+
+# Simulación de redes SBM
+
+Simulamos una red con **tres clases conocidas** para estudiar la generación y recuperación de los parámetros.
+
+```{r paquetes}
+# Paquetes
+suppressMessages(suppressWarnings(library(igraph)))
+suppressMessages(suppressWarnings(library(blockmodels)))
+suppressMessages(suppressWarnings(library(sand)))
+suppressMessages(suppressWarnings(library(corrplot)))
+```
+
+```{r simulacion, fig.width=8, fig.height=5, fig.align='center'}
+# Tamaños y clases verdaderas
+block_sizes_true <- c(40, 50, 45)
+Q_true <- length(block_sizes_true)
+n_true <- sum(block_sizes_true)
+labels_true <- rep(seq_len(Q_true), times = block_sizes_true)
+
+# Probabilidades verdaderas de interacción
+Pi_true <- matrix(
+  c(0.55, 0.04, 0.03,
+    0.04, 0.45, 0.06,
+    0.03, 0.06, 0.50),
+  nrow = Q_true, byrow = TRUE
+)
+
+# Simular una red simple no dirigida
+set.seed(42)
+g_true <- sample_sbm(
+  n = n_true,
+  pref.matrix = Pi_true,
+  block.sizes = block_sizes_true,
+  directed = FALSE,
+  loops = FALSE
+)
+
+# Visualizar los bloques verdaderos
+cols_true <- grDevices::hcl.colors(Q_true, "Dark 3")
+set.seed(42)
+plot(
+  g_true,
+  layout = igraph::layout_with_fr(g_true),
+  vertex.label = NA,
+  vertex.size = 5,
+  vertex.color = cols_true[labels_true],
+  vertex.frame.color = cols_true[labels_true],
+  edge.color = grDevices::adjustcolor("black", alpha.f = 0.12)
+)
+```
+
+## Estimación con clases conocidas
+
+Estimamos la matriz $\mathbf\Pi$ contando **aristas observadas** y **díadas posibles** en cada par de bloques.
+
+```{r mle-conocidas}
+# Matriz de adyacencia de la red simulada
+A_true <- as.matrix(igraph::as_adjacency_matrix(g_true, sparse = FALSE))
+
+# Número de vértices por clase
+nq_true <- tabulate(labels_true, nbins = Q_true)
+
+# Matrices de aristas observadas y díadas posibles
+M <- matrix(0, nrow = Q_true, ncol = Q_true)
+N <- matrix(0, nrow = Q_true, ncol = Q_true)
+
+for (q in seq_len(Q_true)) {
+  for (r in q:Q_true) {
+    # Identificar los vértices de los bloques
+    iq <- which(labels_true == q)
+    ir <- which(labels_true == r)
+
+    if (q == r) {
+      # Contar aristas internas una sola vez
+      A_qq <- A_true[iq, iq, drop = FALSE]
+      M[q, r] <- sum(A_qq[upper.tri(A_qq)])
+      N[q, r] <- choose(length(iq), 2)
+    } else {
+      # Contar aristas entre bloques
+      M[q, r] <- sum(A_true[iq, ir, drop = FALSE])
+      N[q, r] <- length(iq) * length(ir)
+    }
+
+    # Completar las matrices simétricas
+    M[r, q] <- M[q, r]
+    N[r, q] <- N[q, r]
+  }
+}
+
+# Estimadores de máxima verosimilitud
+Pi_mle <- M / N
+alpha_mle <- nq_true / n_true
+
+# Comparar valores verdaderos y estimados
+round(Pi_true, 3)
+round(Pi_mle, 3)
+round(alpha_mle, 3)
+```
+
+## Estimación con clases desconocidas
+
+### Estimación
+
+Cuando las **etiquetas de clase** son desconocidas, `blockmodels` utiliza un **algoritmo EM variacional** para estimar las **probabilidades de pertenencia** $\tau_{i,q}=\textsf{Pr}(\xi_i=q\mid\mathbf y)$, los **parámetros del modelo** $(\boldsymbol\alpha,\mathbf\Pi)$ y explorar diferentes **números de bloques** $Q$.
+
+Con **clases desconocidas**, la verosimilitud marginal involucra una suma sobre las $Q^n$ asignaciones posibles. 
+
+El algoritmo maximiza iterativamente una **cota inferior de la log-verosimilitud** (ELBO), definida como
+$$
+\mathcal{L}(q,\boldsymbol\theta)
+=
+\textsf{E}_{q(\boldsymbol\xi)}
+\left[\log p(\mathbf y,\boldsymbol\xi\mid\boldsymbol\theta)\right]
+-
+\textsf{E}_{q(\boldsymbol\xi)}
+\left[\log q(\boldsymbol\xi)\right],
+$$
+donde $\boldsymbol\theta=(\boldsymbol\alpha,\mathbf\Pi)$. 
+
+En el **paso E**, se actualizan las probabilidades $\tau_{i,q}$; en el **paso M**, se estiman los parámetros $\boldsymbol\alpha$ y $\mathbf\Pi$. 
+
+Este procedimiento realiza **máxima verosimilitud aproximada**, no inferencia plenamente bayesiana.
+
+### Criterio ICL
+
+La **verosimilitud integrada de clasificación** (*Integrated Classification Likelihood*, ICL) combina la **bondad de ajuste** del modelo con una **penalización por complejidad**.
+
+Para el **SBM Bernoulli simétrico**, el **criterio ICL** implementado en `blockmodels` se expresa como
+$$
+\mathrm{ICL}(Q)
+=
+\mathrm{PL}_Q
+-\frac12\left\{
+\frac{Q(Q+1)}{2}\log\binom{n}{2}
++(Q-1)\log n
+\right\},
+$$
+donde
+$$
+\mathrm{PL}_Q
+=
+\textsf{E}_{\hat q_Q(\boldsymbol\xi)}
+\left[
+\log p(\mathbf y,\boldsymbol\xi\mid\hat{\boldsymbol\theta}_Q)
+\right]
+$$
+es el **valor esperado variacional de la log-verosimilitud completa**, evaluado en las estimaciones del modelo con $Q$ bloques. La **penalización por complejidad** distingue entre los $Q(Q+1)/2$ parámetros de **interacción** (díadas) y los $Q-1$ parámetros de **proporción de clases** (vértices). 
+
+Se selecciona el número de bloques que **maximiza el ICL**.
+
+El resultado puede depender de **inicializaciones**, **óptimos locales** y del intervalo de valores de $Q$ considerado.
+
+### Probabilidades de pertenencia
+
+Sea $\tau_{i,q}$ la **probabilidad variacional** de que el vértice $i$ pertenezca al bloque $q$. 
+
+Una **clasificación puntual** se obtiene mediante
+$$
+\hat\xi_i=\underset{q}{\arg\max}\;\tau_{i,q}.
+$$
+
+Esta regla **no requiere un umbral** y asigna todos los vértices. La **incertidumbre de clasificación** puede resumirse mediante $u_i=1-\max_q\tau_{i,q}$ o la entropía $H_i=-\sum_q\tau_{i,q}\log\tau_{i,q}$, con $0\log0=0$.
+
+```{r ajuste-simulado}
+# Ajustar SBM Bernoulli no dirigido
+set.seed(42)
+fit_true <- blockmodels::BM_bernoulli(
+  membership_type = "SBM_sym",
+  adj = A_true,
+  verbosity = 0,
+  plotting = "",
+  explore_min = 4,  # Explorar al menos hasta 4 bloques
+  explore_max = 6,  # Explorar como máximo 6 bloques
+  ncores = 1
+)
+fit_true$estimate()
+
+# Número de bloques seleccionado por ICL
+Q_sim <- which.max(fit_true$ICL)
+Q_sim
+
+# Probabilidades estimadas de pertenencia a los bloques
+Z_sim <- fit_true$memberships[[Q_sim]]$Z
+head(Z_sim)
+
+# Asignar cada vértice al bloque más probable
+labels_sim <- max.col(Z_sim)
+head(labels_sim)
+
+# Comparar las clases verdaderas con las estimadas
+igraph::compare(labels_true, labels_sim, method = "adjusted.rand")
+```
+
+El **Adjusted Rand Index (ARI)** compara particiones y es **invariante a las permutaciones de etiquetas**. Un valor alto indica mayor concordancia, pero no demuestra por sí solo que el modelo recupere exactamente todos los parámetros.
+
+Debido a la **invariancia ante permutaciones de etiquetas** (*label switching*) en los SBM, las clases estimadas pueden tener etiquetas diferentes de las verdaderas. 
+
+Para comparar las matrices de probabilidades, se identifica la **permutación óptima** que maximiza el acuerdo entre ambas clasificaciones:
+$$
+p^*=\underset{p\in\mathcal S_Q}{\arg\max}
+\sum_{i=1}^n\mathbb{1}\left(p(\xi_i)=\hat\xi_i\right),
+$$
+donde $\mathcal S_Q$ contiene las $Q!$ permutaciones posibles. 
+
+Finalmente, se reordenan las filas y columnas de $\widehat{\mathbf\Pi}$ según $p^*$, permitiendo compararla con $\mathbf\Pi$ sin alterar las probabilidades estimadas. 
+
+Este procedimiento supone que **el número de bloques estimados coincide con el verdadero**.
+
+```{r comparar-parametros-simulados}
+# Matriz estimada, con etiquetas potencialmente permutadas
+Pi_sim <- fit_true$model_parameters[[Q_sim]]$pi
+round(Pi_sim, 3)
+
+# Comparar entradas después de alinear etiquetas si Q coincide
+if (Q_sim == Q_true) {
+  # Generar las permutaciones de las etiquetas
+  opciones <- rep(list(seq_len(Q_true)), Q_true)
+  permutaciones <- as.matrix(expand.grid(opciones))
+  distintas <- apply(permutaciones, 1, function(x) length(unique(x)) == Q_true)
+  permutaciones <- permutaciones[distintas, , drop = FALSE]
+
+  # Elegir la correspondencia con mayor acuerdo
+  acuerdos <- apply(permutaciones, 1, function(p) {
+    sum(p[labels_true] == labels_sim)
+  })
+  perm <- as.integer(permutaciones[which.max(acuerdos), ])
+
+  # Reordenar la matriz estimada según las clases verdaderas
+  Pi_sim_alineada <- Pi_sim[perm, perm, drop = FALSE]
+  round(Pi_sim_alineada, 3)
+  round(Pi_true, 3)
+} else {
+  # Las matrices no son comparables entrada a entrada
+  cat("Se seleccionó un número distinto de bloques; comparar por ARI y estructura.\n")
+}
+```
+
+# Ejemplo: Blogs de política
+
+La red `fblog` del paquete `sand` representa **referencias entre blogs políticos franceses**, recopiladas en octubre de 2006. 
+
+Una arista no dirigida indica que **al menos uno de los blogs enlaza al otro**. 
+
+Contiene **192 vértices**, **1431 aristas** y una categoría observada de **afiliación política** (`PolParty`). Estas categorías son información externa y **no necesariamente coinciden con los bloques latentes**.
+
+Fuente: [documentación de `fblog`](https://search.r-project.org/CRAN/refmans/sand/html/fblog.html).
+
+```{r datos-blog, fig.width=7, fig.height=5.5, fig.align='center'}
+# Cargar y actualizar el grafo almacenado
+suppressMessages(suppressWarnings(data("fblog", package = "sand")))
+fblog <- igraph::upgrade_graph(fblog)
+
+# Afiliaciones políticas observadas
+partidos <- factor(igraph::vertex_attr(fblog, "PolParty"))
+stopifnot(!anyNA(partidos))
+cols_partidos <- grDevices::hcl.colors(nlevels(partidos), "Dark 3")
+
+# Calcular una disposición reproducible
+set.seed(42)
+layout_blog <- igraph::layout_with_fr(fblog)
+
+# Graficar según las afiliaciones políticas
+plot(fblog, layout = layout_blog, vertex.label = NA,
+     vertex.size = 4, vertex.color = cols_partidos[as.integer(partidos)],
+     vertex.frame.color = cols_partidos[as.integer(partidos)],
+     edge.color = grDevices::adjustcolor("black", alpha.f = 0.10))
+```
+
+## Características observadas
+
+```{r estadisticas-blog}
+# Matriz binaria de adyacencia
+A <- as.matrix(igraph::as_adjacency_matrix(fblog, sparse = FALSE))
+
+# Resumen de la red
+resumen_red <- data.frame(
+  Vertices = igraph::vcount(fblog),
+  Aristas = igraph::ecount(fblog),
+  Densidad = igraph::edge_density(fblog),
+  Grado_medio = mean(igraph::degree(fblog)),
+  Transitividad = igraph::transitivity(fblog, type = "global", isolates = "zero"),
+  Componentes = igraph::count_components(fblog)
+)
+knitr::kable(resumen_red, digits = 3)
+summary(igraph::degree(fblog))
+```
+
+## Ajuste del SBM
+
+```{r ajuste-blog}
+# Ajustar un SBM Bernoulli para la red no dirigida
+set.seed(42)
+fblog.sbm <- blockmodels::BM_bernoulli(
+  membership_type = "SBM_sym",
+  adj = A,
+  verbosity = 0,
+  plotting = "",
+  explore_min = 4,
+  explore_max = 15,
+  ncores = 1
+)
+fblog.sbm$estimate()
+
+# Valores ICL y número seleccionado
+ICLs <- fblog.sbm$ICL
+Q <- which.max(ICLs)
+Q
+
+# Informar si la búsqueda terminó en el límite superior
+if (Q == length(ICLs)) {
+  message("El mejor ICL está en el extremo explorado: conviene ampliar explore_max.")
+}
+```
+
+```{r grafico-icl, fig.width=7, fig.height=4.5, fig.align='center'}
+# Comparar los números de bloques explorados
+plot(seq_along(ICLs), ICLs, type = "b", pch = 16,
+     xlab = "Número de bloques (Q)", ylab = "ICL")
+abline(v = Q, col = "red", lty = 2)
+```
+
+Como **diagnóstico de estabilidad**, se recomienda ajustar el modelo con **diferentes inicializaciones** y comparar los resultados, conservando la solución con mayor **ELBO** para cada número de bloques $Q$. Esto permite reducir el riesgo de convergencia a **óptimos locales**, aunque incrementa el costo computacional.
+
+```{r pertenencias-blog}
+# Matriz de probabilidades variacionales
+Z <- fblog.sbm$memberships[[Q]]$Z
+head(Z)
+
+# Clasificación por máxima probabilidad
+labs <- max.col(Z)
+head(labs)
+
+# Incertidumbre de pertenencia
+prob_max <- apply(Z, 1, max)
+incertidumbre <- 1 - prob_max
+entropia <- -rowSums(ifelse(Z > 0, Z * log(pmax(Z, .Machine$double.eps)), 0))
+
+# Resumir la incertidumbre
+summary(prob_max)
+summary(incertidumbre)
+summary(entropia)
+
+# Tamaños según la clasificación puntual
+nq <- tabulate(labs, nbins = Q)
+nq
+
+# Proporciones basadas en asignaciones puntuales
+alpha_dura <- nq / igraph::vcount(fblog)
+
+# Proporciones a partir de las probabilidades variacionales
+alpha_variacional <- colMeans(Z)
+round(rbind(Dura = alpha_dura, Variacional = alpha_variacional), 3)
+```
+
+## Probabilidades de interacción
+
+La matriz $\widehat{\mathbf\Pi}$ describe la **conectividad entre bloques**, no necesariamente comunidades. 
+
+Valores altos en la diagonal caracterizan una estructura **assortativa**; valores altos fuera de ella pueden indicar otras organizaciones.
+
+```{r probabilidades-blog, fig.width=7, fig.height=6, fig.align='center'}
+# Matriz de probabilidades estimadas
+Pi <- fblog.sbm$model_parameters[[Q]]$pi
+
+# Eliminar pequeñas discrepancias numéricas de simetría
+Pi <- (Pi + t(Pi)) / 2
+
+# Visualizar una matriz de probabilidades, no de correlaciones
+corrplot::corrplot(
+  corr = Pi,
+  is.corr = FALSE,
+  method = "color",
+  col.lim = c(0, 1),
+  type = "full",
+  addgrid.col = "gray90",
+  tl.col = "black"
+)
+round(Pi, 3)
+```
+
+## Visualización de la red y las matrices
+
+La **matriz de probabilidades predichas** bajo la aproximación variacional es $\widehat{\mathbf P}=\mathbf Z\widehat{\mathbf\Pi}\mathbf Z^\top$ para $i\neq j$. Sus entradas no diagonales representan aproximaciones a las **probabilidades marginales de enlace** bajo la distribución variacional de clases. La diagonal se fija en cero porque se excluyen los bucles.
+
+```{r matrices-blog, fig.width=12, fig.height=4, fig.align='center'}
+# Ordenar los vértices según los bloques estimados
+orden <- order(labs)
+A_ordenada <- A[orden, orden]
+
+# Calcular las probabilidades estimadas de enlace
+P_hat <- Z %*% Pi %*% t(Z)
+diag(P_hat) <- 0
+P_ordenada <- P_hat[orden, orden]
+
+# Identificar las divisiones entre bloques
+tam_bloques <- tabulate(labs, nbins = Q)
+limites <- cumsum(tam_bloques)
+limites <- unique(limites[limites > 0 & limites < nrow(A)] + 0.5)
+
+# Definir los colores: blanco (0) y azul (1)
+colores <- colorRampPalette(c("white", "#08519C"))(100)
+
+# Función para visualizar matrices
+graficar_matriz <- function(matriz, titulo, limites = numeric(0)) {
+
+  n <- nrow(matriz)
+
+  # Representar los valores mediante colores
+  image(
+    x = seq_len(n),
+    y = seq_len(n),
+    z = matriz,
+    col = colores,
+    zlim = c(0, 1),
+    axes = FALSE,
+    xlab = "",
+    ylab = "",
+    main = titulo,
+    useRaster = TRUE
+  )
+
+  # Marcar las divisiones entre bloques
+  if (length(limites) > 0) {
+    abline(v = limites, h = limites, col = "red", lwd = 1)
+  }
+
+  box()
+}
+
+# Guardar la configuración gráfica
+par_anterior <- par(no.readonly = TRUE)
+
+# Mostrar los tres gráficos
+par(mfrow = c(1, 3), mar = c(2, 2, 3, 1))
+
+graficar_matriz(A, "Adyacencia original")
+graficar_matriz(A_ordenada, "Adyacencia ordenada", limites)
+graficar_matriz(P_ordenada, "Probabilidad estimada", limites)
+
+# Restaurar la configuración gráfica
+par(par_anterior)
+```
+
+```{r grafo-blog-bloques, fig.width=11, fig.height=5, fig.align='center'}
+# Colores de los bloques estimados
+cols_bloques <- grDevices::hcl.colors(Q, "Dark 3")
+
+# Comparar afiliaciones políticas y bloques en la misma disposición
+par(mfrow = c(1, 2), mar = c(2, 1, 3, 1))
+plot(fblog, layout = layout_blog, vertex.label = NA,
+     vertex.size = 4, vertex.color = cols_partidos[as.integer(partidos)],
+     vertex.frame.color = cols_partidos[as.integer(partidos)],
+     edge.color = grDevices::adjustcolor("black", alpha.f = 0.10),
+     main = "Afiliaciones políticas")
+plot(fblog, layout = layout_blog, vertex.label = NA,
+     vertex.size = 4, vertex.color = cols_bloques[labs],
+     vertex.frame.color = cols_bloques[labs],
+     edge.color = grDevices::adjustcolor("black", alpha.f = 0.10),
+     main = "Bloques estimados")
+par(mfrow = c(1, 1))
+```
+
+## Comparación con afiliaciones políticas observadas
+
+Las **afiliaciones políticas** constituyen una **clasificación externa**, no clases latentes verdaderas. 
+
+La concordancia puede medirse con **Rand**, **ARI** e **información mutua normalizada** (**NMI**). Valores altos indican similitud, pero una discrepancia no implica necesariamente un mal ajuste del SBM.
+
+```{r comparacion-blog}
+# Etiquetas de las afiliaciones observadas
+party_nums <- as.integer(partidos)
+
+# Índices invariantes a la numeración de los grupos
+concordancia <- c(
+  Rand = igraph::compare(party_nums, labs, method = "rand"),
+  ARI = igraph::compare(party_nums, labs, method = "adjusted.rand"),
+  NMI = igraph::compare(party_nums, labs, method = "nmi")
+)
+round(concordancia, 4)
+
+# Tabla de correspondencias
+knitr::kable(table(Afiliacion = partidos, Bloque = labs))
+```
+
+# Bondad de ajuste mediante simulación
+
+La **bondad de ajuste** compara estadísticas observadas con las obtenidas de redes generadas por el modelo estimado. 
+
+Comenzamos con simulaciones **condicionales a las clases puntuales estimadas**; después mostramos la alternativa de simular también las pertenencias.
+
+## Estadísticos de diagnóstico
+
+Se consideran **densidad**, **varianza del grado**, **grado máximo**, **transitividad**, **triángulos**, **assortatividad de grados**, **número de componentes** y **tamaño relativo del mayor componente**. Un ajuste adecuado de la densidad **no garantiza** que el modelo reproduzca la estructura local o la heterogeneidad de grados.
+
+```{r funcion-estadisticos}
+# Extraer estadísticas de una red simple no dirigida
+estadisticas_red <- function(g) {
+  grados <- igraph::degree(g)
+  componentes <- igraph::components(g)
+  assort <- igraph::assortativity_degree(g)
+
+  # Evitar valores no definidos en grafos degenerados
+  if (!is.finite(assort)) assort <- NA_real_
+
+  c(
+    Densidad = igraph::edge_density(g),
+    Varianza_grado = stats::var(grados),
+    Grado_maximo = max(grados),
+    Transitividad = igraph::transitivity(g, type = "global", isolates = "zero"),
+    Triangulos = sum(igraph::count_triangles(g)) / 3,
+    Assortatividad = assort,
+    Componentes = componentes$no,
+    Mayor_componente = max(componentes$csize) / igraph::vcount(g)
+  )
+}
+
+# Calcular las estadísticas observadas
+estad_obs <- estadisticas_red(fblog)
+round(estad_obs, 4)
+```
+
+## Simulación condicional a la partición estimada
+
+```{r bondad-ajuste}
+# Número de redes simuladas
+n_sim <- 500
+n_blog <- igraph::vcount(fblog)
+
+# Guardar estadísticas y grados ordenados
+estad_sim <- matrix(NA_real_, nrow = length(estad_obs), ncol = n_sim)
+rownames(estad_sim) <- names(estad_obs)
+grados_sim <- matrix(NA_real_, nrow = n_blog, ncol = n_sim)
+
+# Tamaños de bloques y probabilidades estimados
+block_sizes <- tabulate(labs, nbins = Q)
+
+# Simular con la partición y parámetros estimados
+set.seed(42)
+for (s in seq_len(n_sim)) {
+  g_sim <- igraph::sample_sbm(
+    n = n_blog,
+    pref.matrix = Pi,
+    block.sizes = block_sizes,
+    directed = FALSE,
+    loops = FALSE
+  )
+
+  # Almacenar estadísticas y distribución de grados
+  estad_sim[, s] <- estadisticas_red(g_sim)
+  grados_sim[, s] <- sort(igraph::degree(g_sim))
+}
+
+# Calcular medias y cuantiles simulados
+media_sim <- apply(estad_sim, 1, mean, na.rm = TRUE)
+desv_sim <- apply(estad_sim, 1, sd, na.rm = TRUE)
+lim_inf <- apply(estad_sim, 1, quantile, probs = 0.025, na.rm = TRUE)
+lim_sup <- apply(estad_sim, 1, quantile, probs = 0.975, na.rm = TRUE)
+
+# Resumir el diagnóstico
+resultados <- data.frame(
+  Estadistico = names(estad_obs),
+  Observado = as.numeric(estad_obs),
+  Media = media_sim,
+  Desviacion = desv_sim,
+  Limite_2.5 = lim_inf,
+  Limite_97.5 = lim_sup,
+  row.names = NULL
+)
+knitr::kable(resultados, digits = 4,
+             caption = "Estadísticos observados e intervalos de referencia simulados (95 %)")
+```
+
+```{r graficos-ajuste, fig.width=12, fig.height=7, fig.align='center'}
+# Graficar distribuciones de las estadísticas simuladas
+par(mfrow = c(2, 4), mar = c(3.5, 3.5, 2.5, 0.5), mgp = c(2, 0.7, 0))
+for (j in seq_along(estad_obs)) {
+  valores <- estad_sim[j, ]
+  valores <- valores[is.finite(valores)]
+
+  # Comparar simulaciones con el valor observado
+  hist(valores, breaks = "Sturges", main = names(estad_obs)[j],
+       xlab = "Valor simulado", col = "gray85", border = "white")
+  abline(v = estad_obs[j], col = "red", lwd = 2)
+}
+par(mfrow = c(1, 1))
+```
+
+```{r grados-ajuste, fig.width=8, fig.height=5, fig.align='center'}
+# Construir bandas por posición en los grados ordenados
+posicion <- seq_len(n_blog)
+grado_obs <- sort(igraph::degree(fblog))
+grado_inf <- apply(grados_sim, 1, quantile, probs = 0.025)
+grado_sup <- apply(grados_sim, 1, quantile, probs = 0.975)
+
+# Dibujar el intervalo simulado y los grados observados
+plot(posicion, grado_obs, type = "n",
+     ylim = range(c(grado_obs, grado_inf, grado_sup)),
+     xlab = "Posición del vértice (grados ordenados)",
+     ylab = "Grado", main = "Distribución de grados")
+polygon(c(posicion, rev(posicion)), c(grado_inf, rev(grado_sup)),
+        col = grDevices::adjustcolor("steelblue", alpha.f = 0.25), border = NA)
+lines(posicion, grado_obs, col = "red", lwd = 2)
+lines(posicion, apply(grados_sim, 1, median), col = "steelblue", lwd = 2)
+legend("topleft", legend = c("Observado", "Mediana simulada", "Banda 95 %"),
+       col = c("red", "steelblue", "steelblue"),
+       lty = c(1, 1, 1), lwd = c(2, 2, 8), bty = "n")
+```
+
+Las **bandas de grados ordenados** comparan distribuciones empíricas, no intervalos para vértices individualmente identificados. Una discrepancia sistemática sugiere limitaciones del SBM para reproducir la **heterogeneidad de grados**.
+
+## Simulación no condicional de las pertenencias
+
+También es posible generar primero los tamaños de bloques con una **distribución multinomial**, usando las proporciones variacionales estimadas. Esta estrategia evalúa otro aspecto de la distribución generativa, pues permite que cambien los tamaños de las clases entre simulaciones.
+
+```{r simulacion-no-condicional, fig.width=6, fig.height=4.5, fig.align='center'}
+# Generar tamaños de clases según las probabilidades estimadas
+set.seed(202)
+bs_nuevo <- as.integer(stats::rmultinom(
+  n = 1, size = n_blog, prob = alpha_variacional
+))
+
+# Conservar únicamente bloques no vacíos
+activos <- which(bs_nuevo > 0)
+
+# Simular una red con nuevas asignaciones de tamaños
+red_nueva <- igraph::sample_sbm(
+  n = n_blog,
+  pref.matrix = Pi[activos, activos, drop = FALSE],
+  block.sizes = bs_nuevo[activos],
+  directed = FALSE,
+  loops = FALSE
+)
+
+# Comparar estadísticas básicas con las observadas
+round(rbind(Observado = estad_obs,
+            Simulado = estadisticas_red(red_nueva)), 3)
+```
+
+La **comprobación predictiva paramétrica** genera redes utilizando los parámetros estimados $\hat{\boldsymbol\theta}=(\hat{\boldsymbol\alpha},\widehat{\mathbf\Pi})$ como valores fijos, sin incorporar su **incertidumbre de estimación**. Para considerarla, existen dos alternativas:
+
+- **Bootstrap paramétrico:** generar $B$ redes a partir del modelo ajustado y reestimar sus parámetros, obteniendo $\hat{\boldsymbol\theta}^{(1)},\ldots,\hat{\boldsymbol\theta}^{(B)}$. Estas estimaciones permiten aproximar la **variabilidad muestral** de los estimadores.
+
+- **Inferencia bayesiana:** asignar distribuciones previas a los parámetros e incorporar su incertidumbre mediante la **distribución predictiva posterior**:
+$$
+p(\mathbf y^{\mathrm{rep}}\mid\mathbf y)
+=
+\int
+p(\mathbf y^{\mathrm{rep}}\mid\boldsymbol\theta)\,
+p(\boldsymbol\theta\mid\mathbf y)
+\,\textsf{d}\boldsymbol\theta,
+$$
+donde $p(\boldsymbol\theta\mid\mathbf y)$ es la **distribución posterior** de los parámetros y las clases latentes se encuentran marginalizadas.
+
+## Extensiones del SBM
+
+- **SBM con corrección por grado (DCSBM):** incorpora la **heterogeneidad de grados** entre vértices.
+- **SBM dirigidos:** permiten probabilidades de conexión diferentes según la dirección.
+- **SBM ponderados:** modelan la **intensidad de los vínculos**.
+- **SBM con covariables:** incorporan características de los vértices o las díadas.
+- **SBM de pertenencia mixta:** permiten que un vértice participe en diferentes bloques.
+- **SBM jerárquicos:** representan **estructuras de bloques anidadas**.
+- **SBM dinámicos:** modelan la **evolución temporal** de los bloques y sus interacciones.
+
+# Referencias
+
+- Holland, P. W., Laskey, K. B., y Leinhardt, S. (1983). *Stochastic blockmodels: First steps*. **Social Networks**, 5, 109–137.
+- Daudin, J.-J., Picard, F., y Robin, S. (2008). *A mixture model for random graphs*. **Statistics and Computing**, 18, 173–183.
+- Karrer, B., y Newman, M. E. J. (2011). *Stochastic blockmodels and community structure in networks*. **Physical Review E**, 83, 016107. https://doi.org/10.1103/PhysRevE.83.016107
+- Documentación de [`blockmodels`](https://search.r-project.org/CRAN/refmans/blockmodels/html/BM_bernoulli.html), [`igraph`](https://r.igraph.org/reference/sample_sbm.html) y [notas de inferencia en SBM](https://jchiquet.github.io/MAP566/docs/mixture-models/map566-lecture-graph-clustering-part2.html).
+
