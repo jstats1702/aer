@@ -1,5 +1,5 @@
 ---
-title: "Modelos de bloques estocásticos"
+title: "Modelo de bloques estocásticos"
 author:
 - Juan Sosa PhD
 - Email   jcsosam@unal.edu.co

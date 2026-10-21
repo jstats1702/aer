@@ -93,7 +93,7 @@ El modelo es **homogéneo** porque no considera diferencias entre vértices o d�
 
 Simulamos una red **dispersa** con **grado esperado** aproximadamente igual a \(k=2\). 
 
-     La probabilidad de enlace es \(\theta=k/(n-1)\).
+La probabilidad de enlace es \(\theta=k/(n-1)\).
 
 ```{r, fig.width=7, fig.height=5, fig.align='center'}
 # Paquetes necesarios: install.packages(c("igraph", "igraphdata"))
