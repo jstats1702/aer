@@ -1,0 +1,2155 @@
+---
+title: "Modelo de espacio latente de distancia"
+author: "Juan Sosa, PhD"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: cerulean
+    highlight: kate
+    self_contained: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center")
+options(digits = 3, scipen = 4)
+```
+
+# Introducción
+
+Los **modelos de espacio latente** asignan a cada vértice una **posición no observada** $\boldsymbol{u}_i\in\mathbb{R}^k$ y explican las conexiones mediante estas posiciones y las covariables diádicas $\mathbf{x}_{ij}$. 
+
+Una formulación general es
+
+$$
+\begin{aligned}
+y_{ij}\mid\boldsymbol{\theta},\mathbf{U}
+&\overset{\mathrm{ind}}{\sim}
+\textsf{Bernoulli}(p_{ij}),\\
+p_{ij}&=g^{-1}(\eta_{ij}),\\
+\eta_{ij}&=\mu+\boldsymbol{\beta}^{\mathsf{T}}\mathbf{x}_{ij}
++\alpha(\boldsymbol{u}_i,\boldsymbol{u}_j),
+\end{aligned}
+$$
+
+donde $g$ es la **función de enlace**, $\mu$ es el intercepto y $\boldsymbol{\beta}$ reúne los coeficientes de las covariables. Estas pueden ser observaciones propiamente diádicas o funciones de atributos nodales.
+
+Las funciones de interacción latente más utilizadas son:
+
+- **Distancia:** $\alpha(\boldsymbol{u}_i,\boldsymbol{u}_j)=-\|\boldsymbol{u}_i-\boldsymbol{u}_j\|$.
+- **Bilineal:**  $\alpha(\boldsymbol{u}_i,\boldsymbol{u}_j)=\boldsymbol{u}_i^{\mathsf{T}}\boldsymbol{u}_j$.
+- **Factorial:** $\alpha(\boldsymbol{u}_i,\boldsymbol{u}_j)=\boldsymbol{u}_i^{\mathsf{T}}\mathbf{\Lambda}\boldsymbol{u}_j$, con $\mathbf{\Lambda}$ diagonal.
+
+La **independencia condicional de las aristas** no implica independencia marginal. Al integrar las posiciones compartidas por varias díadas, el modelo puede inducir dependencia relacional.
+
+La inferencia bayesiana combina la verosimilitud y las distribuciones previas:
+
+$$
+p(\boldsymbol{\theta},\mathbf{U}\mid\mathbf{Y})
+\propto p(\mathbf{Y}\mid\boldsymbol{\theta},\mathbf{U})\,
+p(\boldsymbol{\theta},\mathbf{U}).
+$$
+
+La posterior se aproxima mediante **cadenas de Markov de Monte Carlo** (MCMC). En particular, el paquete `latentnet` implementa ajustes bayesianos de estos modelos mediante `ergmm()`.
+
+# Modelo de distancia
+
+El **modelo de distancia euclidiana** de Hoff, Raftery y Handcock (2002) especifica
+
+$$
+\begin{aligned}
+y_{ij}\mid\mu,\mathbf{U}
+&\overset{\mathrm{ind}}{\sim}
+\textsf{Bernoulli}(p_{ij}),\\
+\operatorname{logit}(p_{ij})
+&=\mu-\|\boldsymbol{u}_i-\boldsymbol{u}_j\|,
+\end{aligned}
+$$
+
+donde $\boldsymbol{u}_i\in\mathbb{R}^d$ representa la **posición latente** del vértice $i$ y $\mathbf{U}$ contiene las posiciones de los $n$ vértices. El intercepto $\mu$ determina la **probabilidad condicional máxima** $\operatorname{expit}(\mu)$ alcanzada cuando la distancia es cero. Por lo tanto, las **conexiones son menos probables** entre **vértices más distantes** en el espacio latente.
+
+Para una red simple no dirigida, la **logverosimilitud** es
+
+$$
+\ell(\mu,\mathbf{U})=
+\sum_{i<j}\left[
+y_{ij}\eta_{ij}
+-\log\{1+\exp(\eta_{ij})\}
+\right],
+\qquad
+\eta_{ij}=\mu-\|\boldsymbol{u}_i-\boldsymbol{u}_j\|.
+$$
+
+Para realizar **inferencia bayesiana**, se especifican **distribuciones previas independientes** para el intercepto y la varianza de las posiciones latentes. En particular, la implementación predeterminada de la función `ergmm()` del paquete `latentnet`, sin agrupaciones latentes, considera
+
+$$
+\begin{aligned}
+\mu &\sim \text{N}(0,9),\\
+\boldsymbol{u}_i\mid\sigma^2
+&\overset{\mathrm{iid}}{\sim}
+\text{N}(\boldsymbol{0},\sigma^2\mathbf{I}_d),\\
+\sigma^2
+&\sim \text{IG}\left(
+\frac{\sqrt{n}}{2},
+\frac{n^{2/d}\sqrt{n}}{16}
+\right),
+\end{aligned}
+$$
+
+donde $\text{IG}(a,b)$ denota la distribución Gamma inversa con parámetros de forma $a$ y escala $b$. 
+
+El modelo se estima mediante **MCMC**, lo que permite aproximar la distribución posterior de los parámetros, las posiciones latentes y las probabilidades de conexión.
+
+## Identificabilidad
+
+La verosimilitud permanece inalterada ante **traslaciones, rotaciones y reflexiones**:
+
+$$
+\boldsymbol{u}_i^*=\mathbf{Q}\boldsymbol{u}_i+\boldsymbol{a},
+\qquad\mathbf{Q}^{\mathsf{T}}\mathbf{Q}=\mathbf{I}_d.
+$$
+
+Por ello, los ejes latentes no tienen significado absoluto. 
+
+La comparación y el promedio de posiciones latentes requieren una **alineación de Procrustes**, donde la matriz ortogonal $\mathbf{Q}$ y el vector de traslación $\boldsymbol{a}$ se eligen minimizando
+$$
+\sum_{i=1}^n
+\|\mathbf{Q}\boldsymbol{u}_i+\boldsymbol{a}
+-\boldsymbol{u}_i^{\mathrm{ref}}\|^2,
+$$
+respecto a una configuración de referencia. 
+
+Esta transformación permite **rotaciones, reflexiones y traslaciones** (pero no cambios de escala) preservando las distancias y las probabilidades de conexión.
+
+## Simulación del modelo
+
+Se simula una red para ilustrar cómo la **proximidad latente** determina las probabilidades de enlace. 
+
+La desigualdad triangular favorece patrones de **cierre transitivo**, pero no garantiza triángulos en cada realización.
+
+Se simula una **red no dirigida** de 80 vértices en dos grupos, con posiciones latentes normales bivariadas de medias $(-1,-1)$ y $(1,1)$ y desviación estándar $0.6$. Las conexiones siguen un **modelo de distancia euclidiana** con $\mu=-1.5$.
+
+El valor $\mu=-1.5$ genera una red dispersa, con una probabilidad máxima de conexión de $\operatorname(-1.5)\approx 0.182$.
+
+```{r librerias}
+# Cargar las bibliotecas necesarias.
+suppressMessages(suppressWarnings(library(latentnet)))
+suppressMessages(suppressWarnings(library(ergm)))
+suppressMessages(suppressWarnings(library(network)))
+suppressMessages(suppressWarnings(library(igraph)))
+suppressMessages(suppressWarnings(library(ggplot2)))
+suppressMessages(suppressWarnings(library(coda)))
+suppressMessages(suppressWarnings(library(corrplot)))
+suppressMessages(suppressWarnings(library(knitr)))
+suppressMessages(suppressWarnings(library(future)))
+```
+
+```{r simulacion, fig.width=10, fig.height=4.5}
+set.seed(42)
+
+# Definir los parámetros de simulación.
+n_grupo <- 40
+n_sim   <- 2 * n_grupo
+mu      <- -1.5
+
+# Generar posiciones latentes en dos grupos.
+U_sim <- rbind(
+  matrix(rnorm(2 * n_grupo, mean = -1, sd = 0.6), ncol = 2),
+  matrix(rnorm(2 * n_grupo, mean =  1, sd = 0.6), ncol = 2)
+)
+
+# Identificar los grupos.
+grupo <- rep(1:2, each = n_grupo)
+
+# Calcular distancias y probabilidades de conexión.
+D_sim <- as.matrix(dist(U_sim))
+P_sim <- plogis(mu - D_sim)
+
+# Simular una red simple no dirigida.
+A_sim <- matrix(0L, n_sim, n_sim)
+
+A_sim[upper.tri(A_sim)] <- rbinom(
+  n = sum(upper.tri(A_sim)),
+  size = 1,
+  prob = P_sim[upper.tri(P_sim)]
+)
+
+# Completar la matriz simétrica.
+A_sim <- A_sim + t(A_sim)
+
+# Construir la red.
+g_sim <- igraph::graph_from_adjacency_matrix(
+  A_sim,
+  mode = "undirected"
+)
+
+# Definir colores y límites comunes.
+colores <- c("#377EB8", "#E41A1C")
+col_nodos <- colores[grupo]
+
+xlim <- range(U_sim[, 1]) + c(-0.4, 0.4)
+ylim <- range(U_sim[, 2]) + c(-0.4, 0.4)
+
+# Obtener los extremos de las aristas.
+aristas <- igraph::as_edgelist(g_sim, names = FALSE)
+
+# Configurar las visualizaciones.
+op <- par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+
+# Gráfico 1: posiciones latentes.
+plot(
+  U_sim,
+  type = "n",
+  xlim = xlim,
+  ylim = ylim,
+  asp = 1,
+  xlab = "Dimensión 1",
+  ylab = "Dimensión 2",
+  main = "Posiciones latentes"
+)
+
+points(
+  U_sim,
+  pch = 21,
+  bg = col_nodos,
+  col = "white",
+  cex = 1.4
+)
+
+# Gráfico 2: red simulada.
+plot(
+  U_sim,
+  type = "n",
+  xlim = xlim,
+  ylim = ylim,
+  asp = 1,
+  xlab = "Dimensión 1",
+  ylab = "Dimensión 2",
+  main = "Red simulada"
+)
+
+# Dibujar las aristas semitransparentes.
+segments(
+  x0 = U_sim[aristas[, 1], 1],
+  y0 = U_sim[aristas[, 1], 2],
+  x1 = U_sim[aristas[, 2], 1],
+  y1 = U_sim[aristas[, 2], 2],
+  col = adjustcolor("gray35", alpha.f = 0.3),
+  lwd = 0.8
+)
+
+# Dibujar los vértices sobre las aristas.
+points(
+  U_sim,
+  pch = 21,
+  bg = col_nodos,
+  col = "white",
+  cex = 1.4
+)
+```
+
+Se verifica la **invariancia de las distancias euclidianas** ante rotaciones y traslaciones de las posiciones latentes, comprobando que la diferencia máxima entre las distancias originales y las transformadas es aproximadamente cero.
+
+```{r invariancia}
+# Definir la matriz de rotación.
+theta <- pi / 3
+
+Q <- matrix(
+  c(cos(theta), sin(theta),
+   -sin(theta), cos(theta)),
+  nrow = 2
+)
+
+# Rotar y trasladar las posiciones latentes.
+U_transformado <- U_sim %*% Q
+
+U_transformado <- sweep(U_transformado, 2, c(2, -1), "+")
+
+# Calcular las distancias originales y transformadas.
+D_original <- as.matrix(dist(U_sim))
+D_transformado <- as.matrix(dist(U_transformado))
+
+# Verificar que las distancias se preservan.
+max(abs(D_original - D_transformado))
+```
+
+## Datos: Familias florentinas
+
+Se estudia la red no dirigida de **alianzas matrimoniales** entre familias florentinas del Renacimiento, incluida en `ergm`. 
+
+```{r florencia-datos, fig.width=7, fig.height=6}
+# Cargar los datos.
+data("florentine", package = "ergm")
+
+flomarriage
+class(flomarriage)
+
+# Obtener la matriz de adyacencia.
+# Remover el vértice 12 porque es aislado (distancia Inf).
+A <- network::as.matrix.network.adjacency(x = flomarriage)
+index_rm <- which(colSums(A) == 0)
+A <- A[-index_rm, -index_rm]
+
+# Extraer la variable exógena: riqueza.
+wealth <- flomarriage %v% "wealth"
+(wealth <- wealth[-index_rm])
+
+# Construir el objeto igraph.
+g <- igraph::graph_from_adjacency_matrix(
+  adjmatrix = A,
+  mode = "undirected"
+)
+
+class(g)
+
+# Construir el objeto network.
+flomarriage <- network::as.network.matrix(A)
+class(flomarriage)
+
+# Representar la red.
+set.seed(42)
+
+plot(
+  g,
+  vertex.size = 1.2 * sqrt(wealth),
+  vertex.label = NA,
+  main = "Familias Florentinas"
+)
+```
+
+
+## Ajuste del modelo de distancia clásico
+
+Se ajusta un espacio bidimensional ($k=2$) sin componentes de mezcla ($G=0$). 
+
+`burnin` indica las iteraciones descartadas, `interval` la separación entre muestras almacenadas y `sample.size` el número de muestras guardadas.
+
+Se realizan **55 000 iteraciones MCMC**, de las cuales 5 000 corresponden al calentamiento. Posteriormente, se almacena una muestra cada 10 iteraciones, obteniendo **5 000 muestras posteriores** para la inferencia.
+
+```{r}
+# Configurar las cadenas MCMC.
+control_mcmc <- ergmm.control(
+  burnin = 100000,
+  interval = 10,
+  sample.size = 50000
+)
+```
+
+La función `ergmm()` utiliza **distribuciones previas** cuyos hiperparámetros dependen del número de vértices $n$ y de la dimensión latente $d$. 
+
+Al excluir la familia aislada, la red contiene $n=15$ vértices. Para el **modelo de distancia euclidiana** con $d=2$ y sin agrupaciones ($G=0$), la función `ergmm()` utiliza las siguientes **distribuciones previas**:
+$$
+\begin{aligned}
+\mu &\sim \text{N}(0,9),\\
+\boldsymbol{u}_i\mid\sigma^2
+&\overset{\mathrm{iid}}{\sim}
+\text{N}(\boldsymbol{0},\sigma^2\mathbf I_2),\\
+\sigma^2 &\sim \text{IG}(1.936,3.631).
+\end{aligned}
+$$
+La distribución Gamma inversa se parametriza mediante forma y escala. Los demás hiperparámetros asociados con agrupaciones no intervienen porque $G=0$. 
+
+Sus hiperparámetros se determinan automáticamente a partir del número de vértices y la dimensión del espacio latente.
+
+```{r florencia-ajuste, cache=TRUE}
+# Ajustar el modelo de distancia euclidiana.
+fit_dist <- ergmm(
+  flomarriage ~ euclidean(d = 2, G = 0),
+  seed = 42,
+  control = control_mcmc
+)
+
+# Distribución previa
+fit_dist$prior
+
+# Examinar el ajuste.
+summary(fit_dist)
+```
+
+```{r}
+# Examinar ajuste, previas y configuración MCMC.
+summary(fit_dist)
+```
+
+La **media posterior del intercepto** es $5.01$, con un **intervalo de credibilidad del 95\%** de $(2.46,8.12)$, lo que proporciona evidencia posterior de que $\mu>0$.
+
+El **BIC global** es $243.0$, cuyo valor debe compararse con el de modelos alternativos.
+
+## Convergencia
+
+El **diagnóstico de convergencia MCMC** debe incluir la inspección de las trazas, las funciones de autocorrelación, el **tamaño efectivo de muestra (ESS)** y el estadístico $\widehat R$ calculado a partir de cadenas independientes. Se espera observar trazas estables, autocorrelaciones bajas, ESS elevados y valores de $\widehat R$ cercanos a uno.
+
+```{r florencia-diagnostico, fig.width=10, fig.height=6}
+# Convertir las muestras al formato de coda.
+mcmc_flor <- coda::as.mcmc.list(
+  fit_dist,
+  which.vars = list(lpY = 1, beta = 1)
+)
+
+# Calcular los tamaños efectivos de muestra.
+round(coda::effectiveSize(mcmc_flor), 1)
+
+# Extraer las muestras posteriores.
+lp <- as.numeric(fit_dist$sample$lpY)
+mu <- as.numeric(fit_dist$sample$beta)
+
+# Organizar los datos para las figuras.
+datos <- data.frame(
+  muestra = rep(seq_along(lp), 2),
+  valor = c(lp, mu),
+  parametro = rep(
+    c("Logverosimilitud", "Intercepto"),
+    each = length(lp)
+  )
+)
+```
+
+```{r}
+# Extraer las posiciones latentes posteriores.
+Z <- fit_dist$sample$Z
+
+# Identificar el número de muestras y vértices.
+B <- dim(Z)[1]
+n <- dim(Z)[2]
+
+# Construir todas las parejas de vértices.
+pares <- t(combn(n, 2))
+
+# Calcular las distancias posteriores de cada pareja.
+distancias <- vapply(seq_len(nrow(pares)), function(k) {
+
+  i <- pares[k, 1]
+  j <- pares[k, 2]
+
+  sqrt(rowSums((Z[, i, ] - Z[, j, ])^2))
+
+}, numeric(B))
+
+# Calcular el ESS de cada distancia.
+ess <- coda::effectiveSize(coda::mcmc(distancias))
+
+# Resumir la distribución de los ESS.
+round(summary(ess), 1)
+```
+
+Los **tamaños efectivos de muestra (ESS)** de las 120 distancias latentes presentan un mínimo de 2 693, una mediana de 13 792 y una media de 13 760, lo que sugiere una **eficiencia adecuada del muestreo MCMC**.
+
+```{r, fig.align='center'}
+# Representar las trazas posteriores.
+ggplot2::ggplot(
+  datos,
+  ggplot2::aes(x = muestra, y = valor)
+) +
+  ggplot2::geom_line(
+    color = "#377EB8",
+    linewidth = 0.35,
+    alpha = 0.8
+  ) +
+  ggplot2::facet_wrap(
+    ~ parametro,
+    ncol = 1,
+    scales = "free_y"
+  ) +
+  ggplot2::labs(
+    x = "Muestra almacenada",
+    y = NULL,
+    title = "Trazas MCMC"
+  ) +
+  ggplot2::theme_minimal(base_size = 13) +
+  ggplot2::theme(
+    strip.text = ggplot2::element_text(face = "bold"),
+    panel.spacing = grid::unit(1.5, "lines")
+  )
+```
+
+## Inferencia sobre el intercepto
+
+```{r}
+# Extraer las muestras posteriores del intercepto.
+mu_flor <- as.numeric(fit_dist$sample$beta)
+
+# Calcular las probabilidades máximas de conexión.
+p0_flor <- plogis(mu_flor)
+
+# Definir una función para los resúmenes posteriores.
+resumir <- function(x) {
+  c(
+    Media = mean(x),
+    Inferior = unname(quantile(x, 0.025)),
+    Superior = unname(quantile(x, 0.975))
+  )
+}
+
+# Resumir ambas distribuciones posteriores.
+resumen <- rbind(
+  "Intercepto" = resumir(mu_flor),
+  "Probabilidad a distancia cero" = resumir(p0_flor)
+)
+
+# Presentar la tabla de resultados.
+knitr::kable(
+  resumen,
+  digits = 3,
+  caption = "Medias posteriores e intervalos de credibilidad del 95%"
+)
+```
+
+
+```{r, fig.align='center'}
+# Organizar las muestras de ambas cantidades.
+datos_post <- data.frame(
+  valor = c(mu_flor, p0_flor),
+  cantidad = rep(
+    c("Intercepto", "Probabilidad a distancia cero"),
+    each = length(mu_flor)
+  )
+)
+
+# Calcular las medias posteriores.
+medias <- data.frame(
+  cantidad = c("Intercepto", "Probabilidad a distancia cero"),
+  media = c(mean(mu_flor), mean(p0_flor))
+)
+
+# Representar las densidades posteriores.
+ggplot2::ggplot(
+  datos_post,
+  ggplot2::aes(x = valor)
+) +
+  ggplot2::geom_density(
+    fill = "#377EB8",
+    color = "#377EB8",
+    alpha = 0.25,
+    linewidth = 0.8
+  ) +
+  ggplot2::geom_vline(
+    data = medias,
+    ggplot2::aes(xintercept = media),
+    color = "#E41A1C",
+    linetype = "dashed",
+    linewidth = 0.8
+  ) +
+  ggplot2::facet_wrap(
+    ~ cantidad,
+    ncol = 1,
+    scales = "free"
+  ) +
+  ggplot2::labs(
+    x = "Valor del parámetro",
+    y = "Densidad",
+    title = "Distribuciones posteriores marginales"
+  ) +
+  ggplot2::theme_minimal(base_size = 13) +
+  ggplot2::theme(
+    strip.text = ggplot2::element_text(face = "bold"),
+    panel.spacing = grid::unit(1.5, "lines")
+  )
+```
+
+## Inferencia sobre las posiciones latentes
+
+Las posiciones se presentan mediante métodos de visualización que utilizan el **procesamiento posterior para identificación geométrica**. 
+
+Las nubes representan **incertidumbre posterior**, no trayectorias temporales. 
+
+Las distancias son más directamente interpretables porque son invariantes ante rotaciones, reflexiones y traslaciones.
+
+```{r, fig.width=10, fig.height=8, fig.align='center'}
+# Representar las posiciones medias posteriores.
+suppressWarnings(
+  plot(
+    fit_dist,
+    what = "pmean",
+    labels = TRUE,
+    vertex.cex = 1.5,
+    vertex.col = "#377EB8",
+    edge.col = "gray75",
+    xlab = "Dimensión 1",
+    ylab = "Dimensión 2",
+    main = "Posiciones medias posteriores",
+    print.formula = FALSE
+  )
+)
+```
+
+## Inferencia sobre las probabilidades de interacción
+
+Para cada díada se estima 
+$$
+\widehat p_{ij}=\frac{1}{B}\sum_{b=1}^{B}\operatorname{expit}\left\{\mu^{(b)}-\|\boldsymbol{u}_i^{(b)}-\boldsymbol{u}_j^{(b)}\|\right\}.
+$$
+
+```{r florencia-probabilidades, fig.width=10, fig.height=4.8}
+# Obtener las probabilidades posteriores de conexión.
+P_flor <- predict(fit_dist, type = "post")
+
+# Definir una escala de colores común.
+colores <- colorRampPalette(c("white", "#BDD7E7", "#08519C"))(100)
+
+# Configurar las visualizaciones.
+op <- par(mfrow = c(1, 2))
+
+# Representar la matriz de adyacencia observada.
+corrplot::corrplot(
+  A,
+  is.corr = FALSE,
+  method = "color",
+  type = "full",
+  diag = FALSE,
+  tl.pos = "n",
+  col.lim = c(0, 1),
+  col = colores,
+  title = "Adyacencia observada",
+  mar = c(0, 0, 2, 0)
+)
+
+# Representar las probabilidades posteriores.
+corrplot::corrplot(
+  P_flor,
+  is.corr = FALSE,
+  method = "color",
+  type = "full",
+  diag = FALSE,
+  tl.pos = "n",
+  col.lim = c(0, 1),
+  col = colores,
+  title = "Probabilidades posteriores",
+  mar = c(0, 0, 2, 0)
+)
+
+# Restaurar la configuración gráfica.
+par(op)
+```
+
+Estas probabilidades describen el **ajuste dentro de la muestra**. 
+
+Su comparación con los enlaces observados no constituye una evaluación independiente de predicción.
+
+## Bondad de ajuste
+
+Una **comprobación predictiva posterior** genera redes $\mathbf{Y}^{\mathrm{rep}}$ a partir de muestras de parámetros posteriores y contrasta estadísticas de las redes replicadas con las observadas. Los intervalos calculados son **predictivos posteriores**, no intervalos de confianza.
+
+Se consideran cinco **estadísticas de red**, a saber, densidad, transitividad global, asortatividad por grado, desviación estándar de los grados y distancia geodésica promedio. Para redes desconectadas, esta última se calcula únicamente entre parejas de vértices alcanzables.
+
+```{r funciones-ppc}
+# Calcular las estadísticas de una red.
+estadisticas_red <- function(A, dirigida = FALSE) {
+
+  # Construir el grafo.
+  modo <- if (dirigida) "directed" else "undirected"
+
+  g <- igraph::graph_from_adjacency_matrix(
+    A,
+    mode = modo,
+    diag = FALSE
+  )
+
+  # Calcular los grados.
+  grados <- igraph::degree(g, mode = "all")
+
+  # Calcular las distancias geodésicas.
+  D <- igraph::distances(
+    g,
+    mode = if (dirigida) "out" else "all"
+  )
+
+  # Excluir la diagonal y evitar duplicaciones.
+  distancias <- if (dirigida) {
+    D[row(D) != col(D)]
+  } else {
+    D[upper.tri(D)]
+  }
+
+  # Conservar únicamente las distancias finitas.
+  distancias <- distancias[is.finite(distancias)]
+
+  # Calcular las cinco estadísticas.
+  c(
+    Densidad = igraph::edge_density(g),
+
+    Transitividad = igraph::transitivity(
+      g, type = "global"
+    ),
+
+    Asortatividad = igraph::assortativity_degree(
+      g, directed = dirigida
+    ),
+
+    DE_grados = sd(grados),
+
+    Distancia_geodesica = if (length(distancias) > 0) {
+      mean(distancias)
+    } else {
+      NA_real_
+    }
+  )
+}
+```
+
+```{r}
+# Realizar una comprobación predictiva posterior.
+comprobar_ajuste <- function(fit, A_obs, dirigida = FALSE, nsim = 150) {
+
+  # Simular redes desde la distribución predictiva posterior.
+  simulaciones <- simulate(fit, nsim = nsim)
+
+  # Recuperar las redes simuladas.
+  redes <- if (inherits(simulaciones, "network")) {
+    list(simulaciones)
+  } else {
+    simulaciones$networks
+  }
+
+  # Calcular las estadísticas de la red observada.
+  observada <- estadisticas_red(A_obs, dirigida)
+
+  # Calcular las estadísticas de las redes simuladas.
+  replicadas <- t(vapply(redes, function(red) {
+
+    A <- network::as.matrix.network.adjacency(red)
+
+    estadisticas_red(A, dirigida)
+
+  }, numeric(length(observada))))
+
+  # Identificar las estadísticas.
+  colnames(replicadas) <- names(observada)
+
+  # Resumir las distribuciones predictivas posteriores.
+  tabla <- do.call(rbind, lapply(seq_along(observada), function(j) {
+
+    # Extraer los valores simulados.
+    x <- replicadas[, j]
+
+    # Excluir los valores no definidos.
+    x <- x[is.finite(x)]
+
+    # Calcular el intervalo predictivo del 95 %.
+    intervalo <- if (length(x) > 0) {
+      quantile(x, c(0.025, 0.975))
+    } else {
+      c(NA_real_, NA_real_)
+    }
+
+    # Calcular la probabilidad de discrepancia.
+    p <- if (length(x) > 0 && is.finite(observada[j])) {
+      mean(x >= observada[j])
+    } else {
+      NA_real_
+    }
+
+    # Construir el resumen.
+    data.frame(
+      Estadistico = names(observada)[j],
+      Observado = unname(observada[j]),
+      Inferior = unname(intervalo[1]),
+      Superior = unname(intervalo[2]),
+      p_superior = p,
+      Indefinidas = nrow(replicadas) - length(x)
+    )
+  }))
+
+  # Devolver los resultados.
+  list(
+    tabla = tabla,
+    replicadas = replicadas,
+    observada = observada
+  )
+}
+```
+
+```{r}
+# Generar 500 redes predictivas posteriores.
+set.seed(42)
+
+ajuste_flor <- comprobar_ajuste(
+  fit = fit_dist,
+  A_obs = A,
+  dirigida = FALSE,
+  nsim = 1000
+)
+
+# Presentar los resultados.
+knitr::kable(
+  ajuste_flor$tabla,
+  digits = 3,
+  caption = "Comprobación predictiva posterior"
+)
+```
+
+La **comprobación predictiva posterior** muestra que el modelo reproduce razonablemente la **desviación estándar de los grados** y la **distancia geodésica promedio**. 
+
+Sin embargo, tiende a **sobreestimar la densidad y la transitividad**, y no reproduce adecuadamente la **asortatividad negativa por grado** observada.
+
+La proporción `p_superior` aproxima $\textsf{Pr}\left(T(\mathbf{Y}^{\mathrm{rep}})\geq T(\mathbf{Y})\mid\mathbf{Y}\right)$ para cada estadístico. Se utiliza como medida descriptiva de discrepancia, **no como un valor $p$ frecuentista convencional**.
+
+```{r florencia-ppc-graficos, fig.width=10, fig.height=6}
+# Organizar las estadísticas de las redes simuladas.
+datos <- stack(as.data.frame(ajuste_flor$replicadas))
+
+names(datos) <- c("valor", "estadistico")
+
+# Excluir los valores no definidos.
+datos <- datos[is.finite(datos$valor), ]
+
+# Recuperar los valores observados.
+col_observado <- if ("Observado" %in% names(ajuste_flor$tabla)) {
+  "Observado"
+} else {
+  "observado"
+}
+
+observados <- data.frame(
+  estadistico = colnames(ajuste_flor$replicadas),
+  valor = ajuste_flor$tabla[[col_observado]]
+)
+
+# Representar las distribuciones predictivas posteriores.
+ggplot2::ggplot(
+  datos,
+  ggplot2::aes(x = valor)
+) +
+  ggplot2::geom_histogram(
+    bins = 25,
+    fill = "#377EB8",
+    color = "white",
+    alpha = 0.8
+  ) +
+  ggplot2::geom_vline(
+    data = observados,
+    ggplot2::aes(xintercept = valor),
+    color = "#E41A1C",
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  ggplot2::facet_wrap(
+    ~ estadistico,
+    ncol = 2,
+    scales = "free"
+  ) +
+  ggplot2::labs(
+    x = "Estadístico replicado",
+    y = "Frecuencia",
+    title = "Comprobación predictiva posterior"
+  ) +
+  ggplot2::theme_minimal(base_size = 13) +
+  ggplot2::theme(
+    strip.text = ggplot2::element_text(face = "bold"),
+    panel.grid.minor = ggplot2::element_blank(),
+    panel.spacing = grid::unit(1.5, "lines")
+  )
+```
+
+# Modelo de distancia clásico con covariables
+
+Se incorporan **covariables diádicas** al predictor lineal:
+
+$$
+\operatorname{logit}(p_{ij})=
+\mu+\boldsymbol{\beta}^{\mathsf{T}}\mathbf{x}_{ij}
+-\|\boldsymbol{u}_i-\boldsymbol{u}_j\|.
+$$
+Cada $\exp(\beta_\ell)$ es una **razón de odds condicional** asociada con un incremento unitario de la covariable correspondiente, manteniendo constantes las demás y la distancia latente. 
+
+Por ejemplo, si $x_{ij}$ indica pertenencia a la misma comunidad y $\beta=1$, las **odds de conexión** se multiplican por $\exp(1)\approx 2.718$ cuando $x_{ij}$ cambia de $0$ a $1$, manteniendo fija la distancia latente. 
+
+Estos coeficientes describen **asociaciones**, no efectos causales.
+
+## Datos: Familias florentinas (continuación)
+
+La riqueza familiar se utiliza para construir una covariable de **diferencia económica**. No se modela aquí la riqueza individual como propensión a tener más conexiones. Se aplica $\log(1+w_i)$ para moderar la escala y después se estandarizan las diferencias sobre las díadas efectivamente modeladas.
+
+```{r florencia-covariables}
+# Transformar la riqueza a escala logarítmica.
+w_log <- log1p(wealth)
+
+# Calcular las diferencias absolutas de riqueza entre familias.
+X_wealth <- abs(outer(w_log, w_log, "-"))
+
+# Calcular la desviación estándar de las diferencias.
+diferencias <- X_wealth[upper.tri(X_wealth)]
+escala_wealth <- sd(diferencias)
+
+# Estandarizar las diferencias de riqueza.
+X_wealth <- X_wealth / escala_wealth
+
+# Resumir la covariable utilizada en el modelo.
+summary(X_wealth[upper.tri(X_wealth)])
+```
+
+## Ajuste del modelo
+
+Se ajusta un **modelo bayesiano de distancia euclidiana** en dos dimensiones, incorporando la diferencia estandarizada de riqueza entre familias como covariable. Se especifican las distribuciones previas
+$$
+\mu\sim\text{N}(0,9),\qquad
+\beta\sim\text{N}(0,3.2),\qquad
+\boldsymbol{u}_i\mid\sigma^2\sim
+\text{N}_2(\boldsymbol{0},\sigma^2\mathbf{I}_2),\qquad
+\sigma^2\sim\textsf{IG}(1.94,3.64).
+$$
+
+El modelo no incluye componentes de agrupamiento latente ($G=0$).
+
+```{r florencia-ajuste-cov, cache=TRUE}
+# Incorporar la diferencia de riqueza como efecto fijo.
+fit_cov <- ergmm(
+  flomarriage ~ euclidean(d = 2, G = 0) + edgecov(X_wealth),
+  seed = 43,
+  control = control_mcmc
+)
+
+# Distribución previa
+fit_cov$prior
+
+# Examinar coeficientes y previas utilizadas.
+summary(fit_cov)
+```
+
+La diferencia de riqueza presenta una **asociación positiva** sobre la probabilidad de conexión. 
+
+Manteniendo fija la distancia latente, un incremento unitario en la diferencia estandarizada de riqueza multiplica las **posibilidades relativas de conexión** por $\exp(2.42)\approx 11.25$. Por lo tanto, el modelo sugiere que las **familias con mayores diferencias de riqueza tienen mayor propensión a establecer alianzas matrimoniales**.
+
+## Comparación
+
+```{r florencia-comparacion, cache=TRUE}
+# Obtener las probabilidades posteriores de conexión.
+P_flor <- predict(fit_dist, type = "post")
+P_cov <- predict(fit_cov, type = "post")
+
+# Seleccionar las parejas de vértices sin repetir conexiones.
+pares <- upper.tri(A)
+y <- A[pares]
+
+# Calcular el Brier score y el log-loss.
+metricas <- function(y, p) {
+  p <- pmin(pmax(p, 1e-8), 1 - 1e-8)
+
+  c(
+    Brier = mean((y - p)^2),
+    LogLoss = -mean(y * log(p) + (1 - y) * log(1 - p))
+  )
+}
+
+# Comparar ambos modelos.
+comparacion_flor <- rbind(
+  Sin_covariable = metricas(y, P_flor[pares]),
+  Con_riqueza = metricas(y, P_cov[pares])
+)
+
+# Presentar los resultados.
+knitr::kable(
+  comparacion_flor,
+  digits = 3,
+  caption = "Comparación del ajuste de los modelos"
+)
+```
+
+El modelo con riqueza presenta un **mejor ajuste dentro de la muestra**, al reducir el Brier score de $0.046$ a $0.026$ y el log-loss de $0.174$ a $0.112$. 
+
+Estos resultados sugieren que incorporar las diferencias de riqueza mejora la capacidad del modelo para reproducir las conexiones observadas, aunque no permiten establecer su capacidad predictiva fuera de la muestra.
+
+# Modelo de distancia con agrupaciones
+
+Para representar **grupos latentes**, se supone que las posiciones de los vértices provienen de una mezcla de $G$ distribuciones normales multivariadas. La **especificación jerárquica completa** es
+
+$$
+\begin{aligned}
+c_i\mid\boldsymbol{\omega}
+&\overset{\mathrm{ind}}{\sim}
+\textsf{Categorical}(\boldsymbol{\omega}),
+&& i=1,\ldots,n,\\
+\boldsymbol{u}_i\mid c_i=g,\boldsymbol{m}_g,\sigma_g^2
+&\sim\textsf{N}_k(\boldsymbol{m}_g,\sigma_g^2\mathbf{I}_k),\\
+\boldsymbol{m}_g
+&\overset{\mathrm{iid}}{\sim}
+\textsf{N}_k(\boldsymbol{0},\tau^2\mathbf{I}_k),
+&& g=1,\ldots,G,\\
+\sigma_g^2
+&\overset{\mathrm{iid}}{\sim}
+\textsf{IG}\left(\frac{\alpha}{2},
+\frac{\alpha s_0^2}{2}\right),
+&& g=1,\ldots,G,\\
+\boldsymbol{\omega}
+&\sim\textsf{Dirichlet}(\nu_1,\ldots,\nu_G).
+\end{aligned}
+$$
+
+Los parámetros $\boldsymbol{m}_g$ y $\sigma_g^2$ representan el **centro y la dispersión** del grupo $g$, respectivamente. Los pesos $\omega_g$ determinan las probabilidades de pertenencia y satisfacen $\sum_{g=1}^G\omega_g=1$. Los hiperparámetros $\tau^2$, $s_0^2$, $\alpha$ y $\nu_g$ controlan las distribuciones previas.
+
+En `latentnet::ergmm()`, estos hiperparámetros corresponden, respectivamente, a `Z.mean.var`, `Z.var`, `Z.var.df` y `Z.pK`. Por defecto, se utiliza una previa Dirichlet simétrica, con $\nu_1=\cdots=\nu_G$.
+
+Al integrar las asignaciones de grupo $c_i$, se obtiene una **mezcla de distribuciones normales** para las posiciones latentes, dada por
+
+$$
+p(\boldsymbol{u}_i\mid\boldsymbol{\omega},
+\boldsymbol{m}_1,\ldots,\boldsymbol{m}_G,
+\sigma_1^2,\ldots,\sigma_G^2)
+=
+\sum_{g=1}^G
+\omega_g\,
+\textsf{N}_k(\boldsymbol{u}_i\mid
+\boldsymbol{m}_g,\sigma_g^2\mathbf{I}_k).
+$$
+
+Cada componente representa un **grupo latente**, caracterizado por su centro $\boldsymbol{m}_g$, su dispersión $\sigma_g^2$ y su peso $\omega_g$.
+
+La probabilidad de enlace sigue dependiendo de las **distancias**, no directamente de los grupos. Por ello, estos agrupamientos no son idénticos a los de un **modelo de bloques estocásticos**.
+
+Las etiquetas $1,\ldots,G$ son arbitrarias. Permutarlas conjuntamente no cambia el modelo, lo cual origina **intercambio de etiquetas** (*label switching*). Este problema es distinto de las **invariancias geométricas**. 
+
+La inferencia sobre pertenencias requiere un tratamiento que haga comparables las etiquetas posteriores.
+
+## Datos: Monjes de Sampson
+
+Se utiliza `samplike`, una red **dirigida** de nominaciones de agrado entre los monjes del estudio de Sampson, que combina información de tres momentos de observación. 
+
+Se define $y_{ij}=1$ si el monje $i$ nomina al monje $j$ como alguien de su agrado y $y_{ij}=0$ en caso contrario.
+
+Las distancias simétricas por sí solas satisfacen $p_{ij}=p_{ji}$. Para incorporar heterogeneidad direccional se añade un **efecto aleatorio de receptor** $b_j$:
+
+$$
+\operatorname{logit}(p_{ij})=
+\mu+b_j-\|\boldsymbol{u}_i-\boldsymbol{u}_j\|.
+$$
+
+Así, el modelo puede asignar distintas probabilidades a $i\to j$ y $j\to i$. Los efectos de receptor capturan diferencias de **popularidad**.
+
+```{r sampson-datos, fig.width=7, fig.height=5}
+# Cargar la red de nominaciones de agrado.
+data("sampson", package = "ergm")
+
+red_sam <- samplike
+A_sam <- network::as.matrix.network.adjacency(red_sam)
+
+# Construir el grafo dirigido.
+g_sam <- igraph::graph_from_adjacency_matrix(
+  A_sam,
+  mode = "directed"
+)
+
+# Describir las principales características de la red.
+cat("Vértices:", igraph::vcount(g_sam), "\n")
+cat("Arcos:", igraph::ecount(g_sam), "\n")
+cat("Aislados:", sum(igraph::degree(g_sam, mode = "all") == 0), "\n")
+
+# Calcular las nominaciones recibidas por cada monje.
+grado_entrada <- igraph::degree(g_sam, mode = "in")
+
+# Calcular posiciones reproducibles para los vértices.
+set.seed(42)
+posiciones <- igraph::layout_with_fr(g_sam)
+
+# Representar la red dirigida.
+plot(
+  g_sam,
+  layout = posiciones,
+  vertex.size = 10 + 3 * sqrt(grado_entrada),
+  vertex.color = "#4682B4",
+  vertex.frame.color = "white",
+  vertex.label.color = "#253342",
+  vertex.label.cex = 0.85,
+  vertex.label.dist = 0.7,
+  edge.color = grDevices::adjustcolor("gray40", alpha.f = 0.45),
+  edge.width = 1,
+  edge.arrow.size = 0.35,
+  edge.curved = 0.15,
+  main = "Red de nominaciones de agrado",
+  margin = 0.15
+)
+```
+
+## Ajuste del modelo
+
+Se ajustan modelos con $G=1,2,3,4$ **grupos latentes**, manteniendo la misma estructura de efectos aleatorios. 
+
+Para facilitar la inicialización, primero se ajusta un modelo sin mezcla y se aplica **agrupamiento jerárquico** a las posiciones latentes estimadas. Las asignaciones obtenidas se **utilizan únicamente como valores iniciales** y pueden modificarse durante el muestreo MCMC.v
+
+```{r}
+# Configurar las cadenas MCMC.
+control_mcmc <- ergmm.control(
+  burnin = 100000,
+  interval = 10,
+  sample.size = 50000
+)
+```
+
+```{r sampson-ajustes, cache=TRUE}
+# Ajustar un modelo preliminar sin agrupamiento.
+fit_sam_base <- ergmm(
+  red_sam ~ euclidean(d = 2, G = 0) + rreceiver,
+  seed = 100,
+  control = control_mcmc
+)
+
+# Extraer las posiciones latentes estimadas.
+Z0_sam <- as.matrix(fit_sam_base$mcmc.mle$Z)
+
+# Calcular distancias y realizar agrupamiento jerárquico.
+D_sam <- as.matrix(dist(Z0_sam))
+arbol_sam <- hclust(as.dist(D_sam), method = "ward.D2")
+
+# Construir grupos iniciales con al menos dos vértices.
+crear_grupos_sam <- function(G) {
+
+  grupos <- cutree(arbol_sam, k = G)
+
+  for (g in seq_len(G)) {
+
+    # Conservar los grupos que ya tienen dos o más vértices.
+    if (sum(grupos == g) >= 2) next
+
+    # Buscar vértices en grupos con más de dos integrantes.
+    tamanos <- tabulate(grupos, nbins = G)
+    candidatos <- which(grupos != g & tamanos[grupos] > 2)
+
+    if (length(candidatos) == 0) {
+      stop("No es posible formar grupos de tamaño mínimo 2.")
+    }
+
+    # Incorporar el vértice más cercano al grupo pequeño.
+    i <- which(grupos == g)
+    vecino <- candidatos[which.min(D_sam[i, candidatos])]
+
+    grupos[vecino] <- g
+  }
+
+  grupos
+}
+
+# Conservar las posiciones y asignaciones iniciales.
+control_sam <- control_mcmc
+control_sam$refine.user.start <- FALSE
+
+# Ajustar los modelos con diferentes números de grupos.
+G_sam <- 1:4
+fits_sam <- vector("list", length(G_sam))
+names(fits_sam) <- as.character(G_sam)
+
+for (G in G_sam) {
+
+  # Definir los valores iniciales.
+  inicio <- list(
+    Z = Z0_sam,
+    Z.K = crear_grupos_sam(G)
+  )
+
+  # Ajustar el modelo correspondiente.
+  fits_sam[[as.character(G)]] <- tryCatch(
+    ergmm(
+      red_sam ~ euclidean(d = 2, G = G) + rreceiver,
+      user.start = inicio,
+      seed = 100 + G,
+      control = control_sam
+    ),
+    error = function(e) {
+      warning(sprintf("Error con G = %d: %s", G, conditionMessage(e)))
+      NULL
+    }
+  )
+}
+
+# Identificar los modelos ajustados sin errores.
+G_ajustados <- G_sam[!vapply(fits_sam, is.null, logical(1))]
+
+cat("Modelos ajustados con G =", paste(G_ajustados, collapse = ", "), "\n")
+```
+
+## Selección del modelo
+
+Se compara el número de grupos $G$ mediante el **BIC global** de `latentnet`, que combina el ajuste de las **conexiones observadas** ($Y$) y de las **posiciones latentes** ($Z$). 
+
+Se prefiere el modelo con **menor BIC**, manteniendo fija la dimensión latente y la estructura de efectos aleatorios. 
+
+```{r sampson-bic, fig.width=7, fig.height=4}
+# Extraer las componentes del BIC de cada modelo.
+BIC_sam <- t(vapply(
+  fits_sam[as.character(G_ajustados)],
+  function(modelo) {
+    bic <- unlist(bic.ergmm(modelo))
+    bic[c("Y", "Z", "overall")]
+  },
+  numeric(3)
+))
+
+# Organizar los resultados en una tabla.
+tabla_bic <- data.frame(
+  G = G_ajustados,
+  BIC_Y = BIC_sam[, "Y"],
+  BIC_Z = BIC_sam[, "Z"],
+  BIC_global = BIC_sam[, "overall"],
+  row.names = NULL
+)
+
+# Seleccionar el modelo con menor BIC global.
+stopifnot(any(is.finite(tabla_bic$BIC_global)))
+
+bic_validos <- replace(
+  tabla_bic$BIC_global,
+  !is.finite(tabla_bic$BIC_global),
+  Inf
+)
+
+mejor_G <- tabla_bic$G[which.min(bic_validos)]
+fit_sam <- fits_sam[[as.character(mejor_G)]]
+
+# Presentar los resultados.
+knitr::kable(
+  tabla_bic,
+  digits = 2,
+  caption = "Comparación del BIC según el número de grupos"
+)
+
+cat("Número seleccionado de grupos:", mejor_G, "\n")
+summary(fit_sam)
+
+# Representar el BIC global.
+plot(
+  tabla_bic$G,
+  tabla_bic$BIC_global,
+  type = "b",
+  pch = 19,
+  col = "#4682B4",
+  lwd = 2,
+  xaxt = "n",
+  xlab = "Número de grupos",
+  ylab = "BIC global",
+  main = "Selección del número de grupos"
+)
+
+axis(1, at = tabla_bic$G)
+
+# Destacar el modelo seleccionado.
+points(
+  mejor_G,
+  min(bic_validos),
+  pch = 19,
+  col = "#D55E00",
+  cex = 1.6
+)
+```
+
+## Inferencia sobre las posiciones latentes
+
+```{r sampson-posiciones, fig.align='center'}
+# Definir los colores de los grupos.
+colores <- grDevices::hcl.colors(mejor_G, "Dark 3")
+
+# Representar las posiciones y pertenencias posteriores.
+suppressWarnings(
+  plot(
+    fit_sam,
+    what = "mkl",
+    pie = TRUE,
+    labels = FALSE,
+    cluster.col = colores,
+    vertex.cex = 2,
+    edge.col = "gray80",
+    plot.means = FALSE,
+    plot.vars = FALSE,
+    print.formula = FALSE,
+    main = "Grupos latentes de la red de Sampson"
+  )
+)
+```
+
+```{r sampson-clasificacion}
+# Extraer las probabilidades posteriores de pertenencia.
+Q_sam <- attr(fit_sam$sample, "Q")
+
+# Verificar que las probabilidades estén disponibles.
+if (is.matrix(Q_sam) && nrow(Q_sam) == nrow(A_sam)) {
+
+  # Asignar nombres a las columnas.
+  colnames(Q_sam) <- paste0("Grupo_", seq_len(ncol(Q_sam)))
+
+  # Identificar el grupo más probable de cada monje.
+  grupo <- max.col(Q_sam, ties.method = "first")
+  prob_max <- apply(Q_sam, 1, max)
+
+  # Calcular la entropía de las probabilidades de pertenencia.
+  entropia <- -rowSums(Q_sam * log(pmax(Q_sam, 1e-12)))
+
+  # Organizar los resultados.
+  tabla_grupos <- data.frame(
+    Monje = seq_len(nrow(Q_sam)),
+    Grupo = grupo,
+    Prob_max = prob_max,
+    Q_sam,
+    Entropia = entropia
+  )
+
+  # Presentar la tabla.
+  knitr::kable(
+    tabla_grupos,
+    digits = 3,
+    caption = "Probabilidades posteriores de pertenencia a grupos"
+  )
+
+} else {
+  cat("No se encontraron probabilidades posteriores de pertenencia.\n")
+}
+```
+
+La **entropía de clasificación** es pequeña para asignaciones concentradas y mayor cuando existen varias pertenencias plausibles. 
+
+# Validación cruzada de modelos de redes
+
+Se comparan tres modelos estadísticos para redes mediante **validación cruzada de cinco particiones**. 
+
+El objetivo es evaluar la **capacidad predictiva fuera de la muestra** de un **modelo de distancia latente** (*latent distance model*), un **modelo de factores latentes** (*eigenmodel*) y un **modelo de bloques estocásticos** (*SBM*).
+
+Se utiliza la red **dirigida de asesoría profesional** de Lazega, compuesta por $n=71$ abogados. 
+
+Se define $y_{ij}=1$ si el abogado $i$ solicita asesoría al abogado $j$, y $y_{ij}=0$ en caso contrario, con $i\neq j$.
+
+## Modelos considerados
+
+Se ajustan tres modelos sin covariables observadas, con distintas representaciones de la estructura de dependencia entre vértices.
+
+**1. Modelo de distancia latente.** Se supone que cada abogado ocupa una posición $\boldsymbol{u}_i\in\mathbb{R}^2$ y que la probabilidad de conexión disminuye con la distancia euclidiana entre posiciones:
+
+$$
+\begin{aligned}
+y_{ij}\mid p_{ij}
+&\overset{\mathrm{ind}}{\sim}\textsf{Bernoulli}(p_{ij}),\\
+\operatorname{logit}(p_{ij})
+&=\mu+b_j-\|\boldsymbol{u}_i-\boldsymbol{u}_j\|.
+\end{aligned}
+$$
+
+Aquí, $\mu$ representa la propensión general a establecer conexiones y $b_j$ es un **efecto aleatorio de receptor** que captura la heterogeneidad en la cantidad de consultas recibidas. Se consideran distribuciones previas normales para las posiciones y los efectos aleatorios, con parámetros de dispersión desconocidos. El modelo se ajusta mediante MCMC utilizando `latentnet::ergmm()`.
+
+**2. Eigenmodel dirigido.** Se asignan a cada abogado dos vectores latentes, $\boldsymbol{u}_i,\boldsymbol{v}_i\in\mathbb{R}^2$, que representan sus características como emisor y receptor de conexiones. Se considera el modelo probit
+
+$$
+\begin{aligned}
+y_{ij}\mid p_{ij}
+&\overset{\mathrm{ind}}{\sim}\textsf{Bernoulli}(p_{ij}),\\
+p_{ij}
+&=\Phi\left(\mu+b_j+\boldsymbol{u}_i^\mathsf{T}\boldsymbol{v}_j\right),
+\end{aligned}
+$$
+
+donde $\Phi(\cdot)$ es la función de distribución acumulada normal estándar. El término $\boldsymbol{u}_i^\mathsf{T}\boldsymbol{v}_j$ representa una **interacción bilineal** que permite capturar patrones de conexión no necesariamente explicados por proximidad euclidiana. Se incorpora un efecto aleatorio de receptor $b_j$ y se realiza inferencia bayesiana mediante `amen::ame()`. Esta es una extensión dirigida del enfoque de factores latentes, no la formulación simétrica del eigenmodel original.
+
+**3. Modelo de bloques estocásticos.** Se supone que cada abogado pertenece a uno de $G$ bloques latentes y que las probabilidades de conexión dependen de las pertenencias:
+
+$$
+\begin{aligned}
+y_{ij}\mid c_i,c_j,\boldsymbol{\Pi}
+&\overset{\mathrm{ind}}{\sim}\textsf{Bernoulli}(\pi_{c_i,c_j}),\\
+\Pr(c_i=g)&=\omega_g,
+\qquad g=1,\ldots,G.
+\end{aligned}
+$$
+
+Aquí, $\theta_{gh}$ representa la probabilidad de conexión desde un abogado del bloque $g$ hacia uno del bloque $h$, sin imponer $\theta_{gh}=\theta_{hg}$. El modelo permite identificar **grupos con patrones similares de conexión**, incluyendo relaciones entre bloques. Se utiliza `missSBM`, que implementa inferencia variacional y selección del número de bloques mediante el **criterio ICL**.
+
+En los tres casos se estiman las probabilidades de conexión a partir de las relaciones de entrenamiento. Los modelos de distancia y de factores incluyen efectos de receptor, mientras que el SBM representa la heterogeneidad mediante sus bloques.
+
+## Construcción de las particiones
+
+Se dividen aleatoriamente las $n(n-1)=4970$ **díadas dirigidas** en cinco grupos. 
+
+En cada iteración se reserva una partición para evaluación y se ajustan los modelos con las cuatro restantes. 
+
+Las relaciones reservadas se registran como **valores faltantes (`NA`)**, sin confundirlas con ausencias de conexión.
+
+```{r}
+# Cargar los datos de Lazega.
+data("lazega_lawfirm", package = "netmem")
+
+# Construir la matriz de adyacencia dirigida.
+A_ley <- 1L * (as.matrix(lazega_lawfirm$advice) > 0)
+diag(A_ley) <- 0L
+
+# Construir la red para latentnet.
+red_ley <- network::network(
+  A_ley,
+  directed = TRUE,
+  loops = FALSE,
+  matrix.type = "adjacency"
+)
+```
+
+
+```{r}
+# Enumerar las díadas dirigidas sin autoconexiones.
+dyads <- which(row(A_ley) != col(A_ley), arr.ind = TRUE)
+
+# Asignar aleatoriamente las díadas a cinco particiones.
+set.seed(204)
+
+K <- 5
+folds <- sample(rep(seq_len(K), length.out = nrow(dyads)))
+
+# Verificar el tamaño de cada partición.
+table(folds)
+
+# Preparar la matriz para almacenar las predicciones.
+pred_cv <- matrix(
+  NA_real_,
+  nrow = nrow(dyads),
+  ncol = 3,
+  dimnames = list(NULL, c("Distancia", "Eigenmodel", "SBM"))
+)
+
+# Registrar el número de bloques seleccionado.
+G_cv <- integer(K)
+```
+
+Cada partición contiene **994 díadas de prueba y 3976 de entrenamiento**. De esta manera, todas las conexiones se utilizan para evaluación exactamente una vez.
+
+## Ajuste de los modelos y predicción
+
+Para cada partición se ajustan los tres modelos utilizando únicamente las díadas de entrenamiento. 
+
+En el SBM se consideran entre uno y cinco bloques, seleccionando el número de bloques mediante ICL dentro de cada partición.
+
+```{r}
+# Configurar el muestreador del modelo de distancia.
+control_cv <- ergmm.control(
+  burnin = 10000,
+  interval = 10,
+  sample.size = 5000
+)
+
+# Configurar missSBM según la versión instalada.
+if ("missSBM_param" %in% getNamespaceExports("missSBM")) {
+  control_sbm <- missSBM::missSBM_param(trace = FALSE)
+} else {
+  control_sbm <- list(trace = FALSE)
+}
+```
+
+
+```{r}
+# Realizar la validación cruzada
+
+for (k in seq_len(K)) {
+
+  cat("\nPartición", k, "de", K, "\n")
+
+  # Identificar las díadas reservadas para evaluación.
+  ids <- which(folds == k)
+  test <- dyads[ids, , drop = FALSE]
+
+  # Construir la matriz de entrenamiento.
+  A_train <- A_ley
+  A_train[test] <- NA
+  diag(A_train) <- NA
+
+  # Construir la red de entrenamiento para latentnet.
+  red_train <- red_ley
+
+  for (r in seq_len(nrow(test))) {
+    i <- test[r, 1]
+    j <- test[r, 2]
+
+    red_train[i, j, add.edges = TRUE] <- NA
+  }
+
+  # Comprobar que las díadas de prueba estén excluidas.
+  stopifnot(
+    network::network.naedgecount(red_train) == nrow(test)
+  )
+
+
+  # ----------------------------------------------------------
+  # Modelo 1. Distancia euclidiana
+  # ----------------------------------------------------------
+
+  fit_dist_cv <- ergmm(
+    red_train ~ euclidean(d = 2, G = 0) + rreceiver,
+    seed = 100 + k,
+    control = control_cv
+  )
+
+  # Obtener las probabilidades posteriores.
+  P_dist <- predict(fit_dist_cv, type = "post")
+
+
+  # ----------------------------------------------------------
+  # Modelo 2. Eigenmodel dirigido
+  # ----------------------------------------------------------
+
+  fit_eigen_cv <- amen::ame(
+    Y = A_train,
+    family = "bin",
+    R = 2,
+    symmetric = FALSE,
+    rvar = FALSE,
+    cvar = TRUE,
+    dcor = FALSE,
+    seed = 200 + k,
+    burn = 10000,
+    nscan = 5000,
+    odens = 10,
+    plot = FALSE,
+    print = FALSE,
+    gof = FALSE
+  )
+
+  # Obtener las probabilidades posteriores.
+  P_eigen <- fit_eigen_cv$YPM
+
+
+  # ----------------------------------------------------------
+  # Modelo 3. Bloques estocásticos dirigidos
+  # ----------------------------------------------------------
+
+  set.seed(300 + k)
+
+  fit_sbm_cv <- missSBM::estimateMissSBM(
+    adjacencyMatrix = A_train,
+    vBlocks = 1:10,
+    sampling = "dyad",
+    control = control_sbm
+  )
+
+  # Recuperar el modelo seleccionado mediante ICL.
+  mejor_sbm <- fit_sbm_cv$bestModel
+
+  # Obtener las probabilidades estimadas de conexión.
+  P_sbm <- as.matrix(fitted(mejor_sbm))
+
+  # Registrar el número de bloques seleccionado.
+  G_cv[k] <- mejor_sbm$fittedSBM$nbBlocks
+
+
+  # ----------------------------------------------------------
+  # Almacenar y verificar las predicciones
+  # ----------------------------------------------------------
+
+  # Verificar las dimensiones de las matrices.
+  stopifnot(
+    all(dim(P_dist) == dim(A_ley)),
+    all(dim(P_eigen) == dim(A_ley)),
+    all(dim(P_sbm) == dim(A_ley))
+  )
+
+  # Guardar las probabilidades de las díadas reservadas.
+  pred_cv[ids, "Distancia"] <- P_dist[test]
+  pred_cv[ids, "Eigenmodel"] <- P_eigen[test]
+  pred_cv[ids, "SBM"] <- P_sbm[test]
+
+  # Verificar las predicciones fuera de muestra.
+  stopifnot(
+    all(is.finite(pred_cv[ids, ])),
+    all(pred_cv[ids, ] >= 0 & pred_cv[ids, ] <= 1)
+  )
+
+  cat("Díadas evaluadas:", length(ids), "\n")
+  cat("Bloques seleccionados:", G_cv[k], "\n")
+}
+```
+
+```{r}
+# Resumir los resultados
+
+# Comprobar que todas las díadas tengan predicciones.
+stopifnot(all(is.finite(pred_cv)))
+
+# Presentar el número de bloques seleccionado.
+tabla_bloques <- data.frame(
+  Particion = seq_len(K),
+  Grupos_SBM = G_cv
+)
+
+knitr::kable(
+  tabla_bloques,
+  row.names = FALSE,
+  caption = "Número de bloques seleccionado en cada partición"
+)
+
+# Recuperar las conexiones observadas.
+y_cv <- A_ley[dyads]
+
+# Verificar la correspondencia entre observaciones y predicciones.
+stopifnot(nrow(pred_cv) == length(y_cv))
+
+# Resumir las probabilidades predichas.
+summary(pred_cv)
+```
+
+Las configuraciones MCMC son ilustrativas y deben acompañarse de **diagnósticos de convergencia**, especialmente porque los modelos se ajustan repetidamente sobre redes parcialmente observadas.
+
+## Evaluación predictiva
+
+Se comparan las predicciones mediante tres medidas:
+
+- **Brier score:** promedio de las diferencias cuadráticas entre las conexiones observadas y sus probabilidades predichas.
+- **Log-loss:** pérdida logarítmica que penaliza especialmente las predicciones incorrectas con probabilidades extremas.
+- **AUC:** área bajo la curva ROC, que mide la capacidad de distinguir conexiones existentes de ausentes.
+
+Para cada partición se calculan estas medidas utilizando exclusivamente las díadas reservadas.
+
+```{r}
+# Definir las medidas de evaluación predictiva.
+metricas_cv <- function(y, p) {
+
+  # Limitar las probabilidades para evitar logaritmos de cero.
+  p <- pmin(pmax(p, 1e-8), 1 - 1e-8)
+
+  # Calcular el AUC mediante rangos.
+  n1 <- sum(y == 1)
+  n0 <- sum(y == 0)
+
+  rangos <- rank(p, ties.method = "average")
+
+  auc <- (sum(rangos[y == 1]) - n1 * (n1 + 1) / 2) /
+    (n1 * n0)
+
+  c(
+    Brier = mean((y - p)^2),
+    LogLoss = -mean(y * log(p) + (1 - y) * log1p(-p)),
+    AUC = auc
+  )
+}
+
+# Recuperar las relaciones observadas.
+y_cv <- A_ley[dyads]
+
+# Calcular las métricas para cada partición y modelo.
+resultados_cv <- do.call(rbind, lapply(seq_len(K), function(k) {
+
+  ids <- which(folds == k)
+
+  do.call(rbind, lapply(colnames(pred_cv), function(modelo) {
+
+    m <- metricas_cv(y_cv[ids], pred_cv[ids, modelo])
+
+    data.frame(
+      Particion = k,
+      Modelo = modelo,
+      Brier = unname(m["Brier"]),
+      LogLoss = unname(m["LogLoss"]),
+      AUC = unname(m["AUC"])
+    )
+  }))
+}))
+
+# Calcular las métricas promedio entre particiones.
+tabla_cv <- aggregate(
+  cbind(Brier, LogLoss, AUC) ~ Modelo,
+  data = resultados_cv,
+  FUN = mean
+)
+
+# Ordenar por el Brier score.
+tabla_cv <- tabla_cv[order(tabla_cv$Brier), ]
+
+# Presentar los resultados.
+knitr::kable(
+  tabla_cv,
+  digits = 3,
+  row.names = FALSE,
+  caption = "Comparación predictiva mediante validación cruzada"
+)
+```
+
+Los valores **menores** de Brier score y log-loss indican un mejor desempeño probabilístico, mientras que un **AUC mayor** refleja una mejor capacidad de discriminación.
+
+## Comparación mediante curvas ROC
+
+Se representan las curvas ROC utilizando las predicciones fuera de muestra obtenidas en las cinco particiones. Cada curva resume la relación entre la **tasa de verdaderos positivos** y la **tasa de falsos positivos** para distintos umbrales de clasificación.
+
+```{r}
+# Construir una curva ROC a partir de las predicciones.
+curva_roc <- function(y, p) {
+
+  # Ordenar las probabilidades de mayor a menor.
+  orden <- order(p, decreasing = TRUE)
+
+  y <- y[orden]
+  p <- p[orden]
+
+  # Identificar los umbrales distintos.
+  indices <- which(!duplicated(p, fromLast = TRUE))
+
+  # Calcular verdaderos y falsos positivos.
+  VP <- c(0, cumsum(y)[indices])
+  FP <- c(0, cumsum(1 - y)[indices])
+
+  data.frame(
+    FPR = FP / sum(y == 0),
+    TPR = VP / sum(y == 1)
+  )
+}
+
+# Calcular las curvas para los tres modelos.
+curvas <- lapply(
+  colnames(pred_cv),
+  function(modelo) curva_roc(y_cv, pred_cv[, modelo])
+)
+
+# Definir colores.
+colores <- c("#2166AC", "#D55E00", "#009E73")
+
+# Representar la primera curva.
+plot(
+  curvas[[1]]$FPR,
+  curvas[[1]]$TPR,
+  type = "s",
+  col = colores[1],
+  lwd = 2,
+  xlim = c(0, 1),
+  ylim = c(0, 1),
+  xlab = "Tasa de falsos positivos",
+  ylab = "Tasa de verdaderos positivos",
+  main = "Curvas ROC: validación cruzada"
+)
+
+# Agregar las curvas restantes.
+for (j in 2:3) {
+  lines(
+    curvas[[j]]$FPR,
+    curvas[[j]]$TPR,
+    type = "s",
+    col = colores[j],
+    lwd = 2
+  )
+}
+
+# Agregar la referencia de clasificación aleatoria.
+abline(0, 1, col = "gray60", lty = 2)
+
+# Calcular los AUC globales a partir de las predicciones excluidas.
+auc_global <- sapply(
+  colnames(pred_cv),
+  function(modelo) metricas_cv(y_cv, pred_cv[, modelo])["AUC"]
+)
+
+# Agregar la leyenda.
+legend(
+  "bottomright",
+  legend = paste0(
+    colnames(pred_cv),
+    " (AUC = ", sprintf("%.3f", auc_global), ")"
+  ),
+  col = colores,
+  lwd = 2,
+  bty = "n"
+)
+```
+
+## Observaciones
+
+La comparación permite evaluar qué representación de la estructura latente ofrece mayor **capacidad predictiva de conexiones no observadas**. Mientras que el modelo de distancia se basa en proximidad euclidiana, el eigenmodel incorpora interacciones bilineales y el SBM representa patrones de conexión mediante bloques.
+
+Los resultados deben interpretarse considerando la variabilidad entre particiones, las diferencias entre los procedimientos de estimación y los diagnósticos de convergencia. El experimento evalúa la predicción de relaciones **entre abogados conocidos**, pero no la generalización a nuevos vértices ni la evolución futura de la red.
+
+# Aplicación: Red de asesoría profesional entre abogados
+
+La red de Lazega contiene **71 abogados** de una firma corporativa de Estados Unidos.
+
+Se dispone de **relaciones dirigidas de asesoría profesional** y de atributos como oficina, especialidad, edad y categoría profesional. 
+
+La dirección $i\to j$ indica que el abogado $i$ declaró acudir a $j$ para solicitar asesoría.
+
+¿La coincidencia de oficina o especialidad, la diferencia de edad y la categoría de socio del receptor se asocian con las consultas profesionales, incluso después de incorporar proximidad latente y heterogeneidad en la popularidad?
+
+Se compara un modelo de distancia con efecto aleatorio de receptor frente a una extensión con cuatro covariables diádicas. 
+
+La aplicación permite estudiar simultáneamente **homofilia observada**, **estructura relacional no observada** y **popularidad**.
+
+## Datos
+
+La distribución de datos de `netmem` contiene tres matrices de relaciones entre los 71 abogados y una tabla de atributos. 
+
+Se analiza exclusivamente la **red de asesoría**, sin confundirla con amistad o colaboración.
+
+```{r lazega-datos, fig.width=8, fig.height=6}
+# Cargar la red de asesoría y los atributos de los abogados.
+data("lazega_lawfirm", package = "netmem")
+
+ley <- lazega_lawfirm
+A_ley <- as.matrix(ley$advice)
+atributos <- as.data.frame(ley$attributes)
+names(atributos) <- tolower(names(atributos))
+
+# Verificar las dimensiones y los atributos necesarios.
+stopifnot(
+  nrow(A_ley) == 71,
+  ncol(A_ley) == 71,
+  nrow(atributos) == nrow(A_ley),
+  all(c("office", "practice", "age", "status") %in% names(atributos)),
+  !anyNA(A_ley),
+  !anyNA(atributos[, c("office", "practice", "age", "status")])
+)
+
+# Construir la matriz de adyacencia binaria sin autoconexiones.
+A_ley <- 1L * (A_ley > 0)
+diag(A_ley) <- 0L
+
+# Construir la red dirigida.
+red_ley <- network::network(
+  A_ley,
+  directed = TRUE,
+  matrix.type = "adjacency",
+  loops = FALSE
+)
+
+g_ley <- igraph::graph_from_adjacency_matrix(
+  A_ley,
+  mode = "directed"
+)
+
+# Describir las principales características de la red.
+cat("Vértices:", igraph::vcount(g_ley), "\n")
+cat("Arcos:", igraph::ecount(g_ley), "\n")
+
+# Identificar las oficinas y asignarles colores.
+oficinas <- factor(atributos$office)
+colores <- grDevices::hcl.colors(nlevels(oficinas), "Dark 3")
+color_vertices <- colores[as.integer(oficinas)]
+
+# Calcular el número de consultas recibidas por abogado.
+grado_entrada <- igraph::degree(g_ley, mode = "in")
+
+# Calcular posiciones reproducibles para los vértices.
+set.seed(42)
+posiciones <- igraph::layout_with_fr(g_ley)
+
+# Representar la red de asesoría profesional.
+plot(
+  g_ley,
+  layout = posiciones,
+  vertex.size = 6 + 2 * sqrt(grado_entrada),
+  vertex.color = color_vertices,
+  vertex.frame.color = "white",
+  vertex.label = NA,
+  edge.color = grDevices::adjustcolor("gray40", alpha.f = 0.20),
+  edge.width = 0.7,
+  edge.arrow.size = 0.15,
+  edge.curved = 0.08,
+  main = "Red de asesoría profesional",
+  margin = 0.1
+)
+
+# Identificar los colores correspondientes a las oficinas.
+legend(
+  "topleft",
+  legend = paste("Oficina", levels(oficinas)),
+  col = colores,
+  pch = 19,
+  pt.cex = 1.4,
+  bty = "n",
+  cex = 0.85
+)
+```
+
+## Construcción de covariables diádicas
+
+Se consideran cuatro **covariables diádicas** para explicar las relaciones de asesoría profesional:
+
+- **Oficina:** $X_{\text{oficina},ij}=1$ si los abogados $i$ y $j$ pertenecen a la misma oficina, y $0$ en caso contrario.
+- **Especialidad:** $X_{\text{practica},ij}=1$ si ambos abogados tienen la misma especialidad, y $0$ en caso contrario.
+- **Edad:** $X_{\text{edad},ij}$ representa la diferencia absoluta y estandarizada de edad entre los abogados $i$ y $j$.
+- **Socio receptor:** $X_{\text{socio},ij}=1$ si el abogado $j$, quien recibe la solicitud de asesoría, es socio de la firma, y $0$ en caso contrario.
+
+```{r lazega-covariables}
+# Número de abogados.
+n <- nrow(A_ley)
+
+# Identificar parejas de abogados de la misma oficina.
+oficina <- as.character(atributos$office)
+X_oficina <- 1L * outer(oficina, oficina, "==")
+
+# Identificar parejas con la misma especialidad.
+practica <- as.character(atributos$practice)
+X_practica <- 1L * outer(practica, practica, "==")
+
+# Calcular las diferencias absolutas de edad.
+edad <- as.numeric(as.character(atributos$age))
+X_edad <- abs(outer(edad, edad, "-"))
+
+# Estandarizar las diferencias de edad.
+diferencias <- X_edad[row(X_edad) != col(X_edad)]
+escala_edad <- sd(diferencias)
+
+stopifnot(is.finite(escala_edad), escala_edad > 0)
+X_edad <- X_edad / escala_edad
+
+# Identificar los abogados que son socios de la firma.
+estado <- tolower(as.character(atributos$status))
+es_socio <- estado %in% c("1", "partner")
+
+# Construir el indicador de que el receptor es socio.
+X_socio_receptor <- matrix(
+  rep(as.integer(es_socio), times = n),
+  nrow = n,
+  byrow = TRUE
+)
+
+# Excluir las autoconexiones.
+diag(X_oficina) <- 0
+diag(X_practica) <- 0
+diag(X_edad) <- 0
+diag(X_socio_receptor) <- 0
+```
+
+## Ajuste e inferencia posterior
+
+Para modelar las **relaciones dirigidas de asesoría profesional**, se considera
+
+$$
+\begin{aligned}
+y_{ij}\mid p_{ij}
+&\sim\textsf{Bernoulli}(p_{ij}),\\
+\operatorname{logit}(p_{ij})
+&=\mu+\beta_1\mathbb{1}(o_i=o_j)
++\beta_2\mathbb{1}(r_i=r_j)\\
+&\quad+\beta_3\frac{|a_i-a_j|}{s_a}
++\beta_4s_j+b_j\\
+&\quad-\|\boldsymbol{u}_i-\boldsymbol{u}_j\|,
+\qquad i\neq j.
+\end{aligned}
+$$
+
+Aquí, $o_i$, $r_i$ y $a_i$ representan la **oficina**, la **especialidad** y la **edad del abogado** $i$, respectivamente, mientras que $s_a$ es la desviación estándar de las diferencias absolutas de edad. 
+
+Además, $s_j$ indica si el **abogado receptor es socio** y $b_j$ es un **efecto aleatorio de receptor** que captura diferencias individuales en la propensión a recibir consultas. 
+
+Los coeficientes $\beta_1,\ldots,\beta_4$ representan **asociaciones condicionales**, no efectos causales, manteniendo constantes los demás términos del modelo.
+
+```{r}
+# Configurar las cadenas MCMC.
+control_mcmc <- ergmm.control(
+  burnin = 100000,
+  interval = 10,
+  sample.size = 50000
+)
+```
+
+```{r lazega-ajustes, cache=TRUE}
+# Ajustar el modelo base con posiciones latentes y efectos de receptor.
+fit_ley_base <- ergmm(
+  red_ley ~ euclidean(d = 2, G = 0) + rreceiver,
+  seed = 201,
+  control = control_mcmc
+)
+
+# Ajustar el modelo incorporando las cuatro covariables.
+fit_ley_cov <- ergmm(
+  red_ley ~ euclidean(d = 2, G = 0) +
+    edgecov(X_oficina) +
+    edgecov(X_practica) +
+    edgecov(X_edad) +
+    edgecov(X_socio_receptor) +
+    rreceiver,
+  seed = 202,
+  control = control_mcmc
+)
+
+# Examinar los resultados del modelo sin covariables.
+summary(fit_ley_base)
+
+# Examinar los resultados del modelo con covariables.
+summary(fit_ley_cov)
+```
+El modelo con covariables muestra **asociaciones importantes** con las relaciones de asesoría profesional. Compartir oficina ($\hat\beta=2.444$) o especialidad ($\hat\beta=1.809$) aumenta las **odds de conexión**, mientras que una mayor diferencia de edad las reduce ($\hat\beta=-0.295$). 
+
+Además, ser socio de la firma incrementa la propensión a recibir consultas ($\hat\beta=2.567$). Todos los intervalos de credibilidad del 95% excluyen el cero, manteniendo constantes los demás efectos del modelo.
+
+El **BIC global disminuye** de $3772$ a $3749$, favoreciendo el modelo con covariables. La varianza del efecto de receptor también disminuye de $1.66$ a $1.15$, lo que sugiere que las covariables explican parte de la heterogeneidad entre abogados.
+
+## Diagnóstico y probabilidades posteriores
+
+La inferencia se condiciona a la correcta exploración MCMC. Se revisan el **ESS** de los parámetros y la estabilidad de la logverosimilitud. 
+
+Para un análisis definitivo se requieren corridas independientes y sensibilidad a las previas.
+
+```{r lazega-diagnostico, fig.width=7, fig.height=5}
+# Extraer las muestras posteriores.
+B_ley <- as.matrix(fit_ley_cov$sample$beta)
+lpY_ley <- as.numeric(fit_ley_cov$sample$lpY)
+
+# Identificar los coeficientes.
+colnames(B_ley) <- c(
+  "Intercepto",
+  "Misma oficina",
+  "Misma práctica",
+  "Diferencia de edad",
+  "Receptor socio"
+)
+
+# Calcular los tamaños efectivos de muestra.
+muestras <- coda::mcmc(
+  cbind(B_ley, Logverosimilitud = lpY_ley)
+)
+
+ess_ley <- coda::effectiveSize(muestras)
+
+# Presentar los resultados.
+tabla_ess <- data.frame(
+  Parametro = names(ess_ley),
+  ESS = as.numeric(ess_ley)
+)
+
+knitr::kable(
+  tabla_ess,
+  digits = 0,
+  row.names = FALSE,
+  caption = "Tamaños efectivos de muestra"
+)
+
+# Representar las trazas MCMC.
+op <- par(mfrow = c(2, 1), mar = c(4, 4, 2, 1))
+
+plot(
+  lpY_ley,
+  type = "l",
+  col = "#4682B4",
+  xlab = "Iteración almacenada",
+  ylab = "Logverosimilitud",
+  main = "Traza de la logverosimilitud"
+)
+
+plot(
+  B_ley[, "Receptor socio"],
+  type = "l",
+  col = "#D55E00",
+  xlab = "Iteración almacenada",
+  ylab = expression(beta[4]),
+  main = "Traza del efecto de receptor socio"
+)
+```
+
+Las matrices se ordenan por oficina, especialidad y grado de entrada. Los **bloques delimitados** corresponden a las oficinas, mientras que las filas y columnas representan a los abogados que solicitan y reciben asesoría, respectivamente. 
+
+La intensidad del color indica la presencia de conexiones o su probabilidad posterior. Esta representación permite identificar **patrones de homofilia** y comparar visualmente el ajuste de los modelos con y sin covariables.
+
+```{r lazega-probabilidades, fig.width=12, fig.height=4}
+# Obtener las probabilidades posteriores de conexión.
+P_ley_base <- predict(fit_ley_base, type = "post")
+P_ley_cov <- predict(fit_ley_cov, type = "post")
+
+# Ordenar abogados por oficina, especialidad y consultas recibidas.
+grado_entrada <- igraph::degree(g_ley, mode = "in")
+
+orden <- order(
+  atributos$office,
+  atributos$practice,
+  -grado_entrada
+)
+
+# Aplicar el mismo orden a las tres matrices.
+matrices <- list(
+  "Red observada" = A_ley[orden, orden],
+  "Modelo sin covariables" = P_ley_base[orden, orden],
+  "Modelo con covariables" = P_ley_cov[orden, orden]
+)
+
+# Identificar los límites entre oficinas.
+oficinas <- as.character(atributos$office[orden])
+cortes <- head(cumsum(rle(oficinas)$lengths), -1)
+n <- nrow(A_ley)
+
+# Utilizar la misma escala de colores para las tres matrices.
+colores <- grDevices::colorRampPalette(
+  c("white", "#BFD7EA", "#2166AC")
+)(100)
+
+# Representar las matrices.
+op <- par(mfrow = c(1, 3))
+
+for (nombre in names(matrices)) {
+
+  corrplot::corrplot(
+    matrices[[nombre]],
+    is.corr = FALSE,
+    method = "color",
+    diag = FALSE,
+    tl.pos = "n",
+    cl.pos = "n",
+    col = colores,
+    col.lim = c(0, 1),
+    mar = c(0, 0, 2, 0),
+    title = nombre
+  )
+
+  # Separar visualmente las oficinas.
+  abline(
+    v = cortes + 0.5,
+    h = n - cortes + 0.5,
+    col = "gray40",
+    lwd = 1
+  )
+}
+```
+
+```{r lazega-posiciones, fig.width=7, fig.height=6}
+# Representar las posiciones latentes y los efectos de receptor.
+suppressWarnings(
+  plot(
+    fit_ley_cov,
+    what = "pmean",
+    rand.eff = "receiver",
+    rand.eff.cap = 1.5,
+    vertex.cex = 0.7,
+    vertex.col = "#4682B4",
+    edge.col = grDevices::adjustcolor("gray50", alpha.f = 0.15),
+    labels = FALSE,
+    plot.means = FALSE,
+    plot.vars = FALSE,
+    print.formula = FALSE,
+    main = "Posiciones latentes y efectos de receptor"
+  )
+)
+```
+
+## Evaluación predictiva posterior
+
+Se examina si el modelo reproduce **densidad, transitividad, heterogeneidad de grados, aislamiento y conectividad**. Para redes dirigidas, la transitividad global de `igraph` usa la estructura subyacente sin orientación. Las estadísticas de grado y las distancias sí pueden distinguir direcciones.
+
+```{r lazega-ppc, cache=TRUE}
+# Realizar la comprobación predictiva posterior del modelo base.
+set.seed(203)
+ppc_ley_base <- comprobar_ajuste(
+  fit_ley_base,
+  A_ley,
+  dirigida = TRUE,
+  nsim = 120
+)
+
+# Realizar la comprobación predictiva del modelo con covariables.
+set.seed(204)
+ppc_ley_cov <- comprobar_ajuste(
+  fit_ley_cov,
+  A_ley,
+  dirigida = TRUE,
+  nsim = 120
+)
+
+# Reunir los resultados de ambos modelos.
+tabla_ppc <- rbind(
+  data.frame(Modelo = "Sin covariables", ppc_ley_base$tabla),
+  data.frame(Modelo = "Con covariables", ppc_ley_cov$tabla)
+)
+
+# Presentar los intervalos predictivos posteriores.
+knitr::kable(
+  tabla_ppc,
+  digits = 3,
+  row.names = FALSE,
+  caption = "Comprobación predictiva posterior de ambos modelos"
+)
+```
+
+La **comprobación predictiva posterior** muestra que ambos modelos reproducen adecuadamente la **densidad** y la **dispersión de los grados**, con una ligera mejora de esta última al incorporar covariables. 
+
+Sin embargo, ambos **subestiman la transitividad y la distancia geodésica promedio**, y no logran reproducir la **asortatividad negativa** observada. 
+
+Por lo tanto, aunque las covariables contribuyen a explicar las relaciones de asesoría, persisten limitaciones para representar algunas propiedades estructurales de la red.
+
+# Referencias
+
+- Handcock, M. S., Raftery, A. E. y Tantrum, J. M. (2007). *Model-based clustering for social networks*. Journal of the Royal Statistical Society: Series A, 170(2), 301–354.
+- Hoff, P. D., Raftery, A. E. y Handcock, M. S. (2002). *Latent space approaches to social network analysis*. Journal of the American Statistical Association, 97(460), 1090–1098.
+- Krivitsky, P. N. y Handcock, M. S. (2008). *Fitting position latent cluster models for social networks with latentnet*. Journal of Statistical Software, 24(5), 1–23.
+- Krivitsky, P. N., Handcock, M. S., Raftery, A. E. y Hoff, P. D. (2009). *Representing degree distributions, clustering, and homophily in social networks with latent cluster random effects models*. Social Networks, 31(3), 204–213.
+- Lazega, E. (2001). *The Collegial Phenomenon: The Social Mechanisms of Cooperation Among Peers in a Corporate Law Partnership*. Oxford University Press.
+- Padgett, J. F. (1994). *Marriage and Elite Structure in Renaissance Florence, 1282–1500*. Ponencia presentada en la Social Science History Association.
+- Sampson, S. F. (1968). *A Novitiate in a Period of Change: An Experimental and Case Study of Relationships*. Tesis doctoral, Cornell University.
