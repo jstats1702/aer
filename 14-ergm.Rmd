@@ -1,0 +1,1704 @@
+---
+title: "Modelos de grafos aleatorios exponenciales"
+author: "Juan Sosa"
+date: ""
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: cerulean
+    highlight: kate
+    self_contained: true
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introducción
+
+Los **modelos de grafos aleatorios exponenciales** (*exponential random graph models*, ERGM) constituyen una familia de modelos probabilísticos que describen la distribución de una **red completa**, dado un conjunto fijo de vértices y, cuando corresponde, sus atributos.
+
+# Formulación probabilística
+
+## Notación
+
+La **matriz de adyacencia aleatoria** se denota por $\mathbf{Y}$ y su **realización observada** por $\mathbf{y}$. 
+
+Los **parámetros del modelo** se representan mediante $\boldsymbol{\theta}$ y el **vector de estadísticas de la red** mediante $\boldsymbol{g}(\mathbf{y})$.
+
+## Espacio muestral y familia exponencial
+
+Considérese una **red simple no dirigida** con $n$ vértices etiquetados. Su **matriz de adyacencia aleatoria** $\mathbf{Y}=[Y_{i,j}]$ es simétrica, tiene diagonal nula y satisface $Y_{i,j}\in\{0,1\}$ para todo $i,j=1,\ldots,n$. 
+
+El **espacio muestral** de las redes posibles está dado por
+
+$$
+\mathcal{Y}_n=\left\{\mathbf{y}\in\{0,1\}^{n\times n}:y_{i,j}=y_{j,i},\ y_{i,i}=0\right\},
+\qquad |\mathcal{Y}_n|=2^{\binom n2}.
+$$
+
+Dados los **atributos nodales observados** $\mathbf{x}$, un **ERGM canónico con referencia Bernoulli** se define mediante la distribución de probabilidad
+
+$$
+p(\mathbf{y}\mid\boldsymbol{\theta},\mathbf{x})=
+\frac{\exp\!\left\{\boldsymbol{\theta}^{\mathsf T}\boldsymbol{g}(\mathbf{y},\mathbf{x})\right\}}
+{\kappa(\boldsymbol{\theta},\mathbf{x})},
+\qquad \mathbf{y}\in\mathcal{Y}_n,
+$$
+
+con
+
+$$
+\kappa(\boldsymbol{\theta},\mathbf{x})=
+\sum_{\mathbf{z}\in\mathcal{Y}_n}
+\exp\!\left\{\boldsymbol{\theta}^{\mathsf T}\boldsymbol{g}(\mathbf{z},\mathbf{x})\right\}.
+$$
+
+El vector $\boldsymbol{g}(\mathbf{y},\mathbf{x})=(g_1,\ldots,g_K)^{\mathsf{T}}$ contiene las **estadísticas de la red**, mientras que $\boldsymbol{\theta}=(\theta_1,\ldots,\theta_K)^{\mathsf{T}}$ representa los **parámetros del modelo**. Los atributos nodales $\mathbf{x}$ se consideran **fijos y observados**.
+
+## Razones de probabilidades y estadísticas de cambio
+
+Sea $\mathbf{y}_{i,j}^{+}$ la red con $y_{i,j}=1$ y $\mathbf{y}_{i,j}^{-}$ la red idéntica salvo por $y_{i,j}=0$. 
+
+Se define la **estadística de cambio** mediante
+
+$$
+\boldsymbol{\delta}_{i,j}(\mathbf{y},\mathbf{x})=
+\boldsymbol{g}(\mathbf{y}_{i,j}^{+},\mathbf{x})-
+\boldsymbol{g}(\mathbf{y}_{i,j}^{-},\mathbf{x}).
+$$
+
+La **razón de probabilidades condicionales** está dada por
+
+$$
+\begin{aligned}
+\frac{\Pr(Y_{i,j}=1\mid\mathbf{Y}_{-(i,j)},\mathbf{x})}
+{\Pr(Y_{i,j}=0\mid\mathbf{Y}_{-(i,j)},\mathbf{x})}
+&=
+\frac{p(\mathbf{y}_{i,j}^{+}\mid\boldsymbol{\theta},\mathbf{x})}
+{p(\mathbf{y}_{i,j}^{-}\mid\boldsymbol{\theta},\mathbf{x})}\\[6pt]
+&=
+\frac{\exp\left\{\boldsymbol{\theta}^{\mathsf{T}}
+\boldsymbol{g}(\mathbf{y}_{i,j}^{+},\mathbf{x})\right\}}
+{\exp\left\{\boldsymbol{\theta}^{\mathsf{T}}
+\boldsymbol{g}(\mathbf{y}_{i,j}^{-},\mathbf{x})\right\}}\\[6pt]
+&=
+\exp\left\{\boldsymbol{\theta}^{\mathsf{T}}
+\boldsymbol{\delta}_{i,j}(\mathbf{y},\mathbf{x})\right\},
+\end{aligned}
+$$
+donde $\boldsymbol{\delta}_{i,j}(\mathbf{y},\mathbf{x})$ es la **estadística de cambio**. 
+
+Al aplicar el logaritmo natural a ambos lados, se obtiene que
+
+$$
+\operatorname{logit}\left[
+\Pr(Y_{i,j}=1\mid\mathbf{Y}_{-(i,j)},\mathbf{x})
+\right]
+=
+\boldsymbol{\theta}^{\mathsf{T}}
+\boldsymbol{\delta}_{i,j}(\mathbf{y},\mathbf{x}).
+$$
+
+Si la estadística de cambio asociada al parámetro $\theta_k$ aumenta una unidad, manteniendo constantes las demás estadísticas de cambio, las **posibilidades relativas (*odds*) condicionales de conexión** se multiplican por $\exp(\theta_k)$.
+
+## Verosimilitud, puntuación e información
+
+Para una red observada $\mathbf{y}$, la log-verosimilitud es
+
+$$
+\ell(\boldsymbol{\theta})=
+\boldsymbol{\theta}^{\mathsf T}\boldsymbol{g}(\mathbf{y},\mathbf{x})-
+\psi(\boldsymbol{\theta},\mathbf{x}),
+\qquad \psi=\log\kappa.
+$$
+
+El paquete `ergm` de R estima los parámetros mediante **máxima verosimilitud**. 
+
+Cuando las aristas son independientes, la estimación puede realizarse directamente. 
+
+En modelos con dependencia entre aristas, el paquete utiliza **máxima verosimilitud mediante Monte Carlo (MCMLE)**. Este procedimiento simula redes a partir de estimaciones iniciales, compara sus estadísticas con las de la red observada y actualiza iterativamente los parámetros hasta alcanzar la convergencia. La idea es encontrar parámetros que permitan reproducir las **características estructurales de la red observada**.
+
+# Modelo Bernoulli homogéneo
+
+Sea
+
+$$
+S(\mathbf{y})=\sum_{i<j}y_{i,j},
+\qquad N=\binom n2.
+$$
+
+El ERGM con un único término `edges` tiene distribución
+
+$$
+p(\mathbf{y}\mid\theta)=\frac{\exp\{\theta \, S(\mathbf{y})\}}{(1+e^\theta)^N}.
+$$
+
+dado que
+
+$$
+\kappa(\theta)
+=\sum_{\mathbf{y}\in\mathcal{Y}_n}
+\exp\left\{\theta\sum_{i<j}y_{i,j}\right\}
+=(1+e^\theta)^N,
+$$
+
+Por lo tanto,
+
+$$
+Y_{i,j}\overset{\text{ind}}{\sim}\textsf{Bernoulli}(\pi),
+\quad \pi=\operatorname{expit}(\theta)=\frac{1}{1+e^{-\theta}},\quad i<j.
+$$
+
+pues
+
+$$
+p(\mathbf{y}\mid\theta)
+=\frac{\exp\left\{\theta\sum_{i<j}y_{i,j}\right\}}{(1+e^\theta)^N}
+=\prod_{i<j}
+\left(\frac{e^\theta}{1+e^\theta}\right)^{y_{i,j}}
+\left(\frac{1}{1+e^\theta}\right)^{1-y_{i,j}}.
+$$
+
+Así, para $0<S(\mathbf{y})<N$,
+
+$$
+\widehat\pi=\frac{S(\mathbf{y})}{N},
+\qquad \widehat\theta=\log\frac{\widehat\pi}{1-\widehat\pi}.
+$$
+
+## Ejemplo: Familias florentinas
+
+La red `flomarriage` representa los **vínculos matrimoniales entre familias de la élite florentina**. 
+
+En este caso, $y_{i,j}=1$ si existe un vínculo matrimonial entre las familias $i$ y $j$, y $y_{i,j}=0$ en caso contrario.
+
+
+```{r}
+suppressMessages(suppressWarnings(library(ergm)))
+suppressMessages(suppressWarnings(library(network)))
+```
+
+
+```{r florentinas-datos}
+# Cargar los datos
+data(florentine, package = "ergm")
+
+# Número de familias
+n <- network.size(flomarriage)
+
+# Número de vínculos matrimoniales
+m <- network.edgecount(flomarriage)
+
+# Número de díadas posibles
+N <- choose(n, 2)
+
+# Densidad de la red
+densidad <- m / N
+
+# Resumen de la red
+c(familias = n,
+  matrimonios = m,
+  diadas_posibles = N,
+  densidad = densidad)
+```
+
+```{r florentinas-visualizacion, fig.width=8, fig.height=6, fig.align='center'}
+set.seed(42)
+plot(flomarriage,
+     label = network.vertex.names(flomarriage),
+     vertex.cex = 1.4,
+     main = "Alianzas matrimoniales entre familias florentinas")
+```
+
+```{r florentinas-bernoulli}
+# Estadística observada
+summary(flomarriage ~ edges)
+
+# Ajustar el modelo Bernoulli homogéneo
+modelo_flo_bernoulli <- ergm(flomarriage ~ edges)
+
+# Resumen del modelo
+summary(modelo_flo_bernoulli)
+
+# Estimaciones analíticas
+pi_analitica <- m / N
+theta_analitico <- qlogis(pi_analitica)
+
+# Estimaciones mediante ergm
+theta_ergm <- unname(coef(modelo_flo_bernoulli)[1])
+pi_ergm <- plogis(theta_ergm)
+
+# Comparación de las estimaciones
+data.frame(
+  metodo = c("Analítico", "ergm"),
+  theta = c(theta_analitico, theta_ergm),
+  pi = c(pi_analitica, pi_ergm)
+)
+```
+
+# Configuraciones estructurales y estadísticas de cambio
+
+## Aristas, estrellas y triángulos
+
+Para un grafo no dirigido, sea $d_i(\mathbf{y})=\sum_{j\neq i}y_{i,j}$ el **grado del vértice** $i$. 
+
+Se define el **número de $k$-estrellas** para $k\geq2$ por
+
+$$
+S_k(\mathbf{y})=\sum_{i=1}^{n}\binom{d_i(\mathbf{y})}{k}.
+$$
+
+La estadística $S_k$ cuenta las configuraciones formadas por $k$ aristas que comparten un mismo vértice, independientemente de si los demás vértices están conectados entre sí.
+
+```{r, fig.align='center', echo=F}
+# Función para dibujar una k-estrella
+dibujar_estrella <- function(k) {
+
+  # Cargar paquetes
+  suppressMessages(suppressWarnings(library(igraph)))
+     
+  # Construir la red
+  red <- make_star(k + 1, mode = "undirected", center = 1)
+
+  # Distribuir los vecinos alrededor del vértice central
+  angulos <- seq(0, 2 * pi, length.out = k + 1)[-(k + 1)]
+  coordenadas <- rbind(c(0, 0), cbind(cos(angulos), sin(angulos)))
+
+  # Visualizar
+  plot(
+    red,
+    layout = coordenadas,
+    vertex.color = c("tomato", rep("lightblue", k)),
+    vertex.size = 15,
+    vertex.frame.color = NA,
+    vertex.label = NA,
+    edge.color = "gray40",
+    edge.width = 2,
+    margin = 0.2,
+    main = paste0(k, "-estrella")
+  )
+}
+
+# Dibujar las configuraciones S2, S3 y S4
+par(mfrow = c(1, 3), mar = c(1, 1, 2, 1))
+
+for (k in 2:4) 
+     dibujar_estrella(k)
+```
+
+
+
+El **número de triángulos** es
+
+\[
+T(\mathbf{y})=\sum_{i<j<k}y_{i,j}y_{i,k}y_{j,k}.
+\]
+
+Así, un modelo de aristas, 2-estrellas y triángulos se escribe
+
+$$
+p(\mathbf{y}\mid\boldsymbol{\theta})\propto
+\exp\{\theta_E S(\mathbf{y})+\theta_S S_2(\mathbf{y})+\theta_T T(\mathbf{y})\}.
+$$
+
+Las **aristas** describen la densidad de la red, las **estrellas** capturan la concentración de vínculos en los vértices y los **triángulos** representan el cierre relacional. Estas configuraciones locales contribuyen a describir la estructura global de la red.
+
+Un ERGM presenta **independencia díadica** cuando la existencia de una arista no depende de las demás, como ocurre en modelos con `edges` y ciertas covariables. En cambio, términos como `triangle` y `kstar(2)` permiten representar **dependencias entre aristas**.
+
+## Derivaciones de las estadísticas de cambio
+
+Si la arista $(i,j)$ está ausente, su incorporación produce los siguientes cambios en las estadísticas de la red:
+
+$$
+\delta_{i,j}^{(E)}=1,
+\qquad
+\delta_{i,j}^{(S_2)}=d_i+d_j,
+\qquad
+\delta_{i,j}^{(T)}=\sum_{\ell\neq i,j}y_{i,\ell}y_{j,\ell},
+$$
+
+donde $d_i$ y $d_j$ representan los grados de los vértices antes de incorporar la arista. En particular:
+
+- **Aristas:** aumenta en una unidad el número total de vínculos.
+- **2-estrellas:** se generan $d_i+d_j$ nuevas configuraciones de dos aristas que comparten un vértice.
+- **Triángulos:** se genera un nuevo triángulo por cada vecino común de los vértices $i$ y $j$.
+
+Por lo tanto, para un ERGM que incluye estas tres estadísticas, la **probabilidad condicional de conexión** está dada por
+
+$$
+\Pr(Y_{i,j}=1\mid\mathbf{Y}_{-(i,j)})
+=
+\operatorname{expit}\left(
+\theta_E+\theta_S(d_i+d_j)
++\theta_T\sum_{\ell\neq i,j}y_{i,\ell}y_{j,\ell}
+\right).
+$$
+
+Esta expresión representa la **probabilidad de que exista una arista entre los vértices $i$ y $j$, dadas todas las demás aristas de la red**. Permite evaluar cómo la conectividad de los vértices y sus vecinos comunes influyen sobre dicha probabilidad.
+
+## Ejemplo de juguete
+
+Considere un modelo con parámetros $\theta_E=-2$, $\theta_S=0.5$ y $\theta_T=1$. 
+
+Suponga que dos vértices tienen grados $d_i=2$ y $d_j=1$, respectivamente, y comparten un vecino. Entonces,
+
+$$
+\begin{aligned}
+\Pr(Y_{i,j}=1\mid\mathbf{Y}_{-(i,j)})
+&=\operatorname{expit}\left(-2+0.5(2+1)+1(1)\right)\\
+&=\operatorname{expit}(0.5)\\
+&\approx 0.622.
+\end{aligned}
+$$
+
+Por lo tanto, la probabilidad condicional de conexión entre estos vértices es aproximadamente **62.2 %**.
+
+En cambio, si los mismos vértices no compartieran ningún vecino, manteniendo sus respectivos grados, se tendría
+
+$$
+\begin{aligned}
+\Pr(Y_{i,j}=1\mid\mathbf{Y}_{-(i,j)})
+&=\operatorname{expit}\left(-2+0.5(2+1)\right)\\
+&=\operatorname{expit}(-0.5)\\
+&\approx 0.378.
+\end{aligned}
+$$
+
+En consecuencia, **tener un vecino común aumenta la probabilidad condicional de conexión del 37.8 % al 62.2 %** en este ejemplo. 
+
+Esto ilustra cómo un parámetro positivo asociado a los triángulos favorece el **cierre relacional**, mientras que el parámetro de las estrellas permite capturar el efecto de los grados de los vértices sobre la formación de vínculos.
+
+## Ejemplo: Familias florentinas (cont.)
+
+Se ajusta un **ERGM con aristas y triángulos** a la red de familias florentinas. 
+
+A partir de los parámetros estimados, se calcula la **probabilidad condicional de conexión** entre dos familias según el número de vecinos comunes.
+
+### Ajuste del modelo
+
+```{r flo-triangulos}
+# Estadísticas observadas
+summary(flomarriage ~ edges + triangle)
+
+# Ajustar el modelo con aristas y triángulos
+set.seed(42)
+modelo_flo_triangulos <- ergm(flomarriage ~ edges + triangle)
+
+# Resumen del modelo
+summary(modelo_flo_triangulos)
+```
+
+El coeficiente de `edges` es negativo y significativo, lo que refleja una **baja propensión a formar vínculos matrimoniales**. 
+
+El coeficiente de `triangle` es positivo, pero no significativo, por lo que **no hay evidencia estadística de que compartir vínculos matrimoniales con otras familias favorezca nuevos matrimonios**.
+
+La **devianza** disminuye de 166.4 (modelo nulo, con probabilidad de conexión 0.5) a 108.1 (modelo con `edges` y `triangle`), lo que indica una **mejora en la verosimilitud**. Los grados de libertad disminuyen de 120 a 118 por la estimación de dos parámetros.
+
+```{r}
+# Extraer los parámetros estimados
+beta_tri <- coef(modelo_flo_triangulos)
+
+# Número de vecinos comunes
+vecinos_comunes <- 0:2
+
+# Calcular los log-odds y las probabilidades condicionales
+log_odds <- beta_tri["edges"] + beta_tri["triangle"] * vecinos_comunes
+probabilidades <- plogis(log_odds)
+
+# Organizar los resultados
+prob_triangulos <- data.frame(
+  Vecinos_comunes = vecinos_comunes,
+  Log_odds = as.numeric(log_odds),
+  Prob_condicional = as.numeric(probabilidades)
+)
+
+# Presentar los resultados
+knitr::kable(prob_triangulos, digits = 4)
+```
+
+Manteniendo fijas todas las demás aristas de la red, la **probabilidad condicional de establecer un vínculo matrimonial** entre las familias $i$ y $j$ es
+
+$$
+\Pr(Y_{i,j}=1\mid\mathbf{Y}_{-(i,j)})
+=
+\operatorname{expit}\left(
+\theta_E+\theta_T\,\delta_{i,j}^{(T)}
+\right).
+$$
+
+La probabilidad estimada aumenta de 16.1 % a 19.2 % cuando la estadística de cambio pasa de 0 a 2, es decir, cuando incorporar el vínculo matrimonial genera dos nuevos triángulos en lugar de ninguno. 
+
+Sin embargo, **el efecto de los triángulos no es estadísticamente significativo**.
+
+```{r flo-comparacion-triangulos}
+# Modelos anidados, ajustados sobre la misma red.
+anova(modelo_flo_bernoulli,
+      modelo_flo_triangulos,
+      eval.loglik = TRUE)
+```
+
+La comparación de modelos anidados muestra que:
+
+- **Modelo Bernoulli (`edges`):** reduce significativamente la desviación respecto al modelo nulo (58.221, $p<0.001$), lo que evidencia que la probabilidad de establecer vínculos matrimoniales difiere de 0.5.
+- **Modelo con triángulos (`edges + triangle`):** la incorporación de `triangle` apenas reduce la desviación en 0.054 unidades ($p=0.8169$), sin producir una mejora estadísticamente significativa.
+
+No hay evidencia estadística de que compartir vínculos matrimoniales con otras familias favorezca nuevos matrimonios. Por su mayor simplicidad, **se prefiere el modelo Bernoulli**.
+
+```{r}
+# Criterios de información basados en la verosimilitud.
+AIC(modelo_flo_bernoulli, modelo_flo_triangulos)
+BIC(modelo_flo_bernoulli, modelo_flo_triangulos)
+```
+
+Ambos criterios favorecen el **modelo Bernoulli**, que presenta menores valores de AIC y BIC. Por lo tanto, **incorporar triángulos no mejora suficientemente el ajuste para justificar un parámetro adicional**, por lo que se prefiere el modelo más sencillo.
+
+### Probabilidades para díadas reales
+
+Las **probabilidades condicionales de conexión** se calculan para parejas de familias de la red, considerando sus atributos observados y manteniendo fijas las demás aristas.
+
+```{r flo-triangulos-diadas}
+# Matriz de adyacencia
+A_flo <- as.matrix.network.adjacency(flomarriage)
+
+# Identificar todas las parejas de familias
+parejas_flo <- which(upper.tri(A_flo), arr.ind = TRUE)
+
+# Número de vecinos comunes de cada pareja
+vecinos_flo <- rowSums(
+  A_flo[parejas_flo[, 1], , drop = FALSE] *
+  A_flo[parejas_flo[, 2], , drop = FALSE]
+)
+
+# Probabilidades condicionales de conexión
+prob_flo <- plogis(
+  beta_tri["edges"] + beta_tri["triangle"] * vecinos_flo
+)
+
+# Organizar los resultados
+resultado_diadas <- data.frame(
+  Familia_1 = network.vertex.names(flomarriage)[parejas_flo[, 1]],
+  Familia_2 = network.vertex.names(flomarriage)[parejas_flo[, 2]],
+  Arista_observada = A_flo[parejas_flo],
+  Vecinos_comunes = vecinos_flo,
+  Prob_condicional = as.numeric(prob_flo)
+)
+
+# Ordenar según el número de vecinos comunes
+resultado_diadas <- resultado_diadas[
+  order(resultado_diadas$Vecinos_comunes, decreasing = TRUE),
+]
+
+# Mostrar las primeras 12 parejas
+knitr::kable(head(resultado_diadas, 12), digits = 4)
+```
+
+Las probabilidades de la tabla se calculan **manteniendo fijas las demás aristas de la red**, tal como fueron observadas. Por ejemplo, las familias Bischeri y Castellani no tienen un vínculo matrimonial, pero comparten dos familias con las que están vinculadas, por lo que su **probabilidad condicional de conexión** es 19.24 %.
+
+En general, la probabilidad estimada aumenta de 17.62 % a 19.24 % cuando el número de vecinos comunes pasa de uno a dos. Sin embargo, **el efecto de los triángulos no es estadísticamente significativo** ($p=0.835$), por lo que no existe evidencia suficiente de que compartir vínculos matrimoniales favorezca nuevas conexiones.
+
+Estas probabilidades son **condicionales a la estructura observada de la red**, excluyendo la arista evaluada.
+
+## Ejemplo: monjes de Sampson
+
+Los datos de Sampson registran **elecciones sociales entre monjes**. En esta red dirigida, $y_{i,j}=1$ si el monje $i$ elige al monje $j$, y $Y_{i,j}=0$ en caso contrario. Por lo tanto, $y_{i,j}$ y $y_{j,i}$ representan relaciones distintas.
+
+La **reciprocidad** se describe mediante la estadística
+
+$$
+M(\mathbf{y})=\sum_{i<j}y_{i,j}\,y_{j,i},
+$$
+
+que cuenta el número de **parejas de monjes que se eligen mutuamente**. 
+
+La estadística de cambio al incorporar la arista $i\to j$ es $\delta_{i,j}^{(M)}=y_{j,i}$. Por lo tanto, en el modelo `edges + mutual`, la **probabilidad condicional de elección** está dada por
+
+$$
+\Pr(Y_{i,j}=1\mid\mathbf{Y}_{-(i,j)})
+=
+\operatorname{expit}(\theta_E+\theta_M \, y_{j,i}).
+$$
+
+Así, manteniendo fijas las demás relaciones, las **posibilidades relativas (*odds*) condicionales de conexión** de que el monje $i$ elija al monje $j$ se multiplican por $\exp(\theta_M)$ cuando $j$ también elige a $i$. 
+
+Un valor positivo de $\theta_M$ indica, por tanto, una mayor propensión a las **elecciones recíprocas**.
+
+```{r sampson-datos}
+# Cargar los datos de Sampson
+data(samplk, package = "ergm")
+
+# Características de la red
+n_monjes <- network::network.size(samplk3)
+n_aristas <- network::network.edgecount(samplk3)
+
+# Resumen de la red
+c(Monjes = n_monjes, Aristas = n_aristas)
+
+# Estadísticas observadas: aristas y relaciones recíprocas
+summary(samplk3 ~ edges + mutual)
+```
+
+```{r sampson-grafico, fig.width=7, fig.height=6, fig.align='center'}
+set.seed(42)
+plot(samplk3,
+     vertex.cex = 1.8,
+     main = "Nominaciones dirigidas entre monjes")
+```
+
+```{r sampson-ajuste}
+# Ajustar el modelo Bernoulli
+modelo_sampson_0 <- ergm(samplk3 ~ edges)
+
+# Ajustar el modelo con reciprocidad
+set.seed(42)
+modelo_sampson_mutual <- ergm(samplk3 ~ edges + mutual)
+
+# Resumen del modelo
+summary(modelo_sampson_mutual)
+```
+
+El coeficiente de `edges` es **negativo y significativo**, lo que indica una baja propensión a establecer relaciones entre monjes. 
+
+El coeficiente de `mutual` es **positivo y significativo**, lo que evidencia una fuerte asociación con la **reciprocidad**.
+
+Se consideran dos escenarios según la existencia de la elección inversa:
+
+- **Sin elección inversa** ($y_{j,i}=0$):
+
+$$
+\Pr(Y_{i,j}=1\mid Y_{j,i}=0,\ldots)
+=
+\operatorname{expit}(-2.1489)
+\approx 0.104.
+$$
+
+- **Con elección inversa** ($y_{j,i}=1$):
+
+$$
+\Pr(Y_{i,j}=1\mid Y_{j,i}=1,\ldots)
+=
+\operatorname{expit}(-2.1489+2.2849)
+\approx 0.534.
+$$
+
+En consecuencia, **la probabilidad condicional de que un monje elija a otro aumenta de 10.4 % a 53.4 % cuando este último también lo elige**, manteniendo fijas las restantes relaciones. Esto equivale a multiplicar las *odds* condicionales por $\exp(2.2849)\approx 9.83$, lo que evidencia una fuerte asociación con la **reciprocidad entre monjes**.
+
+```{r sampson-comparacion}
+# Comparación de modelos anidados mediante análisis de desviación
+anova(
+  modelo_sampson_0,
+  modelo_sampson_mutual,
+  eval.loglik = TRUE
+)
+```
+
+La comparación muestra que el modelo Bernoulli (`edges`) mejora significativamente respecto al modelo nulo. Además, incorporar la **reciprocidad** (`mutual`) **mejora estadísticamente significativa del ajuste**.
+
+Por lo tanto, **se prefiere el modelo `edges + mutual`**, que proporciona evidencia de que las elecciones entre monjes presentan una fuerte asociación con la reciprocidad.
+
+```{r}
+# Comparación mediante criterios de información
+AIC(modelo_sampson_0, modelo_sampson_mutual)
+BIC(modelo_sampson_0, modelo_sampson_mutual)
+```
+
+Ambos criterios favorecen el **modelo con reciprocidad** (`edges + mutual`), que presenta menores valores de AIC y BIC. Por lo tanto, **incorporar la reciprocidad mejora suficientemente el ajuste para justificar el parámetro adicional**, confirmando su importancia para describir las elecciones sociales entre monjes.
+
+## Otras estadísticas
+
+Además de `edges`, `triangle` y `mutual`, los ERGM permiten incorporar **estadísticas endógenas** que describen otras propiedades estructurales de la red. 
+
+Entre las más utilizadas se encuentran:
+
+| Término | Estadística | Interpretación |
+|:--|:--|:--|
+| `kstar(k)` | $\displaystyle S_k(\mathbf{y})=\sum_i\binom{d_i}{k}$ | Concentración de vínculos en vértices que comparten $k$ aristas. |
+| `degree(k)` | $\displaystyle \sum_i I(d_i=k)$ | Número de vértices con grado $k$. |
+| `isolates` | $\displaystyle \sum_i I(d_i=0)$ | Número de vértices aislados. |
+| `gwdegree` | Suma geométricamente ponderada de estadísticas de grado | Heterogeneidad de grados, con contribuciones marginales decrecientes. |
+| `gwesp` | Suma geométricamente ponderada de vecinos comunes entre vértices conectados | Cierre relacional, con contribuciones marginales decrecientes. |
+| `gwdsp` | Suma geométricamente ponderada de vecinos comunes entre todas las parejas | Estructura de vecinos comunes, exista o no una conexión directa. |
+
+Las estadísticas `gwdegree`, `gwesp` y `gwdsp` permiten representar **patrones estructurales complejos**, de manera que cada conexión o vecino común adicional tiene una **contribución progresivamente menor** al valor de la estadística. Esto evita que los vértices con muchas conexiones o vecinos comunes dominen excesivamente el modelo.
+
+# Atributos nodales y covariables díadicas
+
+## Definiciones correctas de los términos
+
+Para una red no dirigida, los **términos de covariables** más comunes tienen estadísticas de la forma
+
+$$
+g_h(\mathbf{y},\mathbf{x})=
+\sum_{i<j}y_{i,j}\,h(x_i,x_j).
+$$
+
+| Término | Función $h(x_i,x_j)$ o estadística | Interpretación |
+|:--|:--|:--|
+| `edgecov(X)` | $x_{i,j}$ | Covariable observada para cada díada. |
+| `nodecov("x")` | $x_i+x_j$ | Propensión a conectarse asociada con un atributo cuantitativo. |
+| `absdiff("x")` | $|x_i-x_j|$ | Asociación con la diferencia absoluta del atributo. |
+| `nodematch("x")` | $I(x_i=x_j)$ | Homofilia global para una categoría. |
+| `nodematch("x", diff=TRUE)` | Conteos separados por categoría coincidente | Homofilia específica por categoría. |
+| `nodefactor("x")` | $I(x_i=c)+I(x_j=c)$ para cada categoría $c$ no omitida | Actividad por categorías con una referencia. |
+| `nodemix("x")` | Conteos de aristas según pares de categorías | Patrones de mezcla entre grupos. |
+
+## Ejemplo: Familias florentinas (cont.)
+
+```{r riqueza-datos}
+# Extraer la riqueza y los nombres de las familias
+riqueza <- flomarriage %v% "wealth"
+nombres_flo <- network.vertex.names(flomarriage)
+
+# Organizar las familias según su riqueza
+datos_riqueza <- data.frame(
+  Familia = nombres_flo,
+  Riqueza = riqueza
+)
+
+datos_riqueza <- datos_riqueza[order(datos_riqueza$Riqueza), ]
+
+# Presentar los resultados
+knitr::kable(datos_riqueza, digits = 1)
+
+# Resumen descriptivo de la riqueza
+summary(riqueza)
+```
+
+```{r riqueza-grafico, fig.width=8, fig.height=6, fig.align='center'}
+# Visualizar la red matrimonial según la riqueza familiar
+set.seed(42)
+plot(
+  flomarriage,
+  label = nombres_flo,
+  vertex.cex = 0.9 + sqrt(riqueza) / 5,
+  vertex.col = "lightblue",
+  edge.col = "gray60",
+  edge.lwd = 1.5,
+  main = "Red matrimonial y riqueza familiar"
+)
+```
+
+Para evaluar la asociación entre la **riqueza familiar** y la formación de vínculos matrimoniales, se incorpora la estadística
+
+$$
+g_{\mathrm{wealth}}(\mathbf{y},\mathbf{x})
+=
+\sum_{i<j}y_{i,j}(x_i+x_j),
+$$
+
+donde $x_i$ representa la riqueza de la familia $i$. La **estadística de cambio** al incorporar una arista entre las familias $i$ y $j$ es $\delta_{i,j}=x_i+x_j$. Por lo tanto, **manteniendo fijas las demás aristas**, la probabilidad condicional de establecer un vínculo matrimonial es
+
+$$
+\Pr(Y_{i,j}=1\mid\mathbf{Y}_{-(i,j)},\mathbf{x})
+=
+\operatorname{expit}\left[
+\theta_E+\theta_W(x_i+x_j)
+\right].
+$$
+
+Un valor positivo de $\theta_W$ indica que una **mayor riqueza de las familias** se asocia con una mayor probabilidad condicional de establecer vínculos matrimoniales. En particular, por cada unidad adicional de riqueza de una familia, las *odds* condicionales se multiplican por $\exp(\theta_W)$, manteniendo constante la riqueza de la otra familia.
+
+```{r riqueza-ajuste}
+# Calcular manualmente la estadística de riqueza
+riqueza_extremos <- outer(riqueza, riqueza, "+")
+
+g_riqueza_manual <- sum((A_flo * riqueza_extremos)[upper.tri(A_flo)])
+
+# Calcular la estadística mediante ergm
+g_riqueza_ergm <- unname(summary(flomarriage ~ nodecov("wealth")))
+
+# Comparar los resultados
+c(manual = g_riqueza_manual, ergm = g_riqueza_ergm)
+
+# Ajustar el modelo con efectos de riqueza
+modelo_flo_riqueza <- ergm(flomarriage ~ edges + nodecov("wealth"))
+
+# Resumen del modelo
+summary(modelo_flo_riqueza)
+```
+
+El coeficiente de `edges` es **negativo y significativo**, lo que indica una baja probabilidad de establecer vínculos matrimoniales cuando la riqueza de las familias es cero.
+
+El coeficiente de `nodecov("wealth")` es **positivo y significativo**, lo que evidencia que **una mayor riqueza familiar se asocia con una mayor probabilidad de establecer vínculos matrimoniales**. En particular, por cada 10 unidades adicionales de riqueza de una familia, las *odds* condicionales de conexión se multiplican por $\exp(10\times 0.010546)\approx 1.111$, es decir, aumentan aproximadamente un **11.1 %**, manteniendo constante la riqueza de la otra familia.
+
+```{r riqueza-diadas-reales}
+# Ordenar las familias según su riqueza
+orden_riqueza <- order(riqueza)
+
+# Seleccionar parejas con riqueza baja, alta y mixta
+pares_reales <- rbind(
+  c(orden_riqueza[1], orden_riqueza[2]),
+  tail(orden_riqueza, 2),
+  c(orden_riqueza[1], tail(orden_riqueza, 1))
+)
+
+# Extraer los parámetros estimados
+beta_riqueza <- coef(modelo_flo_riqueza)
+
+# Calcular los log-odds condicionales
+logit_pares <- beta_riqueza["edges"] +
+  beta_riqueza["nodecov.wealth"] *
+  (riqueza[pares_reales[, 1]] + riqueza[pares_reales[, 2]])
+
+# Organizar los resultados
+comparacion_riqueza <- data.frame(
+  Familia_1 = nombres_flo[pares_reales[, 1]],
+  Familia_2 = nombres_flo[pares_reales[, 2]],
+  Riqueza_1 = riqueza[pares_reales[, 1]],
+  Riqueza_2 = riqueza[pares_reales[, 2]],
+  Prob_condicional = as.numeric(plogis(logit_pares))
+)
+
+# Presentar las probabilidades condicionales
+knitr::kable(comparacion_riqueza, digits = 4)
+```
+
+Las probabilidades condicionales muestran una **asociación positiva entre la riqueza familiar y los vínculos matrimoniales**. 
+
+La probabilidad estimada es de 7.73 % entre Pucci y Guadagni (riquezas bajas), aumenta a 26.43 % entre Pucci y Strozzi (riquezas diferentes) y alcanza 50.78 % entre Medici y Strozzi (riquezas altas).
+
+Por lo tanto, **una mayor riqueza conjunta se asocia con una mayor probabilidad de establecer vínculos matrimoniales**, manteniendo fijas las demás aristas de la red. Este efecto refleja la riqueza de las familias, no necesariamente una preferencia por matrimonios entre familias de riqueza similar.
+
+Para evaluar **similitud en riqueza**, debe agregarse `absdiff("wealth")`, que tiene una interpretación diferente.
+
+## Covariables definidas para cada díada
+
+El término `edgecov(X)` incorpora **covariables díadicas observadas** mediante una matriz simétrica $\mathbf{X}=[x_{i,j}]$, como la distancia geográfica entre instituciones o la cercanía entre empresas. 
+
+Como ejemplo, se construye una matriz de **diferencias absolutas de riqueza** entre familias, cuya estadística coincide con la de `absdiff("wealth")`.
+
+```{r covariable-diadica}
+# Construir la matriz de diferencias absolutas de riqueza
+diferencia_riqueza <- abs(outer(riqueza, riqueza, "-"))
+
+# Calcular las estadísticas mediante ambos términos
+g_absdiff <- summary(flomarriage ~ absdiff("wealth"))
+g_edgecov <- summary(flomarriage ~ edgecov(diferencia_riqueza))
+
+# Comparar los resultados
+c(absdiff = unname(g_absdiff), edgecov = unname(g_edgecov))
+```
+
+
+## Ejemplo: Amistades escolares
+
+`faux.mesa.high` es una **red no dirigida simulada** que reproduce características de las amistades escolares. 
+
+En esta red, $y_{i,j}=1$ si existe una relación de amistad entre los estudiantes $i$ y $j$, y $Y_{i,j}=0$ en caso contrario. 
+
+Los atributos nodales incluyen el **grado escolar** (`Grade`), la **categoría racial** (`Race`) y el **sexo** (`Sex`).
+
+```{r mesa-datos}
+# Cargar los datos de amistades escolares
+data(faux.mesa.high, package = "ergm")
+mesa <- faux.mesa.high
+
+# Características de la red
+c(Estudiantes = network::network.size(mesa),
+  Amistades = network::network.edgecount(mesa))
+
+# Distribución de los atributos nodales
+table(mesa %v% "Grade")
+table(mesa %v% "Race")
+table(mesa %v% "Sex")
+
+# Matriz de mezcla según la categoría racial
+network::mixingmatrix(mesa, "Race")
+```
+
+```{r mesa-visualizacion, fig.width=8, fig.height=6, fig.align='center'}
+# Visualizar la red de amistades escolares
+set.seed(42)
+plot(
+  mesa,
+  vertex.cex = 0.7,
+  main = "Red de amistades escolares"
+)
+```
+
+```{r mesa-homofilia}
+# Ajustar el modelo Bernoulli
+modelo_mesa_bernoulli <- ergm(mesa ~ edges)
+
+# Ajustar el modelo con homofilia por grado escolar y categoría racial
+modelo_mesa_homofilia <- ergm(mesa ~ edges + nodematch("Grade") + nodematch("Race"))
+
+# Resumen del modelo
+summary(modelo_mesa_homofilia)
+```
+
+El coeficiente de `edges` es **negativo y significativo**, lo que refleja una **baja probabilidad de amistad** entre estudiantes que no comparten grado escolar ni categoría racial.
+
+Los coeficientes de `nodematch("Grade")` y `nodematch("Race")` son **positivos y significativos**, lo que evidencia **homofilia** en ambas características. En particular, manteniendo constante la otra característica, las *odds* condicionales de amistad se multiplican por $\exp(2.8279)\approx 16.91$ cuando dos estudiantes pertenecen al mismo grado escolar y por $\exp(0.4267)\approx 1.53$ cuando comparten categoría racial.
+
+Por lo tanto, **la homofilia por grado escolar es considerablemente más pronunciada que la homofilia por categoría racial** en esta red.
+
+```{r}
+# Comparación de modelos anidados
+anova(
+  modelo_mesa_bernoulli,
+  modelo_mesa_homofilia,
+  eval.loglik = TRUE
+)
+```
+
+La comparación muestra que el modelo Bernoulli (`edges`) mejora significativamente respecto al modelo nulo ($p<0.001$). 
+
+Además, incorporar la **homofilia por grado escolar y categoría racial** reduce la devianza de 2285.7 a 1930.7 ($p<0.001$), lo que representa una **mejora estadísticamente significativa del ajuste**.
+
+Por lo tanto, **se prefiere el modelo con homofilia**, lo que evidencia que compartir grado escolar y categoría racial contribuye a explicar los vínculos de amistad entre estudiantes.
+
+```{r}
+# Comparación mediante criterios de información
+AIC(modelo_mesa_bernoulli, modelo_mesa_homofilia)
+BIC(modelo_mesa_bernoulli, modelo_mesa_homofilia)
+```
+
+Ambos criterios favorecen el **modelo con homofilia**, que presenta menores valores de AIC y BIC. Por lo tanto, **incorporar la homofilia por grado escolar y categoría racial mejora considerablemente el ajuste**, justificando los dos parámetros adicionales para describir las relaciones de amistad entre estudiantes.
+
+### Efectos categóricos y estimadores infinitos
+
+Los términos `nodefactor("Grade")` y `nodematch("Grade", diff = TRUE)` representan efectos diferentes del **grado escolar** sobre las amistades. Sea $x_i$ el grado escolar del estudiante $i$ y $c$ una categoría particular de referencia.
+
+- **`nodefactor("Grade")`:** mide la **propensión de los estudiantes de cada grado a establecer amistades**, independientemente del grado de sus amigos. Su estadística es
+
+$$
+g_{\mathrm{factor},c}(\mathbf{y},\mathbf{x})
+=
+\sum_{i<j}y_{i,j}
+\left[I(x_i=c)+I(x_j=c)\right].
+$$
+
+Cada amistad aporta una unidad por cada extremo perteneciente al grado $c$. Por ejemplo, una amistad entre dos estudiantes de grado 12 aporta dos unidades, mientras que una amistad entre estudiantes de grados 11 y 12 aporta una.
+
+- **`nodematch("Grade", diff = TRUE)`:** mide la **homofilia específica de cada grado escolar**, es decir, la tendencia a establecer amistades con estudiantes del mismo grado. Su estadística es
+
+$$
+g_{\mathrm{match},c}(\mathbf{y},\mathbf{x})
+=
+\sum_{i<j}y_{i,j}I(x_i=c)I(x_j=c).
+$$
+
+Cada amistad aporta una unidad únicamente cuando ambos estudiantes pertenecen al grado $c$. Por ejemplo, una amistad entre dos estudiantes de grado 12 aporta una unidad, mientras que una amistad entre estudiantes de grados 11 y 12 no aporta ninguna.
+
+Así, `nodefactor` representa la **actividad de los estudiantes según su grado escolar**, mientras que `nodematch` representa la **preferencia por establecer amistades dentro del mismo grado**. Ambos efectos pueden incluirse simultáneamente para distinguir la actividad de la homofilia.
+
+El término **`nodematch("Grade", diff = FALSE)`** mide la **homofilia global por grado escolar**, es decir, la tendencia de los estudiantes a establecer amistades con compañeros de su mismo grado, sin distinguir entre grados. Su estadística es
+
+$$
+g_{\mathrm{match}}(\mathbf{y},\mathbf{x})
+=
+\sum_{i<j}y_{i,j}I(x_i=x_j),
+$$
+
+donde $x_i$ representa el grado escolar del estudiante $i$. Cada amistad entre estudiantes del mismo grado aporta una unidad, independientemente de cuál sea ese grado.
+
+La diferencia entre las dos especificaciones es:
+
+- **`diff = FALSE`:** utiliza una **única estadística y un único parámetro** para medir la homofilia global por grado escolar.
+- **`diff = TRUE`:** utiliza **una estadística y un parámetro por grado escolar**, permitiendo que la homofilia sea diferente entre grados.
+
+Por lo tanto, `diff = FALSE` supone un **efecto común de homofilia** para todos los grados, mientras que `diff = TRUE` permite **efectos específicos por grado**.
+
+```{r mesa-estadisticos-completos}
+# Estadísticas observadas por grado escolar y categoría racial
+summary(
+  mesa ~ edges +
+    nodefactor("Grade") +
+    nodematch("Grade", diff = TRUE) +
+    nodefactor("Race") +
+    nodematch("Race", diff = TRUE)
+)
+
+# Matriz de mezcla por categoría racial
+network::mixingmatrix(mesa, "Race")
+```
+
+En categorías con pocos estudiantes, como `Black` y `Other`, la ausencia de amistades internas puede producir **estimaciones infinitas negativas** (`-Inf`). 
+
+Esto ocurre cuando las estadísticas observadas se encuentran en la frontera de sus valores posibles, impidiendo obtener un **estimador de máxima verosimilitud (MLE) finito**. 
+
+Estos resultados reflejan una limitación de los datos y del modelo, y **no deben interpretarse como evidencia de que tales amistades sean imposibles**.
+
+```{r mesa-separacion-opcional}
+# Ajustar el modelo con efectos específicos por categoría
+modelo_mesa_extendido <- ergm(
+  mesa ~
+    edges +
+    nodefactor("Grade") +
+    nodematch("Grade", diff = TRUE) +
+    nodefactor("Race") +
+    nodematch("Race", diff = TRUE)
+)
+
+# Resumen del modelo
+summary(modelo_mesa_extendido)
+```
+
+El modelo extendido permite distinguir la **actividad de los estudiantes** y la **homofilia** según el grado escolar y la categoría racial.
+
+- **Grado escolar:** los coeficientes de `nodefactor("Grade")` son positivos y significativos, lo que indica una mayor propensión a establecer amistades respecto al grado 7, utilizado como referencia. Por su parte, los coeficientes de `nodematch("Grade")` son positivos, lo que evidencia **homofilia dentro de cada grado escolar**, aunque el efecto del grado 12 no es significativo al nivel del 5 % ($p=0.063$).
+
+- **Categoría racial:** los coeficientes de `nodefactor("Race")` son negativos y significativos respecto a la categoría de referencia (`Black`), lo que indica diferencias en la propensión a establecer amistades. Los coeficientes de `nodematch("Race")` muestran **homofilia significativa** en las categorías `Hisp` y `NatAm`, pero no en `White` ($p=0.624$).
+
+- **Estimaciones infinitas:** los coeficientes de homofilia para `Black` y `Other` son `-Inf` debido a la **ausencia de amistades internas** en estas categorías. Esto impide obtener estimaciones de máxima verosimilitud finitas para dichos parámetros, por lo que sus valores $p$ no deben interpretarse como evidencia estadística convencional.
+
+**La presencia de estimaciones infinitas limita la validez de la inferencia**, por lo que conviene revisar la especificación antes de interpretar el modelo como definitivo.
+
+# Degeneración
+
+En algunos ERGM, la probabilidad puede concentrarse excesivamente en **redes casi vacías o casi completas**, fenómeno conocido como **degeneración**. 
+
+Este problema es propio de la distribución del modelo y no necesariamente de su estimación.
+
+El siguiente experimento ilustra cómo, al aumentar el **coeficiente asociado a los triángulos** y mantener fijo el de las aristas, la probabilidad puede concentrarse en redes muy densas.
+
+```{r degeneracion-exacta}
+# Enumerar todas las redes posibles con cinco vértices
+n_exacta <- 5
+pares_exactos <- t(combn(n_exacta, 2))
+
+configuraciones <- as.matrix(expand.grid(rep(list(0:1), nrow(pares_exactos))))
+
+# Número de aristas de cada red
+S_exacta <- rowSums(configuraciones)
+
+# Número de triángulos de cada red
+T_exacta <- numeric(nrow(configuraciones))
+
+for (r in seq_len(nrow(configuraciones))) {
+
+  A <- matrix(0, n_exacta, n_exacta)
+
+  A[pares_exactos] <- configuraciones[r, ]
+  A[pares_exactos[, 2:1]] <- configuraciones[r, ]
+
+  T_exacta[r] <- sum(diag(A %*% A %*% A)) / 6
+}
+
+# Función para calcular las probabilidades exactas
+probabilidades_exactas <- function(theta_edges, theta_tri) {
+
+  log_pesos <- theta_edges * S_exacta + theta_tri * T_exacta
+
+  pesos <- exp(log_pesos - max(log_pesos))
+
+  pesos / sum(pesos)
+}
+
+# Definir los parámetros
+theta_aristas <- -1.8
+valores_triangulo <- c(0, 0.8, 2.0)
+
+# Evaluar la distribución para distintos efectos triangulares
+resumen_degeneracion <- lapply(valores_triangulo, function(t) {
+
+  p <- probabilidades_exactas(theta_aristas, t)
+
+  data.frame(
+    theta_tri = t,
+    E_aristas = sum(p * S_exacta),
+    P_casi_vacia = sum(p[S_exacta <= 1]),
+    P_casi_completa = sum(p[S_exacta >= 9])
+  )
+})
+
+# Organizar los resultados
+resumen_degeneracion <- do.call(rbind, resumen_degeneracion)
+
+# Presentar la tabla
+knitr::kable(resumen_degeneracion, digits = 4)
+```
+
+Al aumentar el coeficiente triangular $\theta_T$ de 0 a 2, **manteniendo fijo el coeficiente de aristas**, el número esperado de aristas aumenta de 1.42 a 6.72.
+
+En particular, cuando $\theta_T=2$, la probabilidad de obtener una **red casi completa** alcanza el 55.87 %, mientras que la probabilidad de una **red casi vacía** disminuye al 17.45 %.
+
+Esto ilustra cómo un efecto triangular elevado puede concentrar la probabilidad en **redes extremadamente densas**, evidenciando un comportamiento característico de la **degeneración de los ERGM**.
+
+```{r degeneracion-grafico, fig.width=10, fig.height=4, fig.align='center'}
+# Configurar la visualización
+configuracion_grafica <- par(mfrow = c(1, 3))
+
+# Distribución del número de aristas para cada valor de theta_tri
+for (t in valores_triangulo) {
+
+  # Probabilidades exactas de las redes
+  p <- probabilidades_exactas(theta_aristas, t)
+
+  # Distribución del número de aristas
+  distribucion <- sapply(0:10, function(m) {
+    sum(p[S_exacta == m])
+  })
+
+  # Gráfico de barras
+  barplot(
+    distribucion,
+    names.arg = 0:10,
+    ylim = c(0, 1),
+    col = "lightblue",
+    border = "white",
+    xlab = "Número de aristas",
+    ylab = "Probabilidad",
+    main = paste0("Triángulos: ", t)
+  )
+}
+```
+
+Es importante distinguir **tres problemas diferentes** en los ERGM:
+
+1. **Falta de convergencia:** el algoritmo MCMC no explora adecuadamente la distribución del modelo.
+2. **Degeneración:** el modelo concentra excesivamente la probabilidad en redes extremas, como las casi vacías o completas.
+3. **Problemas de estimación o identificabilidad:** algunos parámetros no admiten estimaciones finitas o no pueden identificarse debido a estadísticas redundantes.
+
+Estos problemas tienen **causas diferentes** y requieren diagnósticos específicos.
+
+# Diagnóstico de convergencia y bondad de ajuste
+
+### Modelos con estadísticas de grado
+
+El término `degree(1)` cuenta los **vértices con exactamente una conexión**. Su estadística está dada por
+
+$$
+g_1(\mathbf{y})=\sum_{i=1}^n I(d_i=1),
+$$
+
+donde $d_i$ representa el grado del vértice $i$. Su **estadística de cambio** corresponde a la variación en el número de vértices de grado uno al incorporar una arista, que puede ser positiva, negativa o nula.
+
+Una alternativa más flexible es `gwdegree`, que permite modelar la **distribución de grados** mediante ponderaciones geométricas. En particular, la contribución de las conexiones adicionales disminuye progresivamente, lo que permite representar diferentes patrones de conectividad sin incorporar un parámetro para cada grado.
+
+El término `gwdegree(0.5, fixed = TRUE)` permite modelar la **distribución de grados** mediante ponderaciones geométricas. El valor `0.5` es el **parámetro de decaimiento**, que controla cuánto disminuye la contribución de cada conexión adicional. El argumento `fixed = TRUE` indica que este parámetro se mantiene fijo, mientras que el coeficiente asociado a la estadística se estima a partir de los datos.
+
+Se consideran tres especificaciones para comparar sus resultados.
+
+```{r flo-degree1}
+# Estadísticas observadas
+summary(flomarriage ~ edges + degree(1))
+summary(flomarriage ~ edges + gwdegree(0.5, fixed = TRUE))
+
+# Modelo con vértices de grado uno
+set.seed(42)
+modelo_flo_grado1 <- ergm(flomarriage ~ edges + degree(1))
+
+# Modelo con grados geométricamente ponderados
+set.seed(42)
+modelo_flo_gwdegree <- ergm(flomarriage ~ edges + gwdegree(0.5, fixed = TRUE))
+
+# Modelo que combina ambas estadísticas
+set.seed(42)
+modelo_flo_grados <- ergm(flomarriage ~ edges + degree(1) + gwdegree(0.5, fixed = TRUE))
+
+# Resúmenes de los modelos
+summary(modelo_flo_grado1)
+summary(modelo_flo_gwdegree)
+summary(modelo_flo_grados)
+
+# Comparación mediante criterios de información
+AIC(modelo_flo_bernoulli, modelo_flo_grado1,
+    modelo_flo_gwdegree, modelo_flo_grados)
+
+BIC(modelo_flo_bernoulli, modelo_flo_grado1,
+    modelo_flo_gwdegree, modelo_flo_grados)
+```
+
+El parámetro de decaimiento de `gwdegree` se fija en 0.5 para simplificar la estimación. Los modelos permiten evaluar si la **distribución de grados** aporta información adicional al número total de aristas.
+
+Aunque `degree(1)` no resulte significativo, esto no garantiza que `gwdegree` mejore el ajuste. La selección debe considerar los **coeficientes estimados**, los **criterios de información** y los **diagnósticos del modelo**.
+
+## Diagnósticos MCMC
+
+El modelo `edges + degree(1)` incorpora **dependencia entre aristas**, por lo que su estimación requiere simulaciones MCMC. Para evaluar la **convergencia del algoritmo**, se examinan las trayectorias de las cadenas, sus autocorrelaciones y los diagnósticos de convergencia.
+
+```{r diagnostico-mcmc, fig.width=9, fig.height=8, fig.align='center'}
+# Diagnóstico de convergencia MCMC
+mcmc.diagnostics(modelo_flo_grado1)
+```
+
+Una **trayectoria estable**, sin tendencias evidentes, y una **autocorrelación que disminuye rápidamente** sugieren una exploración adecuada de la distribución, aunque no garantizan la convergencia. Asimismo, un valor $p>0.05$ en la prueba de Geweke indica que no se detectan diferencias significativas entre los segmentos comparados de la cadena, pero no demuestra su convergencia.
+
+Si se identifican problemas, deben revisarse tanto la **configuración del algoritmo MCMC** como la **especificación del modelo**. Aumentar las iteraciones puede mejorar la exploración y la precisión Monte Carlo, pero no corrige necesariamente problemas de **degeneración**.
+
+## Bondad de ajuste mediante redes simuladas
+
+La función `gof()` evalúa la **bondad de ajuste** comparando las estadísticas de la red observada con las obtenidas de redes simuladas bajo el modelo estimado. 
+
+En redes no dirigidas, permite examinar la **distribución de grados**, las **distancias geodésicas** y el **número de vecinos comunes**, entre otras características estructurales.
+
+```{r gof-bernoulli, fig.width=10, fig.height=6, fig.align='center'}
+# Evaluar la bondad de ajuste del modelo con grado uno
+set.seed(123)
+
+gof_flo_grado1 <- gof(
+  modelo_flo_grado1,
+  control = snctrl(nsim = 100)
+)
+
+# Resumen de la bondad de ajuste
+print(gof_flo_grado1)
+
+# Visualizar las estadísticas observadas y simuladas
+plot(gof_flo_grado1)
+```
+
+La comparación entre las **estadísticas observadas** y las **bandas de variación de las redes simuladas** permite identificar discrepancias estructurales. Por lo tanto, un modelo puede presentar **convergencia adecuada** sin necesariamente ofrecer un **buen ajuste a la red observada**.
+
+## Comparación de densidad, transitividad y asortatividad
+
+Para complementar la evaluación de **bondad de ajuste** mediante `gof()`, se simulan redes a partir del modelo y se comparan tres estadísticas estructurales. 
+
+En particular, la **transitividad global** y la **asortatividad por riqueza** permiten evaluar propiedades de la red que no se incluyen explícitamente en el modelo.
+
+```{r simulacion-redes}
+# Simular 200 redes a partir del modelo ajustado
+nsim <- 200
+
+set.seed(123)
+redes_simuladas <- simulate(
+  modelo_flo_grado1,
+  nsim = nsim,
+  output = "network"
+)
+
+# Verificar el número de redes simuladas
+length(redes_simuladas)
+```
+
+```{r simulacion-estadisticas}
+# Simular redes a partir del modelo ajustado
+set.seed(123)
+
+redes_simuladas <- simulate(
+  modelo_flo_grado1,
+  nsim = 200,
+  output = "network"
+)
+
+# Función para calcular las estadísticas de una red
+calcular_estadisticas <- function(red) {
+
+  # Convertir la red a un objeto igraph
+  A <- network::as.matrix.network.adjacency(red)
+
+  grafo <- igraph::graph_from_adjacency_matrix(
+    A,
+    mode = "undirected",
+    diag = FALSE
+  )
+
+  # Calcular los grados
+  grados <- igraph::degree(grafo)
+
+  # Calcular las estadísticas
+  estadisticas <- c(
+    Densidad = igraph::edge_density(grafo),
+    Grado1 = sum(grados == 1),
+    Transitividad = igraph::transitivity(grafo, type = "global"),
+    Asortatividad = igraph::assortativity_degree(
+      grafo,
+      directed = FALSE
+    )
+  )
+
+  # Reemplazar valores no definidos por NA
+  estadisticas[!is.finite(estadisticas)] <- NA_real_
+
+  return(estadisticas)
+}
+
+# Estadísticas de la red observada
+estadisticas_observadas <- calcular_estadisticas(flomarriage)
+
+# Estadísticas de las redes simuladas
+estadisticas_simuladas <- t(vapply(
+  redes_simuladas,
+  calcular_estadisticas,
+  FUN.VALUE = numeric(4)
+))
+
+# Mostrar las estadísticas observadas
+estadisticas_observadas
+
+# Mostrar las primeras seis simulaciones
+head(estadisticas_simuladas)
+```
+
+La **transitividad** y la **asortatividad** pueden no estar definidas en algunas redes simuladas. Por lo tanto, se excluyen los valores no finitos al calcular los resúmenes y se reporta el **número de simulaciones válidas** para cada estadística.
+
+```{r simulacion-resumen}
+# Función para resumir las estadísticas simuladas
+resumir_muestra <- function(x) {
+
+  # Excluir valores no definidos
+  x <- x[is.finite(x)]
+  n <- length(x)
+
+  # Manejar estadísticas sin simulaciones válidas
+  if (n == 0) {
+    return(c(
+      n = 0,
+      media = NA_real_,
+      desviacion = NA_real_,
+      inferior = NA_real_,
+      superior = NA_real_
+    ))
+  }
+
+  # Calcular los percentiles del 2.5 % y 97.5 %
+  percentiles <- quantile(
+    x,
+    probs = c(0.025, 0.975),
+    names = FALSE
+  )
+
+  # Resumen de las simulaciones válidas
+  c(
+    n = n,
+    media = mean(x),
+    desviacion = if (n > 1) sd(x) else NA_real_,
+    inferior = percentiles[1],
+    superior = percentiles[2]
+  )
+}
+
+# Resumir cada estadística de las redes simuladas
+resumen_simulaciones <- t(vapply(
+  as.data.frame(estadisticas_simuladas),
+  resumir_muestra,
+  FUN.VALUE = numeric(5)
+))
+
+# Comparar las estadísticas observadas y simuladas
+comparacion_simulada <- data.frame(
+  Estadistica = rownames(resumen_simulaciones),
+  Observado = unname(estadisticas_observadas[
+    rownames(resumen_simulaciones)
+  ]),
+  N_valido = resumen_simulaciones[, "n"],
+  Media_simulada = resumen_simulaciones[, "media"],
+  Desviacion_simulada = resumen_simulaciones[, "desviacion"],
+  Percentil_2_5 = resumen_simulaciones[, "inferior"],
+  Percentil_97_5 = resumen_simulaciones[, "superior"],
+  row.names = NULL
+)
+
+# Presentar los resultados
+knitr::kable(
+  comparacion_simulada,
+  digits = 4,
+  caption = "Comparación de las estadísticas observadas y simuladas"
+)
+```
+
+Los percentiles 2.5 y 97.5 definen un **intervalo predictivo empírico del 95 %**, condicionado a los parámetros estimados. Este intervalo no representa la incertidumbre sobre $\boldsymbol{\theta}$ ni incorpora la variabilidad asociada a su estimación. 
+
+```{r simulacion-graficos, fig.width=7, fig.height=7, fig.align='center'}
+# Configurar la disposición de los gráficos
+configuracion_grafica <- par(no.readonly = TRUE)
+
+n_estadisticas <- ncol(estadisticas_simuladas)
+n_columnas <- min(2, n_estadisticas)
+n_filas <- ceiling(n_estadisticas / n_columnas)
+
+par(
+  mfrow = c(n_filas, n_columnas),
+  mar = c(4, 4, 3, 1)
+)
+
+# Comparar las distribuciones simuladas con los valores observados
+for (nombre in colnames(estadisticas_simuladas)) {
+
+  # Excluir simulaciones no válidas
+  valores <- estadisticas_simuladas[, nombre]
+  valores <- valores[is.finite(valores)]
+
+  # Valor observado
+  observado <- estadisticas_observadas[nombre]
+
+  if (length(valores) > 1) {
+
+    # Incluir el valor observado en el rango del gráfico
+    limites <- range(c(valores, observado), finite = TRUE)
+
+    # Histograma de las estadísticas simuladas
+    hist(
+      valores,
+      breaks = "FD",
+      main = nombre,
+      xlab = "Valor de la estadística",
+      ylab = "Frecuencia",
+      xlim = limites,
+      col = "grey80",
+      border = "white"
+    )
+
+    # Indicar el valor observado
+    if (is.finite(observado)) {
+      abline(v = observado, col = "firebrick", lwd = 2)
+    }
+
+    # Mostrar el número de simulaciones válidas
+    title(
+      sub = paste("Simulaciones válidas:", length(valores)),
+      cex.sub = 0.8
+    )
+
+  } else {
+
+    plot.new()
+    title(main = nombre)
+    text(0.5, 0.5, "Simulaciones válidas insuficientes")
+  }
+}
+```
+
+La **línea roja** indica el valor observado de cada estadística. Si se encuentra en las colas de la distribución simulada o fuera de su intervalo predictivo, puede sugerir una **falta de ajuste del modelo**. Sin embargo, esta comparación es exploratoria y no constituye una prueba formal de bondad de ajuste.
+
+# Predicción de aristas y validación fuera de muestra
+
+En un ERGM con **dependencias estructurales**, la probabilidad de una arista está condicionada a las demás relaciones de la red. Por lo tanto, no puede interpretarse directamente como una **predicción fuera de muestra**, pues supone conocidas las relaciones restantes. La validación mediante enlaces ocultos requiere procedimientos que consideren adecuadamente las dependencias y las aristas no observadas.
+
+Para ilustrar una **validación fuera de muestra**, se utilizará un modelo **díadicamente independiente**. En este caso, la regresión logística sobre díadas es equivalente a un ERGM con `edges` y términos de coincidencia entre atributos nodales, condicionando en dichos atributos.
+
+## Diseño de validación estratificada
+
+Para evaluar la capacidad predictiva del modelo, se dividirán las díadas de `faux.mesa.high` en conjuntos de **entrenamiento (80%)** y **evaluación (20%)**, mediante un muestreo aleatorio estratificado según la presencia o ausencia de conexiones. Las díadas de evaluación no se utilizarán durante la estimación. 
+
+Esta estrategia conserva aproximadamente la **proporción de conexiones** en ambos conjuntos y permite evaluar las predicciones sobre díadas no utilizadas en el ajuste.
+
+```{r validacion-datos}
+# Obtener la matriz de adyacencia
+A_mesa <- network::as.matrix.network.adjacency(mesa)
+
+# Identificar todas las díadas de la red no dirigida
+pares_mesa <- which(
+  upper.tri(A_mesa),
+  arr.ind = TRUE
+)
+
+# Extraer los atributos de los estudiantes
+grado_mesa <- as.character(mesa %v% "Grade")
+raza_mesa <- as.character(mesa %v% "Race")
+
+# Construir la base de datos de díadas
+diadas_mesa <- data.frame(
+  y = as.integer(A_mesa[pares_mesa]),
+  mismo_grado = as.integer(
+    grado_mesa[pares_mesa[, 1]] == grado_mesa[pares_mesa[, 2]]
+  ),
+  misma_raza = as.integer(
+    raza_mesa[pares_mesa[, 1]] == raza_mesa[pares_mesa[, 2]]
+  )
+)
+
+# Verificar el número de díadas
+nrow(diadas_mesa)
+
+# Resumir las conexiones presentes y ausentes
+table(diadas_mesa$y)
+
+# Calcular la proporción de conexiones
+mean(diadas_mesa$y)
+
+# Examinar las primeras observaciones
+head(diadas_mesa)
+```
+
+```{r validacion-ajuste}
+# ============================================================
+# 1. Dividir las díadas en entrenamiento y evaluación
+# ============================================================
+
+set.seed(2026)
+
+# Identificar las díadas con y sin conexión
+indices_si <- which(diadas_mesa$y == 1)
+indices_no <- which(diadas_mesa$y == 0)
+
+# Seleccionar el 20 % de cada grupo para evaluación
+indices_prueba <- sort(c(
+  sample(indices_si, round(0.20 * length(indices_si))),
+  sample(indices_no, round(0.20 * length(indices_no)))
+))
+
+# Identificar las díadas de entrenamiento
+indices_entrenamiento <- setdiff(
+  seq_len(nrow(diadas_mesa)),
+  indices_prueba
+)
+
+# Conservar las respuestas para la evaluación posterior
+prueba <- diadas_mesa[indices_prueba, , drop = FALSE]
+
+# Verificar tamaños y proporciones de conexiones
+data.frame(
+  Conjunto = c("Entrenamiento", "Evaluación"),
+  N_diadas = c(length(indices_entrenamiento), length(indices_prueba)),
+  Proporcion_conexiones = c(
+    mean(diadas_mesa$y[indices_entrenamiento]),
+    mean(prueba$y)
+  )
+)
+
+
+# ============================================================
+# 2. Construir la red de entrenamiento
+# ============================================================
+
+# Crear una copia de la red original
+mesa_entrenamiento <- mesa
+
+# Marcar como desconocidas las díadas de evaluación
+for (k in indices_prueba) {
+
+  i <- pares_mesa[k, 1]
+  j <- pares_mesa[k, 2]
+
+  mesa_entrenamiento[i, j] <- NA
+}
+
+# Verificar el número de díadas no observadas
+network::network.naedgecount(mesa_entrenamiento)
+
+stopifnot(
+  network::network.naedgecount(mesa_entrenamiento) ==
+    length(indices_prueba)
+)
+
+
+# ============================================================
+# 3. Ajustar el ERGM con las díadas de entrenamiento
+# ============================================================
+
+modelo_predictivo <- ergm::ergm(
+  mesa_entrenamiento ~
+    edges +
+    nodematch("Grade") +
+    nodematch("Race")
+)
+
+# Examinar los resultados de la estimación
+summary(modelo_predictivo)
+
+# Extraer los coeficientes estimados
+beta_predictivo <- coef(modelo_predictivo)
+
+beta_predictivo
+
+
+# ============================================================
+# 4. Predecir las conexiones de las díadas de evaluación
+# ============================================================
+
+# Calcular las probabilidades utilizando el ERGM estimado
+predicciones <- plogis(
+  beta_predictivo["edges"] +
+    beta_predictivo["nodematch.Grade"] * prueba$mismo_grado +
+    beta_predictivo["nodematch.Race"] * prueba$misma_raza
+)
+
+# Comparar las respuestas observadas y las predicciones
+comparacion_predictiva <- data.frame(
+  Observado = prueba$y,
+  Probabilidad_predicha = as.numeric(predicciones)
+)
+
+# Mostrar las primeras observaciones
+head(comparacion_predictiva)
+
+# Resumir las probabilidades predichas
+summary(comparacion_predictiva$Probabilidad_predicha)
+```
+
+## Brier score, log-loss y curva ROC
+
+Para evaluar la **capacidad predictiva del ERGM**, se comparan las probabilidades estimadas con las conexiones observadas en las díadas reservadas para evaluación.
+
+Se consideran tres métricas. El **Brier score** y la **log-loss** evalúan la calidad de las probabilidades predichas, mientras que el **AUC** mide la capacidad del modelo para discriminar entre díadas conectadas y no conectadas.
+
+El Brier score se define como
+
+$$
+\operatorname{Brier}
+=
+\frac{1}{m}\sum_{r=1}^m
+(y_r-\widehat p_r)^2,
+$$
+
+mientras que la log-loss está dada por
+
+$$
+\operatorname{LogLoss}
+=
+-\frac{1}{m}\sum_{r=1}^m
+\left[
+y_r\log\widehat p_r+
+(1-y_r)\log(1-\widehat p_r)
+\right],
+$$
+
+donde $m$ representa el número de díadas de evaluación, $y_r$ indica la presencia de una conexión y $\widehat p_r$ es su probabilidad estimada.
+
+**Valores menores del Brier score y de la log-loss indican mejores predicciones**. Por su parte, el AUC toma valores entre 0 y 1. Un valor de 0.5 corresponde a una discriminación equivalente al azar y valores próximos a 1 indican una mayor capacidad discriminativa.
+
+### Comparación de los modelos
+
+Se compara el ERGM con homofilia por grado escolar y raza frente a un **ERGM Bernoulli**, que supone una misma probabilidad de conexión para todas las díadas.
+
+Ambos modelos se estiman utilizando exclusivamente las díadas de entrenamiento.
+
+```{r validacion-metricas}
+# Ajustar el ERGM Bernoulli de referencia
+modelo_referencia <- ergm::ergm(mesa_entrenamiento ~ edges)
+
+# Probabilidades del ERGM Bernoulli
+prediccion_referencia <- rep(
+  plogis(coef(modelo_referencia)["edges"]),
+  nrow(prueba)
+)
+
+# Probabilidades del ERGM con homofilia
+# Evitar logaritmos de cero por precisión numérica
+predicciones <- pmin(pmax(as.numeric(predicciones), 1e-10), 1 - 1e-10)
+
+prediccion_referencia <- pmin(
+  pmax(as.numeric(prediccion_referencia), 1e-10),
+  1 - 1e-10
+)
+
+# Función para calcular el Brier score
+brier <- function(y, p) {
+  mean((y - p)^2)
+}
+
+# Función para calcular la log-loss
+log_loss <- function(y, p) {
+  -mean(y * log(p) + (1 - y) * log1p(-p))
+}
+
+# Función para calcular el AUC mediante rangos
+auc_rangos <- function(y, p) {
+
+  n_pos <- sum(y == 1)
+  n_neg <- sum(y == 0)
+
+  if (n_pos == 0 || n_neg == 0) {
+    return(NA_real_)
+  }
+
+  rangos <- rank(p, ties.method = "average")
+
+  (sum(rangos[y == 1]) - n_pos * (n_pos + 1) / 2) /
+    (n_pos * n_neg)
+}
+
+# Calcular las métricas en las díadas de evaluación
+metricas <- data.frame(
+  Modelo = c("ERGM Bernoulli", "ERGM con homofilia"),
+  Brier = c(
+    brier(prueba$y, prediccion_referencia),
+    brier(prueba$y, predicciones)
+  ),
+  LogLoss = c(
+    log_loss(prueba$y, prediccion_referencia),
+    log_loss(prueba$y, predicciones)
+  ),
+  AUC = c(
+    auc_rangos(prueba$y, prediccion_referencia),
+    auc_rangos(prueba$y, predicciones)
+  )
+)
+
+# Presentar los resultados
+knitr::kable(
+  metricas,
+  digits = 4,
+  caption = "Desempeño predictivo de los ERGM en las díadas de evaluación"
+)
+```
+
+El ERGM Bernoulli proporciona una **referencia sin información de los atributos nodales**, mientras que el modelo con homofilia permite evaluar si las coincidencias en grado escolar y raza mejoran las predicciones.
+
+### Curva ROC
+
+La **curva ROC** representa la tasa de verdaderos positivos frente a la tasa de falsos positivos al variar el umbral utilizado para clasificar las díadas como conectadas.
+
+La tasa de verdaderos positivos corresponde a la proporción de conexiones correctamente identificadas, mientras que la tasa de falsos positivos representa la proporción de díadas no conectadas clasificadas incorrectamente como conexiones.
+
+```{r validacion-roc, fig.width=7, fig.height=5, fig.align='center'}
+# Construir la curva ROC del ERGM con homofilia
+umbrales <- c(
+  Inf,
+  sort(unique(predicciones), decreasing = TRUE)
+)
+
+# Tasa de verdaderos positivos
+tpr <- vapply(umbrales, function(u) {
+  mean(predicciones[prueba$y == 1] >= u)
+}, numeric(1))
+
+# Tasa de falsos positivos
+fpr <- vapply(umbrales, function(u) {
+  mean(predicciones[prueba$y == 0] >= u)
+}, numeric(1))
+
+# Graficar la curva ROC
+plot(
+  fpr, tpr,
+  type = "l",
+  lwd = 2,
+  col = "steelblue",
+  xlim = c(0, 1),
+  ylim = c(0, 1),
+  xlab = "Tasa de falsos positivos",
+  ylab = "Tasa de verdaderos positivos",
+  main = "Curva ROC del ERGM"
+)
+
+# Línea de referencia correspondiente a AUC = 0.5
+abline(a = 0, b = 1, lty = 2, col = "grey60")
+
+# Identificar el AUC del modelo
+legend(
+  "bottomright",
+  legend = c(
+    sprintf("ERGM con homofilia (AUC = %.3f)", metricas$AUC[2]),
+    "ERGM Bernoulli (AUC = 0.5)"
+  ),
+  col = c("steelblue", "grey60"),
+  lty = c(1, 2),
+  lwd = c(2, 1),
+  bty = "n"
+)
+```
+
+### Interpretación y limitaciones
+
+Un modelo con **menor Brier score y log-loss** presenta mejores predicciones probabilísticas. Un **AUC mayor** indica una mejor capacidad para distinguir entre conexiones presentes y ausentes, aunque no garantiza que las probabilidades estén bien calibradas.
+
+En particular, deben considerarse las siguientes limitaciones.
+
+- **Independencia díadica.** La validación se realiza con un ERGM que supone independencia condicional entre díadas, dados los atributos nodales. No puede extenderse directamente a modelos con términos de dependencia estructural como `triangle` o `gwesp`.
+- **Generalización.** Las díadas de evaluación involucran vértices presentes en el entrenamiento. Por lo tanto, el procedimiento evalúa la predicción de nuevas relaciones entre los mismos vértices, no la transferencia a vértices desconocidos.
+- **Baja densidad.** Una red dispersa puede producir predicciones con un AUC razonable, pero con probabilidades poco calibradas. Por esta razón, se reportan conjuntamente el Brier score, la log-loss y el AUC.
+- **Incertidumbre.** Las métricas corresponden a una única partición de entrenamiento y evaluación. Para valorar su estabilidad, puede repetirse la partición y resumirse la variabilidad de los resultados.
+
+En consecuencia, esta validación permite examinar si la incorporación de **homofilia por grado escolar y raza** mejora la capacidad predictiva del ERGM frente a un modelo Bernoulli, sin utilizar las respuestas de evaluación durante la estimación.
+
+
+
+
+# Referencias {-}
+
+- Frank, O. y Strauss, D. (1986). *Markov graphs*. Journal of the American Statistical Association, 81, 832–842. https://doi.org/10.1080/01621459.1986.10478342
+- Wasserman, S. y Pattison, P. (1996). *Logit models and logistic regressions for social networks: I. An introduction to Markov graphs and $p^*$*. Psychometrika, 61, 401–425. https://doi.org/10.1007/BF02294547
+- Geyer, C. J. y Thompson, E. A. (1992). *Constrained Monte Carlo maximum likelihood for dependent data*. Journal of the Royal Statistical Society: Series B, 54, 657–683.
+- Hunter, D. R. y Handcock, M. S. (2006). *Inference in curved exponential family models for networks*. Journal of Computational and Graphical Statistics, 15, 565–583. https://doi.org/10.1198/106186006X133069
+- Hunter, D. R., Goodreau, S. M. y Handcock, M. S. (2008). *Goodness of fit of social network models*. Journal of the American Statistical Association, 103, 248–258.
+- Goodreau, S. M., Kitts, J. A. y Morris, M. (2009). *Birds of a feather, or friend of a friend? Using exponential random graph models to investigate adolescent social networks*. Demography, 46, 103–125.
+- Krivitsky, P. N., Handcock, M. S. y Morris, M. (2011). *Adjusting for network size and composition effects in exponential-family random graph models*. Statistical Methodology, 8, 319–339.
+- Statnet Development Team (2026). *Exponential Random Graph Models (ERGMs) using statnet*. https://statnet.org/workshop-ergm/ergm_tutorial.html
+- Documentación de `ergm`, incluidas las ayudas `?ergm`, `?gof`, `?mcmc.diagnostics` y `?ergmTerm`. https://cran.r-project.org/package=ergm
+
