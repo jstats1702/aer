@@ -1,0 +1,185 @@
+---
+title: "Taller #3"
+subtitle: "Cooperación entre entidades públicas colombianas"
+author: "Análisis Estadístico de Redes"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    code_folding: hide
+    df_print: paged
+    self_contained: true
+---
+
+<style>
+body {
+  font-size: 16px;
+  line-height: 1.62;
+}
+.main-container {
+  max-width: 1120px !important;
+}
+h1, h2, h3 {
+  font-weight: 650;
+  margin-top: 1.35em;
+}
+h1 {
+  border-bottom: 2px solid #e7e7e7;
+  padding-bottom: 0.22em;
+}
+h2 {
+  border-bottom: 1px solid #eeeeee;
+  padding-bottom: 0.16em;
+}
+blockquote {
+  border-left: 4px solid #4a6fa5;
+  background: #f7f9fc;
+  padding: 0.8em 1.1em;
+  color: #30343b;
+}
+.callout {
+  border: 1px solid #d9e2ef;
+  border-left: 5px solid #4a6fa5;
+  border-radius: 5px;
+  background: #f8fafc;
+  padding: 0.9em 1.1em;
+  margin: 1.1em 0;
+}
+.callout-warning {
+  border-left-color: #b36b00;
+  background: #fffaf2;
+}
+.callout-extra {
+  border-left-color: #5c6f68;
+  background: #f7faf8;
+}
+table {
+  width: 100%;
+}
+code {
+  font-size: 0.92em;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.align = "center", fig.width = 9, fig.height = 6,
+  out.width = "100%"
+)
+options(width = 100, digits = 3, scipen = 4)
+```
+
+
+# Objetivo
+
+Examinar la **cooperación entre entidades públicas colombianas** a partir de convenios interadministrativos registrados en SECOP. Compare modelos de Erdős–Rényi, Bernoulli con covariables, bloques estocásticos (SBM), espacio latente de distancia y grafos aleatorios exponenciales (ERGM) para estudiar el papel de los atributos institucionales y territoriales, los grupos latentes y los patrones estructurales de cooperación.
+
+La pregunta central es:
+
+> **¿Qué características se asocian con la celebración de convenios entre entidades públicas, y qué modelos reproducen y predicen mejor la estructura observada de relaciones?**
+
+# Datos
+
+Utilice el conjunto oficial [**SECOP – Convenios Interadministrativos**](https://www.datos.gov.co/Estad-sticas-Nacionales/SECOP-Convenios-Interadministrativos/s484-c9k3), publicado por la Agencia Nacional de Contratación Pública – Colombia Compra Eficiente. Este reúne registros de SECOP I y II desde 2019. Consulte el diccionario de datos, conserve la descarga original y documente la fecha de extracción.
+
+- **Convenios interadministrativos:** <https://www.datos.gov.co/Estad-sticas-Nacionales/SECOP-Convenios-Interadministrativos/s484-c9k3>.
+- **Consulta mediante API:** <https://www.datos.gov.co/resource/s484-c9k3.json>.
+- **Ventana:** convenios firmados entre el 1 de enero de 2023 y el 31 de diciembre de 2025.
+- **Unidad original:** registro de convenio o contrato, con sus participantes identificables; la red de entidades se obtiene agregando las relaciones entre parejas.
+
+| Información | Utilidad |
+|:--|:--|
+| Identificador del contrato, proceso y fuente | Identificación, conciliación y deduplicación de registros |
+| Fecha de firma y estado del contrato | Selección del periodo y verificación de la celebración del convenio |
+| Nombre de la entidad y contratista | Identificación de las entidades participantes |
+| Tipo e identificación del contratista | Comprobación de la naturaleza pública de la contraparte |
+| Orden, departamento y municipio | Caracterización de la entidad contratante; no necesariamente de la contraparte |
+| Objeto contractual y enlace al proceso | Revisión de casos ambiguos y análisis de sensibilidad |
+
+<div class="callout callout-warning"><strong>Importante.</strong> La presencia de un registro en este conjunto no garantiza que ambos participantes sean entidades públicas ni que el convenio se haya firmado efectivamente. Verifique su naturaleza jurídica y estado, especialmente cuando los campos estén incompletos o indiquen «No Definido». Distinga la entidad que registra el convenio de su contraparte y no atribuya automáticamente a ambas los datos territoriales del registro. Excluya o audite los casos con consorcios, participantes privados o múltiples partes no identificables. Los convenios registrados no prueban por sí mismos la ejecución efectiva de actividades conjuntas.</div>
+
+## Selección y construcción de la red
+
+Seleccione aproximadamente 30–50 entidades públicas mediante un criterio externo a los convenios observados en la ventana de análisis, como su pertenencia a un sector o territorio, o una selección reproducible por nivel administrativo. Puede utilizar información de 2022 para definir el universo antes de examinar los vínculos de 2023–2025. Verifique que la red resultante tenga una densidad y conectividad adecuadas para el ajuste de los modelos, considerando el número de vértices aislados y el tamaño de la componente principal. Justifique el criterio de selección.
+
+Construya una red no dirigida, binaria y simple, donde dos entidades estén conectadas si figuran como participantes de al menos un convenio válido y firmado durante 2023–2025. Incluya únicamente relaciones con dos entidades públicas identificadas de manera inequívoca. Conserve también el número de convenios compartidos por pareja y elimine los registros duplicados de una misma iniciativa, sin confundir convenios distintos entre las mismas entidades.
+
+Compruebe los identificadores y posibles variantes de nombres de ambas partes. Revise los convenios con varios participantes y documente si se excluyen o cómo se identifican las relaciones correspondientes. Evalúe la sensibilidad de los resultados a un criterio alternativo de inclusión de convenios y registre las exclusiones. Fije las decisiones de selección antes de realizar la evaluación predictiva.
+
+Prepare dos archivos locales con nombres estandarizados y un diccionario de variables:
+
+1. Por ejemplo, `datos/convenios_2023_2025.csv`, con las columnas **creadas durante la limpieza** `convenio_id`, `fecha_firma`, `entidad_a`, `entidad_b`, `estado` y `fuente`.
+2. Por ejemplo, `datos/entidades_2023_2025.csv`, con `id`, `nombre`, `orden`, `departamento`, `municipio` y `sector`, cuando estos atributos estén verificados para cada entidad.
+
+Los nombres anteriores son un esquema de trabajo, no una afirmación sobre los nombres exactos de columnas descargadas del portal.
+
+<div class="callout"><strong>Nota.</strong> Conserve los registros originales, las equivalencias de nombres e identificadores y los criterios de validación de las contrapartes. Registre el número de convenios encontrados y excluidos, los motivos de exclusión y los cambios en el número de enlaces. La red representa convenios registrados dentro del universo seleccionado y no necesariamente toda la cooperación institucional existente.</div>
+
+# Actividades
+
+## Caracterización preliminar de la red
+
+Represente la red con vértices identificados y coloreados según uno de sus atributos observados. Describa el número de vértices y enlaces, la densidad, el número y tamaño de las componentes, la distribución de grados, la transitividad global y la distribución de vecinos comunes. Identifique patrones de homofilia y posibles estructuras núcleo–periferia o comunidades. Para los caminos geodésicos, especifique el tratamiento de las parejas no conectadas.
+
+Construya una tabla diádica con una fila por pareja no ordenada $i<j$, respuesta $y_{ij}$ y covariables exógenas $\boldsymbol{x}_{ij}$. Considere atributos verificables de ambas entidades, como coincidencia de orden administrativo, departamento, municipio o sector. Distinga explícitamente los atributos observados antes de la red de las estadísticas calculadas a partir de ella. No utilice grado, vecinos comunes o comunidades estimadas sobre la red completa como predictores del conjunto de prueba.
+
+## Modelos de referencia y covariables
+
+Ajuste y compare los siguientes modelos estadísticos para redes, justificando las decisiones metodológicas y evaluando los diagnósticos correspondientes.
+
+1. **Modelo Bernoulli homogéneo.** Estime sus parámetros mediante máxima verosimilitud.
+2. **Modelo Bernoulli con covariables.** Considere diferentes especificaciones con covariables exógenas y evalúe su contribución al modelo.
+3. **Modelo de bloques estocásticos.** Determine el número de bloques mediante criterios apropiados e interprete la estructura identificada.
+4. **Modelo de espacio latente de distancia.** Seleccione la dimensión latente y evalúe la inclusión de covariables. Examine la convergencia del procedimiento de estimación.
+5. **Modelo de grafos aleatorios exponenciales.** Considere diferentes especificaciones con términos exógenos y endógenos. Evalúe los diagnósticos del ajuste y posibles problemas de degeneración.
+
+Utilice el mismo conjunto de díadas de entrenamiento para todos los modelos. Justifique las especificaciones seleccionadas, compare sus resultados e interprete las diferencias entre los mecanismos de formación de relaciones que representan.
+
+## Bondad de ajuste mediante simulación
+
+A partir de cada modelo ajustado a la red completa, genere 1 000 redes bajo los parámetros estimados o la distribución predictiva posterior cuando corresponda. Mantenga fijo el conjunto de vértices y los atributos exógenos. Compare las distribuciones simuladas con la red observada en términos de densidad, desviación estándar del grado, transitividad global, asortatividad del grado, tamaño de la componente mayor y una característica adicional relevante para el caso.
+
+Presente gráficas de las estadísticas observadas y los intervalos predictivos o de simulación. Distinga una simulación *plug-in* de la distribución predictiva posterior bayesiana. Examine si un modelo reproduce la estructura observada aun cuando ajuste bien la densidad.
+
+## Evaluación predictiva de enlaces no observados
+
+Fije una semilla y divida aleatoriamente las díadas no dirigidas ($i<j$) en conjuntos de entrenamiento (80 %) y prueba (20 %), conservando aproximadamente la proporción original de enlaces y ausencias. Reporte estas proporciones en ambos conjuntos y evite el balanceo artificial de enlaces y ausencias al evaluar la capacidad predictiva.
+
+Las díadas reservadas son desconocidas y deben registrarse como `NA` en la matriz de entrenamiento, simétricamente. No deben confundirse con ausencias de conexión. Vuelva a estimar todos los parámetros, grupos latentes y posiciones latentes utilizando únicamente los datos de entrenamiento. Si se seleccionan hiperparámetros, hágalo dentro del entrenamiento.
+
+Para cada díada reservada obtenga $\widehat p_{ij}$ y evalúe Brier score, log-loss, AUC-ROC y AUC-PR. Incluya la prevalencia de enlaces como referencia para AUC-PR y la predicción constante basada en la densidad de entrenamiento como modelo de referencia. Use las mismas díadas para todas las comparaciones.
+
+La evaluación predictiva corresponde a la reconstrucción de relaciones no observadas dentro del periodo seleccionado y no a la predicción de convenios futuros. Verifique que los procedimientos de estimación utilizados admitan díadas no observadas y que las probabilidades predictivas se calculen sin utilizar información del conjunto de prueba.
+
+**Precaución con los ERGM estructurales.** Con `gwesp` o `gwdegree`, la probabilidad de una arista depende de la configuración de otras aristas. Para predecir vínculos no observados es necesario estimar probabilidades condicionadas en la red parcialmente observada, integrando las díadas desconocidas mediante un método válido de simulación o imputación. No compute vecinos comunes usando la red original completa ni reemplace silenciosamente los enlaces de prueba por ceros. La logística de estadísticas de cambio del ERGM es una probabilidad condicional en una configuración y no equivale, en general, a la probabilidad predictiva buscada. Si no logra implementar una predicción comparable para el ERGM dependiente, presente su evaluación predictiva por separado y explique esta limitación.
+
+## Sensibilidad y robustez
+
+Repita los análisis principales con otro criterio razonable de inclusión de convenios y una selección alternativa de entidades o periodo. Mantenga fija cada decisión dentro de la comparación e informe su impacto sobre densidad, centralización, agrupamientos, bondad de ajuste y clasificación predictiva. No elija criterios para maximizar el desempeño en el conjunto de prueba.
+
+## Cooperación entre niveles administrativos y estructura institucional
+
+Investigue los patrones de cooperación entre entidades del mismo orden administrativo y de órdenes diferentes. Compare las densidades de enlaces, calculadas respecto al número de díadas posibles en cada categoría, con las distribuciones simuladas por el SBM y el ERGM con `nodematch("orden")`. Evalúe la sensibilidad de los resultados a la definición de los convenios incluidos y discuta por qué las relaciones registradas no implican necesariamente coordinación efectiva ni colaboración institucional en un sentido más amplio.
+
+# Discusión
+
+Responda de manera crítica las siguientes preguntas:
+
+- ¿Se observa mayor cooperación registrada entre entidades del mismo orden, departamento o sector, una vez considerados otros atributos?
+- ¿Los bloques del SBM coinciden con categorías administrativas o describen patrones de relación que atraviesan esas categorías?
+- ¿Qué aporta el modelo de espacio latente a la comprensión de las relaciones entre entidades?
+- ¿Qué tan bien reproducen los modelos los patrones de grados, transitividad y conectividad de la red observada?
+- ¿Qué modelo reproduce mejor las características estructurales de la red y cuál presenta mayor capacidad predictiva? ¿Coinciden los resultados de ambas evaluaciones?
+- ¿Qué ventajas y limitaciones presentan los modelos considerados para estudiar la cooperación entre entidades públicas?
+
+# Producto final
+
+Entregue un documento reproducible en R Markdown y su correspondiente HTML, junto con las bases de datos depuradas de convenios, entidades y relaciones diádicas. Incluya la visualización y descripción de la red, los procedimientos de depuración, las estimaciones y diagnósticos de los modelos, la evaluación de bondad de ajuste mediante redes simuladas, la comparación predictiva y una discusión crítica de los resultados.
+
+Documente las semillas, versiones de los paquetes y tiempos de cómputo. Limite las conclusiones a los convenios documentados durante el periodo seleccionado, evitando interpretaciones causales o afirmaciones sobre relaciones de cooperación no observadas.

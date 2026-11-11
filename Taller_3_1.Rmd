@@ -1,0 +1,185 @@
+---
+title: "Taller #3"
+subtitle: "Colaboración legislativa en Colombia"
+author: "Análisis Estadístico de Redes"
+output:
+  html_document:
+    theme: flatly
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    code_folding: hide
+    df_print: paged
+    self_contained: true
+---
+
+<style>
+body {
+  font-size: 16px;
+  line-height: 1.62;
+}
+.main-container {
+  max-width: 1120px !important;
+}
+h1, h2, h3 {
+  font-weight: 650;
+  margin-top: 1.35em;
+}
+h1 {
+  border-bottom: 2px solid #e7e7e7;
+  padding-bottom: 0.22em;
+}
+h2 {
+  border-bottom: 1px solid #eeeeee;
+  padding-bottom: 0.16em;
+}
+blockquote {
+  border-left: 4px solid #4a6fa5;
+  background: #f7f9fc;
+  padding: 0.8em 1.1em;
+  color: #30343b;
+}
+.callout {
+  border: 1px solid #d9e2ef;
+  border-left: 5px solid #4a6fa5;
+  border-radius: 5px;
+  background: #f8fafc;
+  padding: 0.9em 1.1em;
+  margin: 1.1em 0;
+}
+.callout-warning {
+  border-left-color: #b36b00;
+  background: #fffaf2;
+}
+.callout-extra {
+  border-left-color: #5c6f68;
+  background: #f7faf8;
+}
+table {
+  width: 100%;
+}
+code {
+  font-size: 0.92em;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.align = "center", fig.width = 9, fig.height = 6,
+  out.width = "100%"
+)
+options(width = 100, digits = 3, scipen = 4)
+```
+
+
+# Objetivo
+
+Examinar la **colaboración legislativa en Colombia** a partir de proyectos de ley presentados conjuntamente por representantes a la Cámara. Compare modelos de Erdős–Rényi, Bernoulli con covariables, bloques estocásticos (SBM), espacio latente de distancia y grafos aleatorios exponenciales (ERGM) para estudiar el papel de las características políticas observadas, los grupos latentes y los patrones estructurales de coautoría.
+
+La pregunta central es:
+
+> **¿Qué explica la coautoría de proyectos de ley entre representantes a la Cámara, y qué modelos reproducen y predicen mejor la estructura observada de colaboración?**
+
+# Datos
+
+Utilice el listado oficial de la [**Cámara de Representantes – Proyectos de ley**](https://www.camara.gov.co/proyectos-de-ley/), que permite consultar proyectos, autores, tipo, comisión y legislatura, complementado con el [**directorio de representantes**](https://www.camara.gov.co/) para registrar partido, circunscripción o departamento y comisiones. La herramienta de consulta y descarga puede cambiar, por lo que debe conservar el archivo descargado y documentar la extracción.
+
+- **Proyectos de ley y autores:** <https://www.camara.gov.co/proyectos-de-ley/>.
+- **Consulta legislativa:** <https://www.camara.gov.co/buscador-legislativo/>.
+- **Ventana:** legislatura 2023–2024, dentro del periodo constitucional 2022–2026.
+- **Unidad original:** proyecto de ley con su conjunto de autores; la red de congresistas se obtiene por proyección de esas listas.
+
+| Información | Utilidad |
+|:--|:--|
+| Número del proyecto y legislatura | Identificación y ventana temporal |
+| Autores del proyecto | Construcción de las coautorías |
+| Tipo, origen y comisión | Control de comparabilidad y análisis de sensibilidad |
+| Nombre de representante / identificador | Conciliación de nombres y construcción de los vértices |
+| Partido y departamento | Covariables exógenas nodales o diádicas |
+| Comisión de pertenencia | Posible covariable adicional, si se verifican composición y fechas |
+
+<div class="callout callout-warning"><strong>Importante.</strong> Existen proyectos con participación de ministros, senadores u otras personas, así como listados con expresiones como «y otras firmas». Restrinja los vértices a representantes del universo seleccionado, verifique sus nombres y excluya o audite los proyectos cuyos autores no estén completos. No interprete las coautorías como votos, afinidad ideológica, apoyo final al proyecto ni causalidad política. Los partidos y las comisiones deben corresponder al momento de la actividad analizada.</div>
+
+## Selección y construcción de la red
+
+Seleccione aproximadamente 30–50 representantes mediante un criterio externo a la coautoría observada, como su pertenencia a determinadas comisiones o una selección reproducible por partido y territorio. Verifique que la red resultante tenga una densidad y conectividad adecuadas para el ajuste de los modelos, considerando el número de vértices aislados y el tamaño de la componente principal. Justifique el criterio de selección.
+
+Construya una red no dirigida, binaria y simple, donde dos representantes estén conectados si figuran como coautores de al menos un proyecto de ley durante la legislatura 2023–2024. Conserve también el número de proyectos compartidos por cada pareja y elimine los registros duplicados de una misma iniciativa.
+
+Para evitar que los proyectos con numerosos firmantes dominen la estructura, incluya únicamente aquellos con 2–10 autores identificados, aplicando este filtro antes de restringirlos al universo seleccionado. Conserve los proyectos que incluyan al menos dos representantes de dicho universo. Tenga en cuenta que un proyecto con \(k\) representantes seleccionados induce hasta \(\binom{k}{2}\) nuevas aristas en la red agregada. Evalúe la sensibilidad de los resultados utilizando un límite alternativo de firmantes y documente las exclusiones. Fije las decisiones de selección antes de realizar la evaluación predictiva.
+
+Prepare dos archivos locales con nombres estandarizados y un diccionario de variables:
+
+1. Por ejemplo, `datos/proyectos_2023_2024.csv`, con las columnas **creadas durante la limpieza** `proyecto_id`, `legislatura`, `tipo`, `comision` y `autores` (lista de nombres separados por un delimitador inequívoco).
+2. Por ejemplo, `datos/representantes_2023_2024.csv`, con `id`, `nombre`, `partido`, `departamento` y `comision` cuando exista una adscripción verificable.
+
+Los nombres anteriores son un esquema de trabajo, no una afirmación sobre los nombres exactos de columnas descargadas del portal.
+
+<div class="callout"><strong>Nota.</strong> Registre proyectos encontrados y excluidos, motivos de exclusión, autores institucionales o externos y cambios de nombres. Compare el número de aristas y triángulos antes y después del límite de coautores. La red representa coautoría registrada en una legislatura y no necesariamente cooperación política general.</div>
+
+# Actividades
+
+## Caracterización preliminar de la red
+
+Represente la red con vértices identificados y coloreados según uno de sus atributos observados. Describa el número de vértices y enlaces, la densidad, el número y tamaño de las componentes, la distribución de grados, la transitividad global y la distribución de vecinos comunes. Identifique patrones de homofilia y posibles estructuras núcleo–periferia o comunidades. Para los caminos geodésicos, especifique el tratamiento de las parejas no conectadas.
+
+Construya una tabla diádica con una fila por pareja no ordenada $i<j$, respuesta $y_{ij}$ y covariables exógenas $\boldsymbol{x}_{ij}$. Distinga explícitamente los atributos observados antes de la red de las estadísticas calculadas a partir de la red. No utilice grado, vecinos comunes o comunidades estimadas sobre la red completa como predictores del conjunto de prueba.
+
+## Modelos de referencia y covariables
+
+Ajuste y compare los siguientes modelos estadísticos para redes, justificando las decisiones metodológicas y evaluando los diagnósticos correspondientes.
+
+1. **Modelo Bernoulli homogéneo.** Estime sus parámetros mediante máxima verosimilitud.
+2. **Modelo Bernoulli con covariables.** Considere diferentes especificaciones con covariables exógenas y evalúe su contribución al modelo.
+3. **Modelo de bloques estocásticos.** Determine el número de bloques mediante criterios apropiados e interprete la estructura identificada.
+4. **Modelo de espacio latente de distancia.** Seleccione la dimensión latente y evalúe la inclusión de covariables. Examine la convergencia del procedimiento de estimación.
+5. **Modelo de grafos aleatorios exponenciales.** Considere diferentes especificaciones con términos exógenos y endógenos. Evalúe los diagnósticos del ajuste y posibles problemas de degeneración.
+
+Utilice el mismo conjunto de díadas de entrenamiento para todos los modelos. Justifique las especificaciones seleccionadas, compare sus resultados e interprete las diferencias entre los mecanismos de formación de relaciones que representan.
+
+## Bondad de ajuste mediante simulación
+
+A partir de cada modelo ajustado a la red completa, genere 1 000 redes bajo los parámetros estimados o la distribución predictiva posterior cuando corresponda. Mantenga fijo el conjunto de vértices y los atributos exógenos. Compare las distribuciones simuladas con la red observada en términos de densidad, desviación estándar del grado, transitividad global, asortatividad del grado, tamaño de la componente mayor y una característica adicional relevante para el caso.
+
+Presente gráficas de las estadísticas observadas y los intervalos predictivos o de simulación. Distinga una simulación *plug-in* de la distribución predictiva posterior bayesiana. Examine si un modelo reproduce la estructura observada aun cuando ajuste bien la densidad.
+
+## Evaluación predictiva de enlaces no observados
+
+Fije una semilla y divida aleatoriamente las díadas no dirigidas ($i<j$) en conjuntos de entrenamiento (80 %) y prueba (20 %), conservando aproximadamente la proporción original de enlaces y ausencias. Reporte estas proporciones en ambos conjuntos y evite el balanceo artificial de enlaces y ausencias al evaluar la capacidad predictiva.
+
+Las díadas reservadas son desconocidas y deben registrarse como `NA` en la matriz de entrenamiento, simétricamente. No deben confundirse con ausencias de conexión. Vuelva a estimar todos los parámetros, grupos latentes y posiciones latentes utilizando únicamente los datos de entrenamiento. Si se seleccionan hiperparámetros, hágalo dentro del entrenamiento.
+
+Para cada díada reservada obtenga $\widehat p_{ij}$ y evalúe Brier score, log-loss, AUC-ROC y AUC-PR. Incluya la prevalencia de enlaces como referencia para AUC-PR y la predicción constante basada en la densidad de entrenamiento como modelo de referencia. Use las mismas díadas para todas las comparaciones.
+
+La evaluación predictiva corresponde a la reconstrucción de relaciones no observadas dentro de la legislatura seleccionada y no a la predicción de colaboraciones futuras. Verifique que los procedimientos de estimación utilizados admitan díadas no observadas y que las probabilidades predictivas se calculen sin utilizar información del conjunto de prueba.
+
+**Precaución con los ERGM estructurales.** Con `gwesp` o `gwdegree`, la probabilidad de una arista depende de la configuración de otras aristas. Para predecir vínculos no observados es necesario estimar probabilidades condicionadas en la red parcialmente observada, integrando las díadas desconocidas mediante un método válido de simulación o imputación. No compute vecinos comunes usando la red original completa ni reemplace silenciosamente los enlaces de prueba por ceros. La logística de estadísticas de cambio del ERGM es una probabilidad condicional en una configuración y no equivale, en general, a la probabilidad predictiva buscada. Si no logra implementar una predicción comparable para el ERGM dependiente, presente su evaluación predictiva por separado y explique esta limitación.
+
+## Sensibilidad y robustez
+
+Repita los análisis principales con otra definición razonable de la arista y una selección alternativa de vértices o periodo. Mantenga fija la decisión dentro de cada comparación e informe el impacto sobre densidad, centralización, agrupamientos, bondad de ajuste y clasificación predictiva. No elija umbrales para maximizar el desempeño en el conjunto de prueba.
+
+## Coautoría interpartidista y estructura de colaboración legislativa
+
+Investigue los patrones de coautoría dentro de los partidos y entre ellos. Compare las densidades de enlaces, calculadas respecto al número de díadas posibles en cada categoría, con las distribuciones simuladas por el SBM y el ERGM con `nodematch("partido")`. Evalúe la sensibilidad de los resultados a la inclusión de proyectos con múltiples firmantes y discuta por qué la frecuencia de coautoría no implica necesariamente acuerdos programáticos ni afinidad política.
+
+# Discusión
+
+Responda de manera crítica las siguientes preguntas:
+
+- ¿Se observa mayor coautoría entre representantes del mismo partido, departamento o comisión, una vez controlados otros atributos?
+- ¿Los bloques del SBM coinciden con los partidos políticos o describen patrones de colaboración que atraviesan estas categorías?
+- ¿Qué aporta el modelo de espacio latente a la comprensión de las relaciones entre representantes?
+- ¿En qué medida los triángulos y la transitividad observados pueden explicarse por proyectos firmados por múltiples representantes?
+- ¿Qué modelo reproduce mejor las características estructurales de la red y cuál presenta mayor capacidad predictiva? ¿Coinciden los resultados de ambas evaluaciones?
+- ¿Qué ventajas y limitaciones presentan los modelos considerados para estudiar la colaboración legislativa?
+
+# Producto final
+
+Entregue un documento reproducible en R Markdown y su correspondiente HTML, junto con las bases de datos depuradas de proyectos, representantes y coautorías diádicas. Incluya la visualización y descripción de la red, los procedimientos de depuración, las estimaciones y diagnósticos de los modelos, la evaluación de bondad de ajuste mediante redes simuladas, la comparación predictiva y una discusión crítica de los resultados.
+
+Documente las semillas, versiones de los paquetes y tiempos de cómputo. Limite las conclusiones a las coautorías documentadas durante la legislatura seleccionada, evitando interpretaciones causales o afirmaciones sobre preferencias y motivaciones políticas no observadas.
